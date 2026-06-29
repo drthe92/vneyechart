@@ -417,6 +417,29 @@ const pelliRobson = {
 
     if (index < 0) index = 0;
     if (index > 3) index = 3;
+    
+    const prevBtn = document.getElementById('pelliPrev');
+    const nextBtn = document.getElementById('pelliNext');
+    
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => {
+        this.render(Math.max(0, index - 1));
+      });
+      prevBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        this.render(Math.max(0, index - 1));
+      });
+    }
+    
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        this.render(Math.min(3, index + 1));
+      });
+      nextBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        this.render(Math.min(3, index + 1));
+      });
+    }
 
     this.destroy();
 

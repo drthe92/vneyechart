@@ -101,9 +101,11 @@ const redDesatModule = {
 
           <div class="red-desat-slider-row">
             <span class="red-desat-label">Độ bão hoà:</span>
+            <button class="red-desat-btn-up" id="red-desat-btn-up">▲</button>
             <input type="range" id="red-desat-slider"
                    min="${MIN_SATURATION}" max="${MAX_SATURATION}" step="1"
                    value="${this._saturation}" />
+            <button class="red-desat-btn-down" id="red-desat-btn-down">▼</button>
             <span class="red-desat-value" id="red-desat-value">${this._saturation}%</span>
           </div>
 
@@ -229,6 +231,34 @@ const redDesatModule = {
     if (slider) {
       slider.addEventListener('input', (e) => {
         this._saturation = parseInt(e.target.value, 10);
+        this._drawStimulus();
+      });
+    }
+
+    const upBtn = document.getElementById('red-desat-btn-up');
+    if (upBtn) {
+      upBtn.addEventListener('click', () => {
+        this._saturation = Math.min(MAX_SATURATION, this._saturation + SATURATION_STEP);
+        this._drawStimulus();
+      });
+      // Also support touch events for mobile devices
+      upBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        this._saturation = Math.min(MAX_SATURATION, this._saturation + SATURATION_STEP);
+        this._drawStimulus();
+      });
+    }
+
+    const downBtn = document.getElementById('red-desat-btn-down');
+    if (downBtn) {
+      downBtn.addEventListener('click', () => {
+        this._saturation = Math.max(MIN_SATURATION, this._saturation - SATURATION_STEP);
+        this._drawStimulus();
+      });
+      // Also support touch events for mobile devices
+      downBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        this._saturation = Math.max(MIN_SATURATION, this._saturation - SATURATION_STEP);
         this._drawStimulus();
       });
     }
