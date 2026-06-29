@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5 5">
+    <!-- 
+      Tâm (2.5, 2.5). Bán kính ngoài 2.5, bán kính trong 1.5.
+      Khoảng hở Y từ 2.0 đến 3.0 (chiều cao chính xác 1 đơn vị).
+      Đường cắt song song hoàn toàn với trục X.
+    -->
+    <path d="M 4.9495,3.0 A 2.5,2.5 0 1,1 4.9495,2.0 L 3.9142,2.0 A 1.5,1.5 0 1,0 3.9142,3.0 Z" 
+          fill="#000000" stroke="none" />
+</svg>

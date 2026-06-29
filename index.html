@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vision Therapy - Máy đo thị lực</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- ===== SIDEBAR ===== -->
+    <aside id="sidebar">
+      <div id="sidebar-header">
+        <button id="settings-btn" aria-label="Cài đặt" title="Cài đặt">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1.08 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1.08z"></path>
+          </svg>
+        </button>
+        <span id="sidebar-title">Vision Test</span>
+      </div>
+
+      <nav id="menu">
+        <!-- ====== Accordion: Thị lực nhìn xa ====== -->
+        <div class="menu-accordion expanded">
+          <a href="#" class="menu-item accordion-toggle" data-test="far-vision-group">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            <span>Thị lực nhìn xa</span>
+            <svg class="accordion-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </a>
+          <div class="accordion-children">
+            <a href="#" class="menu-item sub-item active" data-test="far-vision-etdrs">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="4 7 12 15 20 7"></polyline>
+              </svg>
+              <span>ETDRS</span>
+            </a>
+            <a href="#" class="menu-item sub-item" data-test="far-vision-snellen">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <text x="12" y="18" font-size="16" text-anchor="middle" fill="currentColor">S</text>
+              </svg>
+              <span>Snellen</span>
+            </a>
+            <a href="#" class="menu-item sub-item" data-test="far-vision-lea">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="8"></circle>
+              </svg>
+              <span>LEA Symbols</span>
+            </a>
+            <a href="#" class="menu-item sub-item" data-test="far-vision-landolt">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="8" fill="none"/>
+                <rect x="15" y="5" width="4" height="14" fill="currentColor"/>
+              </svg>
+              <span>Landolt C</span>
+            </a>
+            <a href="#" class="menu-item sub-item" data-test="far-vision-tumbling-e">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4h12v4H4z M4 10h8v4H4z M4 16h12v4H4z"/>
+              </svg>
+              <span>Tumbling E</span>
+            </a>
+            <a href="#" class="menu-item sub-item" data-test="far-vision-hotv">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <text x="6" y="18" font-size="16" fill="currentColor">H</text>
+                <text x="14" y="18" font-size="16" fill="currentColor">V</text>
+              </svg>
+              <span>HOTV</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- ====== Accordion: Thị lực nhìn gần ====== -->
+        <div class="menu-accordion">
+          <a href="#" class="menu-item accordion-toggle" data-test="near-vision-group">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span>Thị lực nhìn gần</span>
+            <svg class="accordion-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </a>
+          <div class="accordion-children">
+            <a href="#" class="menu-item sub-item" data-test="near-vision-logmar">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <text x="6" y="18" font-size="14" fill="currentColor">L</text>
+                <text x="14" y="18" font-size="14" fill="currentColor">M</text>
+              </svg>
+              <span>LogMAR 40 cm</span>
+            </a>
+            <a href="#" class="menu-item sub-item" data-test="near-vision-npoint">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <text x="4" y="18" font-size="14" fill="currentColor">N</text>
+                <text x="13" y="18" font-size="10" fill="currentColor">pt</text>
+              </svg>
+              <span>N-points 40 cm</span>
+            </a>
+            <a href="#" class="menu-item sub-item" data-test="near-vision-lea">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="8" cy="12" r="4"></circle>
+                <rect x="14" y="8" width="8" height="8" rx="1"></rect>
+              </svg>
+              <span>LEA Symbols 40 cm</span>
+            </a>
+          </div>
+        </div>
+        <a href="#" class="menu-item" data-test="astigmatism">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="2" x2="12" y2="22"></line>
+            <line x1="2" y1="12" x2="22" y2="12"></line>
+          </svg>
+          <span>Trục loạn thị</span>
+        </a>
+        <a href="#" class="menu-item" data-test="binocular">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.5 6.5a3.5 3.5 0 0 1 0 7"></path>
+            <path d="M6.5 6.5a3.5 3.5 0 0 0 0 7"></path>
+            <path d="M3 17c3.33-3.33 5.67-3 9-3s5.67-.33 9 3"></path>
+          </svg>
+          <span>Chức năng hai mắt</span>
+        </a>
+        <!-- ====== Accordion: Võng mạc (Retina) ====== -->
+        <div class="menu-accordion">
+          <a href="#" class="menu-item accordion-toggle" data-test="retina-group">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+            </svg>
+            <span>Võng mạc</span>
+            <svg class="accordion-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </a>
+          <div class="accordion-children">
+            <a href="#" class="menu-item sub-item" data-test="retina-amsler">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" fill="none"/>
+                <circle cx="12" cy="12" r="2"/>
+              </svg>
+              <span>Amsler Grid</span>
+            </a>
+            <a href="#" class="menu-item sub-item" data-test="retina-ishihara">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" fill="none"/>
+                <circle cx="12" cy="12" r="6" fill="none"/>
+                <circle cx="12" cy="12" r="2" fill="none"/>
+              </svg>
+              <span>Ishihara Test</span>
+            </a>
+            <a href="#" class="menu-item sub-item" data-test="retina-pelli-robson">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <text x="4" y="18" font-size="14" fill="currentColor">C</text>
+                <text x="12" y="18" font-size="10" fill="currentColor">S</text>
+              </svg>
+              <span>Pelli‑Robson</span>
+            </a>
+          </div>
+        </div>
+        <!-- ====== Accordion: Thần kinh Nhãn khoa ====== -->
+        <div class="menu-accordion">
+          <a href="#" class="menu-item accordion-toggle" data-test="neuro-group">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a7 7 0 0 1 7 7c0 2.5-1.5 4.5-3 5.5V20h-8v-5.5C8.5 13.5 7 11.5 7 9a7 7 0 0 1 7-7z"/>
+              <line x1="9" y1="20" x2="15" y2="20"/>
+              <line x1="12" y1="20" x2="12" y2="22"/>
+            </svg>
+            <span>Thần kinh Nhãn khoa</span>
+            <svg class="accordion-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </a>
+          <div class="accordion-children">
+            <a href="#" class="menu-item sub-item" data-test="neuro-red-desat">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" fill="#ff4444" stroke="#ff4444"/>
+              </svg>
+              <span>Bão hoà màu đỏ</span>
+            </a>
+            <a href="#" class="menu-item sub-item" data-test="neuro-okn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="4" width="20" height="16" rx="2"/>
+                <line x1="2" y1="12" x2="22" y2="12"/>
+                <line x1="12" y1="4" x2="12" y2="20"/>
+              </svg>
+              <span>OKN Test</span>
+            </a>
+            <a href="#" class="menu-item sub-item" data-test="neuro-duochrome">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="2" width="9" height="20" rx="1" fill="#ff4444" stroke="#ff4444"/>
+                <rect x="13" y="2" width="9" height="20" rx="1" fill="#44cc44" stroke="#44cc44"/>
+              </svg>
+              <span>Duochrome Test</span>
+            </a>
+          </div>
+        </div>
+
+        <a href="#" class="menu-item" data-test="accommodation">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <span>Điều tiết</span>
+        </a>
+      </nav>
+    </aside>
+
+    <!-- ===== MAIN DISPLAY ===== -->
+    <main id="main-area">
+      <div id="display-board">
+        <!-- Nội dung được controller cập nhật động -->
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

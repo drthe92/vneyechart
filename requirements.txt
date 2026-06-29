@@ -1,0 +1,8 @@
+# Optotype Generator Requirements
+# ================================
+# This script uses only Python standard library — no external dependencies.
+#
+# Usage:
+#   python3 optotype_generator.py --type all --output-dir ./generated
+#   python3 optotype_generator.py --type sloan --optotype C --output sloan_C.svg
+#   python3 optotype_generator.py --type lea --output lea_standard.svg

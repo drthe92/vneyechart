@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5 5">
+    <!-- Hình tròn đường kính 5 đơn vị. Diện tích mảng đen: ~19.6 -->
+    <path d="M 2.5,0 A 2.5,2.5 0 1,1 2.49,0 Z" 
+          fill="#000000" stroke="none" />
+</svg>
