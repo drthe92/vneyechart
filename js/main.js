@@ -11,12 +11,14 @@
 import UniversalInput     from './controller.js';
 import DisplayManager     from './settings.js';
 import DisplayCalibrator  from './calibration.js';
+import CreditCardCalibrator from './credit_card_calibration.js';
 import etdrsChart         from '../modules/etdrs_chart.js';
 import { etdrsChartFarVision } from '../modules/etdrs_chart.js';
 import snellenChart       from '../modules/snellen_chart.js';
 import leaModule          from '../modules/lea_symbols.js';
 import landoltCModule     from '../modules/landolt_c.js';
 import tumblingEModule    from '../modules/tumbling_e.js';
+import numberChartModule  from '../modules/number_chart.js';
 import hotvModule         from '../modules/hotv.js';
 import worth4dot          from '../modules/worth4dot.js';
 import astigmatism        from '../modules/astigmatism.js';
@@ -155,6 +157,7 @@ registerTestModule(leaModule);             // id: 'far-vision-lea'
 // New standardised optotype modules
 registerTestModule(landoltCModule);        // id: 'far-vision-landolt'
 registerTestModule(tumblingEModule);       // id: 'far-vision-tumbling-e'
+registerTestModule(numberChartModule);      // id: 'far-vision-numbers'
 
 // ----- Other modules -----
 registerTestModule(hotvModule);            // id: 'far-vision-hotv'
@@ -227,32 +230,11 @@ function highlightMenuItem(testId) {
   document.querySelectorAll('.menu-item').forEach(el => {
     el.classList.toggle('active', el.dataset.test === testId);
   });
-  // Handle all accordions
-  document.querySelectorAll('.menu-accordion').forEach(accordion => {
-    const toggle = accordion.querySelector('.accordion-toggle');
-    const children = accordion.querySelectorAll('.sub-item');
-    let childActive = false;
-    children.forEach(el => {
-      if (el.dataset.test === testId) childActive = true;
-    });
-    toggle.classList.toggle('active', childActive);
-  });
 }
 
 function setupSidebar() {
-  // Accordion toggles (support multiple accordions)
-  document.querySelectorAll('.menu-accordion').forEach(accordion => {
-    const toggle = accordion.querySelector('.accordion-toggle');
-    if (toggle) {
-      toggle.addEventListener('click', (e) => {
-        e.preventDefault();
-        accordion.classList.toggle('expanded');
-      });
-    }
-  });
-
-  // Sub‑item clicks
-  document.querySelectorAll('.menu-item.sub-item').forEach(el => {
+  // Flat menu: every .menu-item is a top‑level chart selector.
+  document.querySelectorAll('.menu-item').forEach(el => {
     el.addEventListener('click', (e) => {
       e.preventDefault();
       const testId = el.dataset.test;
@@ -265,13 +247,11 @@ function setupSidebar() {
       if (testId && (testId.startsWith('near-vision-'))) {
         const cal = window.__calibrator;
         if (cal) {
-          // Only switch if distance is > 0.5 m (i.e. currently in far vision mode)
           if (cal.distanceM > 0.5) {
             cal.applyNearVisionPreset();
           }
         }
-      } else if (testId && (testId.startsWith('far-vision-') || testId === 'far-vision')) {
-        // Auto‑switch to 3 m for far vision tests
+      } else if (testId && (testId.startsWith('far-vision-'))) {
         const cal = window.__calibrator;
         if (cal) {
           if (cal.distanceM < 0.5) {
@@ -282,23 +262,21 @@ function setupSidebar() {
 
       highlightMenuItem(testId);
       loadTest(testId, mod.steps);
+
+      // Rút gọn: ẩn menu sau khi chọn xong bảng thị lực, chỉ hiện vùng đo.
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar) sidebar.classList.add('sidebar-hidden');
     });
   });
 
-  // Other flat menu items
-  document.querySelectorAll('.menu-item:not(.sub-item):not(.accordion-toggle)').forEach(el => {
-    el.addEventListener('click', (e) => {
-      e.preventDefault();
-      const testId = el.dataset.test;
-      if (!testId || testId === state.currentTest) return;
-
-      const mod = getTestModule(testId);
-      if (!mod) return;
-
-      highlightMenuItem(testId);
-      loadTest(testId, mod.steps);
+  // Nút phục hồi menu (nhấn đâu trên vùng đo sẽ hiện lại menu).
+  const board = document.getElementById('display-board');
+  if (board) {
+    board.addEventListener('click', () => {
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar) sidebar.classList.remove('sidebar-hidden');
     });
-  });
+  }
 }
 
 // ================================================================
@@ -345,6 +323,22 @@ function setupCalibrator() {
     displayManager.hideModal();
     setTimeout(() => calibrator.showModal(), 200);
   });
+  // Rào cản #1: Hiệu chuẩn vật lý bằng thẻ tín dụng (chính xác nhất)
+  const ccCal = new CreditCardCalibrator({ calibrator });
+  displayManager.addFooterAction('💳 Hiệu chuẩn thẻ tín dụng (85.6mm)', () => {
+    // Mở trực tiếp — không qua settings, không setTimeout mong manh.
+    ccCal.showModal();
+  });
+
+  // Nút riêng trên header sidebar — mở trực tiếp, không cần qua settings.
+  const ccBtn = document.getElementById('cc-calib-btn');
+  if (ccBtn) {
+    ccBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      ccCal.showModal();
+    });
+  }
+
   window.__calibrator = calibrator;
   return calibrator;
 }

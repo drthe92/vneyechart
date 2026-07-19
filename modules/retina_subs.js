@@ -137,10 +137,20 @@ const amslerGrid = {
 
     const container = canvas.parentElement;
     const size = Math.min(container.clientWidth, container.clientHeight, 600);
-    canvas.width  = size;
-    canvas.height = size;
+
+    // Barrier 2: Device Pixel Ratio — back the canvas with device pixels
+    // so lines stay crisp on Retina / 4K (otherwise the browser upscales a
+    // 1× CSS-px buffer and the grid looks blurry).
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width  = Math.round(size * dpr);
+    canvas.height = Math.round(size * dpr);
+    canvas.style.width  = size + 'px';
+    canvas.style.height = size + 'px';
 
     const ctx = canvas.getContext('2d');
+    // Draw in CSS-px coordinates; the scale maps them to device pixels.
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
     const bg  = this._darkMode ? '#000000' : '#FFFFFF';
     const fg  = this._darkMode ? '#FFFFFF' : '#000000';
 
@@ -148,14 +158,16 @@ const amslerGrid = {
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, size, size);
 
-    // Grid lines — 20 × 20 cells
+    // Grid lines — 20 × 20 cells.
+    // Barrier 3 (canvas sub-pixel): snap to half-pixel so a 1px stroke
+    // lands on a single device row instead of straddling two (grey blur).
     const cells = 20;
     const step  = size / cells;
     ctx.strokeStyle = fg;
     ctx.lineWidth   = 1;
     ctx.beginPath();
     for (let i = 0; i <= cells; i++) {
-      const pos = i * step;
+      const pos = Math.floor(i * step) + 0.5;
       ctx.moveTo(pos, 0);
       ctx.lineTo(pos, size);
       ctx.moveTo(0, pos);
@@ -195,6 +207,21 @@ const amslerGrid = {
       };
       canvas.addEventListener('wheel', this._wheelHandler, { passive: false });
     }
+
+    // Barrier 2: redraw on viewport / DPR change so the grid never blurs
+    // after a window resize or moving the window to another monitor.
+    this._resizeHandler = () => this._drawGrid();
+    window.addEventListener('resize', this._resizeHandler);
+    if (window.matchMedia) {
+      this._dprQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+      this._dprQueryHandler = () => this._drawGrid();
+      // Some browsers support addEventListener on MediaQueryList; fall back to addListener.
+      if (this._dprQuery.addEventListener) {
+        this._dprQuery.addEventListener('change', this._dprQueryHandler);
+      } else if (this._dprQuery.addListener) {
+        this._dprQuery.addListener(this._dprQueryHandler);
+      }
+    }
   },
 
   _toggle() {
@@ -211,6 +238,19 @@ const amslerGrid = {
       const canvas = document.getElementById('amslerCanvas');
       if (canvas) canvas.removeEventListener('wheel', this._wheelHandler);
       this._wheelHandler = null;
+    }
+    if (this._resizeHandler) {
+      window.removeEventListener('resize', this._resizeHandler);
+      this._resizeHandler = null;
+    }
+    if (this._dprQuery && this._dprQueryHandler) {
+      if (this._dprQuery.removeEventListener) {
+        this._dprQuery.removeEventListener('change', this._dprQueryHandler);
+      } else if (this._dprQuery.removeListener) {
+        this._dprQuery.removeListener(this._dprQueryHandler);
+      }
+      this._dprQuery = null;
+      this._dprQueryHandler = null;
     }
   },
 

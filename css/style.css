@@ -5,7 +5,7 @@
 /* ---------- CSS Variables ---------- */
 :root {
   /* Sidebar */
-  --sidebar-width: 250px;
+  --sidebar-width: 64px;   /* icon rail; labels show on hover */
   --sidebar-bg: #0d1b2a;
   --sidebar-hover: #1b2d44;
   --sidebar-active: #1e3a5f;
@@ -91,6 +91,9 @@ button {
   color: var(--sidebar-text);
   user-select: none;
   overflow-y: auto;                /* allow internal scroll if menu overflows */
+  position: relative;             /* establish stacking context above #main-area */
+  z-index: 5;
+  overflow-x: hidden;              /* keep header buttons inside the 64px rail */
 }
 
 #sidebar::-webkit-scrollbar {
@@ -104,12 +107,13 @@ button {
   border-radius: 2px;
 }
 
-/* -- Header (Settings icon + title) -- */
+/* -- Header (Settings icon + CC icon, stacked to fit 64px rail) -- */
 #sidebar-header {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--gap-sm);
-  padding: var(--gap-md) var(--gap-md);
+  gap: 6px;
+  padding: 10px 0;
   border-bottom: 1px solid rgba(255,255,255,0.08);
   flex-shrink: 0;
 }
@@ -118,8 +122,8 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-sm);
   color: var(--sidebar-text);
   transition: color 0.2s, background 0.2s;
@@ -130,29 +134,62 @@ button {
   background: var(--sidebar-hover);
 }
 
-#sidebar-title {
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
+#cc-calib-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  color: var(--sidebar-text);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+  flex-shrink: 0;
+}
+#cc-calib-btn:hover {
   color: var(--sidebar-text-active);
-  opacity: 0.75;
-  white-space: nowrap;
+  background: var(--sidebar-hover);
 }
 
-/* -- Navigation Menu -- */
+#sidebar-title {
+  display: none;   /* hidden in the 64px icon rail; shown only when expanded */
+}
+
+/* -- Navigation Menu (flat, icon‑only, grouped) -- */
 #menu {
   display: flex;
   flex-direction: column;
   padding: var(--gap-sm) 0;
   flex: 1;
+  gap: 2px;
 }
 
+/* Group header (function category) */
+.menu-group {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+}
+.menu-group-label {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(176, 196, 222, 0.45);
+  padding: 8px 0 4px 0;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Icon‑only item; label appears on hover */
 .menu-item {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px var(--gap-md);
+  justify-content: center;
+  padding: 11px 0;
   font-size: var(--font-size-sm);
   font-weight: 500;
   color: var(--sidebar-text);
@@ -167,12 +204,44 @@ button {
   transition: opacity 0.2s;
 }
 
+/* Label tooltip on hover */
+.menu-item-label {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%) scale(0.96);
+  background: #1b2d44;
+  color: #fff;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 50;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+}
+.menu-item-label::before {
+  content: "";
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-right-color: #1b2d44;
+}
+
 .menu-item:hover {
   background: var(--sidebar-hover);
   color: var(--sidebar-text-active);
 }
 .menu-item:hover svg {
   opacity: 1;
+}
+.menu-item:hover .menu-item-label {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
 }
 
 .menu-item.active {
@@ -186,48 +255,15 @@ button {
 }
 
 /* ============================================================
-   ACCORDION SUB‑MENU
+   SIDEBAR HIDDEN (after chart selection)
    ============================================================ */
-
-.menu-accordion {
-  display: flex;
-  flex-direction: column;
-}
-
-.accordion-toggle {
-  cursor: pointer;
-}
-
-.accordion-arrow {
-  margin-left: auto;
-  flex-shrink: 0;
-  opacity: 0.5;
-  transition: transform 0.2s ease, opacity 0.2s;
-}
-
-.menu-accordion.expanded .accordion-arrow {
-  transform: rotate(180deg);
-  opacity: 0.8;
-}
-
-.accordion-children {
-  display: flex;
-  flex-direction: column;
+#sidebar.sidebar-hidden {
+  width: 0;
+  min-width: 0;
   overflow: hidden;
-  max-height: 0;
-  transition: max-height 0.3s ease;
-}
-
-.menu-accordion.expanded .accordion-children {
-  max-height: 300px;   /* đủ cho 6 item con */
-}
-
-.sub-item {
-  padding: 10px var(--gap-md) 10px 52px;   /* thụt lề so với parent */
-  font-size: 0.8rem;
-  font-weight: 400;
-  border-left-color: transparent;
-  gap: 10px;
+  border: none;
+  opacity: 0;
+  transition: width 0.25s ease, opacity 0.2s ease, min-width 0.25s ease;
 }
 
 .sub-item svg {
@@ -657,6 +693,20 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+.calib-screen-info {
+  font-size: 0.78rem;
+  color: #666;
+  padding: 8px 12px;
+  background: #eef3f8;
+  border: 1px solid #dde6f0;
+  border-radius: var(--radius-sm);
+  line-height: 1.5;
+}
+.calib-screen-info b {
+  color: #222;
+  font-weight: 600;
+}
+
 .calib-preset-row {
   display: flex;
   gap: 6px;
@@ -732,13 +782,10 @@ button {
 /* ---------- Small screens: collapse sidebar ---------- */
 @media (max-width: 768px) {
   #sidebar {
-    width: 60px;
-    min-width: 60px;
+    width: 56px;
+    min-width: 56px;
   }
   #sidebar-title {
-    display: none;
-  }
-  .menu-item span {
     display: none;
   }
   .menu-item {

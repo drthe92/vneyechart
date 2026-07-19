@@ -40,9 +40,11 @@ const tumblingEModule = {
     parts.push(`<svg viewBox="0 0 5 5" width="${pxSize}" height="${pxSize}" xmlns="http://www.w3.org/2000/svg">${rotate(TUMBLING_E, this._orientation)}</svg>`);
     parts.push('</div>');
 
+    // Note: the on-screen direction indicator (Hướng: Trái/Phải/Trên/Dưới)
+    // was removed per request — the E still rotates, only the text label
+    // is no longer shown to the patient.
     const snellenDenom = Math.round(20 * Math.pow(10, logmar));
-    const labels = { right: 'Phải', left: 'Trái', up: 'Trên', down: 'Dưới' };
-    parts.push(`<div class="etdrs-info"><span class="etdrs-labels">LogMAR <strong>${logmar.toFixed(1)}</strong> &nbsp;·&nbsp; <strong>20/${snellenDenom}</strong> &nbsp;·&nbsp; Hướng: <strong>${labels[this._orientation]}</strong></span><span class="etdrs-counter">${index+1}/${LOGMAR_LEVELS.length}</span></div>`);
+    parts.push(`<div class="etdrs-info"><span class="etdrs-labels">LogMAR <strong>${logmar.toFixed(1)}</strong> &nbsp;·&nbsp; <strong>20/${snellenDenom}</strong></span><span class="etdrs-counter">${index+1}/${LOGMAR_LEVELS.length}</span></div>`);
 
     const board = document.getElementById('display-board');
     if (board) board.innerHTML = parts.join('');

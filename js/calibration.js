@@ -29,6 +29,9 @@ const STORAGE_KEYS = {
   diagonalIn:  'vision-therapy-calibrate-diagonal-in',
   heightMm:    'vision-therapy-calibrate-height-mm',
   inputMode:   'vision-therapy-calibrate-input-mode',   // 'diagonal' | 'height'
+  // Rào cản #1: Hiệu chuẩn vật lý bằng thẻ tín dụng (chính xác nhất).
+  // Khóa này PHẢI khớp với CC_STORAGE_KEY trong credit_card_calibration.js.
+  ccPxPerMm:   'vision-therapy-cc-pxpermm',
 };
 
 const DEFAULT_DISTANCE_M = 4;    // 4 mét
@@ -95,9 +98,18 @@ function _loadCalibFromStorage() {
     const mode   = localStorage.getItem(STORAGE_KEYS.inputMode);
     const diag   = localStorage.getItem(STORAGE_KEYS.diagonalIn);
     const hMm    = localStorage.getItem(STORAGE_KEYS.heightMm);
+    const ccPx   = localStorage.getItem(STORAGE_KEYS.ccPxPerMm);
 
     const distanceM = dist ? parseFloat(dist) : DEFAULT_DISTANCE_M;
     let ppi = 0;
+
+    // Rào cản #1: Hiệu chuẩn vật lý bằng thẻ tín dụng là nguồn CHÍNH XÁC NHẤT.
+    // Ưu tiên cao nhất — nếu có, dùng luôn, bỏ qua ước lượng màn hình.
+    if (ccPx && parseFloat(ccPx) > 0) {
+      const pxPerMm = parseFloat(ccPx);
+      ppi = pxPerMm * MM_PER_INCH; // số thực
+      return { distanceM, ppi };
+    }
 
     if (mode === 'height' && hMm) {
       const heightMm = parseFloat(hMm);
@@ -394,61 +406,40 @@ class DisplayCalibrator {
       (val) => { this.distanceM = parseFloat(val); this._recalculate(); }
     ));
 
-    // -- Separator --
-    const sep = document.createElement('hr');
-    sep.className = 'calib-separator';
-    body.appendChild(sep);
+    // -- Đường chéo màn hình --
+    body.appendChild(this._createFieldGroup(
+      'Đường chéo màn hình',
+      'diagonal-in',
+      'inch',
+      this.diagonalInch,
+      'number',
+      '1',
+      '10',
+      '100',
+      (val) => { this.diagonalInch = parseFloat(val); this._inputMode = 'diagonal'; this._recalculate(); }
+    ));
 
-    // -- Mode toggle --
-    const modeToggle = document.createElement('div');
-    modeToggle.className = 'calib-mode-toggle';
+    // -- Chiều cao vùng hiển thị --
+    body.appendChild(this._createFieldGroup(
+      'Chiều cao vùng hiển thị',
+      'physical-height',
+      'mm',
+      this.physicalHeightMm || 300,
+      'number',
+      '1',
+      '50',
+      '2000',
+      (val) => { this.physicalHeightMm = parseFloat(val); this._inputMode = 'height'; this._recalculate(); }
+    ));
 
-    const diagBtn = document.createElement('button');
-    diagBtn.className = `calib-mode-btn${this._inputMode === 'diagonal' ? ' active' : ''}`;
-    diagBtn.textContent = 'Đường chéo (inch)';
-    diagBtn.addEventListener('click', () => {
-      this._inputMode = 'diagonal';
-      this._rebuildModal();
-    });
-
-    const heightBtn = document.createElement('button');
-    heightBtn.className = `calib-mode-btn${this._inputMode === 'height' ? ' active' : ''}`;
-    heightBtn.textContent = 'Chiều cao (mm)';
-    heightBtn.addEventListener('click', () => {
-      this._inputMode = 'height';
-      this._rebuildModal();
-    });
-
-    modeToggle.appendChild(diagBtn);
-    modeToggle.appendChild(heightBtn);
-    body.appendChild(modeToggle);
-
-    // -- Đường chéo hoặc Chiều cao --
-    if (this._inputMode === 'diagonal') {
-      body.appendChild(this._createFieldGroup(
-        'Đường chéo màn hình',
-        'diagonal-in',
-        'inch',
-        this.diagonalInch,
-        'number',
-        '1',
-        '10',
-        '100',
-        (val) => { this.diagonalInch = parseFloat(val); this._recalculate(); }
-      ));
-    } else {
-      body.appendChild(this._createFieldGroup(
-        'Chiều cao vùng hiển thị',
-        'physical-height',
-        'mm',
-        this.physicalHeightMm || 300,
-        'number',
-        '1',
-        '50',
-        '2000',
-        (val) => { this.physicalHeightMm = parseFloat(val); this._recalculate(); }
-      ));
-    }
+    // -- Chiều cao màn hình vật lý (từ window.screen) --
+    const screenHmm = (window.screen && window.screen.height)
+      ? (window.screen.height / (this.ppi || 1) * 25.4).toFixed(1)
+      : '—';
+    const screenInfo = document.createElement('div');
+    screenInfo.className = 'calib-screen-info';
+    screenInfo.innerHTML = `Màn hình: <b>${window.screen?.width || '?'} × ${window.screen?.height || '?'} px</b> · chiều cao vật lý ≈ <b>${screenHmm} mm</b>`;
+    body.appendChild(screenInfo);
 
     // -- Kết quả PPI --
     const result = document.createElement('div');

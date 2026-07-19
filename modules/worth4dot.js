@@ -18,6 +18,11 @@
 //  Constants
 // ================================================================
 
+import { RED_BG_COMP, GREEN_BG_COMP, WHITE_COMP } from './crosstalk.js';
+//  Barrier 4: raw #FF0000 / #00FF00 / #FFFFFF are replaced by
+//  crosstalk-compensated primaries (see modules/crosstalk.js) so
+//  Worth-4-dot fusion responses are not corrupted by panel leakage.
+
 /**
  * 10 mức spacing (giảm dần), mô phỏng test ở các góc thị giác
  * khác nhau nhằm đánh giá kích thước ám điểm ức chế.
@@ -51,10 +56,10 @@ const worth4dot = {
 
     // 4 chấm tròn hình thoi
     const dots = [
-      { x: CX,           y: CY - spacing, fill: '#FF0000', aria: 'Đỏ' },
-      { x: CX - spacing, y: CY,           fill: '#00FF00', aria: 'Xanh lá' },
-      { x: CX + spacing, y: CY,           fill: '#00FF00', aria: 'Xanh lá' },
-      { x: CX,           y: CY + spacing, fill: '#FFFFFF', aria: 'Trắng' },
+      { x: CX,           y: CY - spacing, fill: RED_BG_COMP,   aria: 'Đỏ' },
+      { x: CX - spacing, y: CY,           fill: GREEN_BG_COMP, aria: 'Xanh lá' },
+      { x: CX + spacing, y: CY,           fill: GREEN_BG_COMP, aria: 'Xanh lá' },
+      { x: CX,           y: CY + spacing, fill: WHITE_COMP,    aria: 'Trắng' },
     ];
 
     // Xây SVG

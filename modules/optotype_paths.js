@@ -12,29 +12,42 @@
  */
 
 // ================================================================
+//  Barrier 3 — Sub‑pixel SVG rendering hints
+// ----------------------------------------------------------------
+//  Straight‑stroke letters (H, N, Z, K, V, T) should snap to the
+//  pixel grid → use crispEdges. Curved letters (C, O, S, D, R)
+//  need antialiasing → use geometricPrecision. Without an explicit
+//  shape‑rendering the browser defaults to "auto" which blurs
+//  straight strokes on scaled‑up optotypes.
+// ================================================================
+
+export const SR_STRAIGHT = 'shape-rendering="crispEdges"';
+export const SR_CURVE    = 'shape-rendering="geometricPrecision"';
+
+// ================================================================
 //  SLOAN LETTERS (10 ký tự, stroke‑based)
 // ================================================================
 
 export const SLOAN = {
-  C: `<path d="M 4.5,1.5 A 2,2 0 0 0 2.5,0.5 A 2,2 0 0 0 0.5,2.5 A 2,2 0 0 0 2.5,4.5 A 2,2 0 0 0 4.5,3.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter"/>`,
+  C: `<path d="M 4.5,1.5 A 2,2 0 0 0 2.5,0.5 A 2,2 0 0 0 0.5,2.5 A 2,2 0 0 0 2.5,4.5 A 2,2 0 0 0 4.5,3.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter" ${SR_CURVE}/>`,
 
-  D: `<path d="M 0.5,0.5 L 2.5,0.5 A 2,2 0 0 1 4.5,2.5 A 2,2 0 0 1 2.5,4.5 L 0.5,4.5 Z" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter"/>`,
+  D: `<path d="M 0.5,0.5 L 2.5,0.5 A 2,2 0 0 1 4.5,2.5 A 2,2 0 0 1 2.5,4.5 L 0.5,4.5 Z" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter" ${SR_CURVE}/>`,
 
-  H: `<path d="M 0.5,0.5 L 0.5,4.5 M 4.5,0.5 L 4.5,4.5 M 0.5,2.5 L 4.5,2.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter"/>`,
+  H: `<path d="M 0.5,0.5 L 0.5,4.5 M 4.5,0.5 L 4.5,4.5 M 0.5,2.5 L 4.5,2.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter" ${SR_STRAIGHT}/>`,
 
-  K: `<path d="M 0.5,0.5 L 0.5,4.5 M 4.5,0.5 L 0.5,2.5 M 1.5,2.5 L 4.5,4.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter"/>`,
+  K: `<path d="M 0.5,0.5 L 0.5,4.5 M 4.5,0.5 L 0.5,2.5 M 1.5,2.5 L 4.5,4.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter" ${SR_STRAIGHT}/>`,
 
-  N: `<path d="M 0.5,4.5 L 0.5,0.5 L 4.5,4.5 L 4.5,0.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter"/>`,
+  N: `<path d="M 0.5,4.5 L 0.5,0.5 L 4.5,4.5 L 4.5,0.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter" ${SR_STRAIGHT}/>`,
 
-  O: `<path d="M 2.5,0.5 A 2,2 0 1 1 2.49,0.5 Z" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter"/>`,
+  O: `<path d="M 2.5,0.5 A 2,2 0 1 1 2.49,0.5 Z" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter" ${SR_CURVE}/>`,
 
-  R: `<path d="M 0.5,4.5 L 0.5,0.5 L 2.5,0.5 A 1.25,1.25 0 0 1 2.5,3 L 0.5,3 M 2.5,3 L 4.5,4.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter"/>`,
+  R: `<path d="M 0.5,4.5 L 0.5,0.5 L 2.5,0.5 A 1.25,1.25 0 0 1 2.5,3 L 0.5,3 M 2.5,3 L 4.5,4.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter" ${SR_CURVE}/>`,
 
-  S: `<path d="M 4.5,1.5 A 2,1 0 0,0 2.5,0.5 A 2,1 0 0,0 0.5,1.5 C 0.5,2.5 4.5,2.5 4.5,3.5 A 2,1 0 0,1 2.5,4.5 A 2,1 0 0,1 0.5,3.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter"/>`,
+  S: `<path d="M 4.5,1.5 A 2,1 0 0,0 2.5,0.5 A 2,1 0 0,0 0.5,1.5 C 0.5,2.5 4.5,2.5 4.5,3.5 A 2,1 0 0,1 2.5,4.5 A 2,1 0 0,1 0.5,3.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter" ${SR_CURVE}/>`,
 
-  V: `<path d="M 0.5,0.5 L 2.5,4.5 L 4.5,0.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter"/>`,
+  V: `<path d="M 0.5,0.5 L 2.5,4.5 L 4.5,0.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter" ${SR_STRAIGHT}/>`,
 
-  Z: `<path d="M 0.5,0.5 L 4.5,0.5 L 0.5,4.5 L 4.5,4.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter"/>`,
+  Z: `<path d="M 0.5,0.5 L 4.5,0.5 L 0.5,4.5 L 4.5,4.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter" ${SR_STRAIGHT}/>`,
 };
 
 // ================================================================
@@ -70,13 +83,13 @@ export const TUMBLING_E =
 // ================================================================
 
 export const HOTV = {
-  H: `<path d="M 0.5,0.5 L 0.5,4.5 M 4.5,0.5 L 4.5,4.5 M 0.5,2.5 L 4.5,2.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter"/>`,
+  H: `<path d="M 0.5,0.5 L 0.5,4.5 M 4.5,0.5 L 4.5,4.5 M 0.5,2.5 L 4.5,2.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter" ${SR_STRAIGHT}/>`,
 
-  O: `<path d="M 2.5,0.5 A 2,2 0 1 1 2.49,0.5 Z" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter"/>`,
+  O: `<path d="M 2.5,0.5 A 2,2 0 1 1 2.49,0.5 Z" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter" ${SR_CURVE}/>`,
 
-  T: `<path d="M 0.5,0.5 L 4.5,0.5 M 2.5,0.5 L 2.5,4.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter"/>`,
+  T: `<path d="M 0.5,0.5 L 4.5,0.5 M 2.5,0.5 L 2.5,4.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter" ${SR_STRAIGHT}/>`,
 
-  V: `<path d="M 0.5,0.5 L 2.5,4.5 L 4.5,0.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter"/>`,
+  V: `<path d="M 0.5,0.5 L 2.5,4.5 L 4.5,0.5" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="square" stroke-linejoin="miter" ${SR_STRAIGHT}/>`,
 };
 
 // ================================================================

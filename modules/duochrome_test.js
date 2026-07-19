@@ -12,13 +12,14 @@
  */
 
 import { SLOAN } from './optotype_paths.js';
+import { RED_BG_COMP as RED_BG, GREEN_BG_COMP as GREEN_BG } from './crosstalk.js';
 
 // ================================================================
 //  Constants
 // ================================================================
-
-const RED_BG   = '#FF0000';
-const GREEN_BG = '#00FF00';
+//  Barrier 4: raw #FF0000 / #00FF00 are replaced by crosstalk-
+//  compensated primaries (see modules/crosstalk.js) so the duochrome
+//  equilibrium point is not shifted by panel channel leakage.
 
 const SLOAN_LETTERS = Object.keys(SLOAN);
 

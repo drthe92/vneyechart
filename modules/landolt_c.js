@@ -41,8 +41,10 @@ const landoltCModule = {
     parts.push('</div>');
 
     const snellenDenom = Math.round(20 * Math.pow(10, logmar));
-    const labels = { right: 'Phải', left: 'Trái', up: 'Trên', down: 'Dưới' };
-    parts.push(`<div class="etdrs-info"><span class="etdrs-labels">LogMAR <strong>${logmar.toFixed(1)}</strong> &nbsp;·&nbsp; <strong>20/${snellenDenom}</strong> &nbsp;·&nbsp; Khe hở: <strong>${labels[this._orientation]}</strong></span><span class="etdrs-counter">${index+1}/${LOGMAR_LEVELS.length}</span></div>`);
+    // Note: the on-screen gap-direction indicator (Khe hở: Trái/Phải/Trên/Dưới)
+    // was removed per request — the Landolt C still rotates, only the text
+    // label is no longer shown to the patient.
+    parts.push(`<div class="etdrs-info"><span class="etdrs-labels">LogMAR <strong>${logmar.toFixed(1)}</strong> &nbsp;·&nbsp; <strong>20/${snellenDenom}</strong></span><span class="etdrs-counter">${index+1}/${LOGMAR_LEVELS.length}</span></div>`);
 
     const board = document.getElementById('display-board');
     if (board) board.innerHTML = parts.join('');
