@@ -6,7 +6,7 @@
  *   - Chuột     (MouseEvent + WheelEvent)
  *   - Cảm ứng   (TouchEvent — swipe)
  *
- * Phát CustomEvent lên document:  'app:next' | 'app:prev' | 'app:back'
+ * Phát CustomEvent lên document:  'app:next' | 'app:prev' | 'app:back' | 'app:shuffle'
  * để tách biệt hoàn toàn khỏi logic module test.
  *
  * Usage:
@@ -35,20 +35,25 @@ function throttle(fn, cooldown) {
 
   return function throttled(...args) {
     const now = Date.now();
-    const elapsed = now - lastCall;
+    const remaining = cooldown - (now - lastCall);
 
-    if (elapsed >= cooldown) {
-      // Đã đủ thời gian chờ → gọi ngay
+    if (remaining <= 0) {
+      // Đã đủ thời gian chờ → gọi ngay (leading edge)
+      // Hủy timeout trễ (nếu có) để không gọi thừa
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
       lastCall = now;
       fn.apply(this, args);
-    } else {
-      // Chưa đủ → lên lịch gọi sau khi hết cooldown
-      if (timeoutId) clearTimeout(timeoutId);
+    } else if (!timeoutId) {
+      // Chưa đủ → lên lịch gọi ĐÚNG 1 LẦN sau khi hết cooldown (trailing edge)
+      // lastCall sẽ được cập nhật tại thời điểm thực thi thực tế
       timeoutId = setTimeout(() => {
         lastCall = Date.now();
         timeoutId = null;
         fn.apply(this, args);
-      }, cooldown - elapsed);
+      }, remaining);
     }
   };
 }
@@ -81,6 +86,7 @@ class UniversalInput {
     this._boundContextMenu  = this._onContextMenu.bind(this);
     this._boundWheel        = throttle(this._onWheel.bind(this), this.wheelCooldown);
     this._boundTouchStart   = this._onTouchStart.bind(this);
+    this._boundTouchMove    = this._onTouchMove.bind(this);
     this._boundTouchEnd     = this._onTouchEnd.bind(this);
 
     /** @private */
@@ -111,12 +117,13 @@ class UniversalInput {
     doc.addEventListener('mousedown', this._boundMouseDown);
     win.addEventListener('contextmenu', this._boundContextMenu);
 
-    // Wheel (passive để không chặn scroll mặc định)
-    doc.addEventListener('wheel', this._boundWheel, { passive: true });
+    // Wheel (bỏ passive để có thể gọi e.preventDefault() chặn scroll trang)
+    doc.addEventListener('wheel', this._boundWheel);
 
-    // Touch
-    doc.addEventListener('touchstart', this._boundTouchStart, { passive: true });
-    doc.addEventListener('touchend',   this._boundTouchEnd,   { passive: true });
+    // Touch (bỏ passive để có thể gọi e.preventDefault() chặn swipe Back/Forward)
+    doc.addEventListener('touchstart', this._boundTouchStart);
+    doc.addEventListener('touchmove',  this._boundTouchMove);
+    doc.addEventListener('touchend',   this._boundTouchEnd);
   }
 
   /**
@@ -134,6 +141,7 @@ class UniversalInput {
     win.removeEventListener('contextmenu', this._boundContextMenu);
     doc.removeEventListener('wheel',      this._boundWheel);
     doc.removeEventListener('touchstart', this._boundTouchStart);
+    doc.removeEventListener('touchmove',  this._boundTouchMove);
     doc.removeEventListener('touchend',   this._boundTouchEnd);
   }
 
@@ -146,6 +154,21 @@ class UniversalInput {
    * @private
    */
   _onKeydown(e) {
+    // 1. Bảo vệ nhập liệu: bỏ qua khi đang gõ trong form / editable
+    const t = e.target;
+    if (
+      t &&
+      (t.tagName === 'INPUT' ||
+       t.tagName === 'TEXTAREA' ||
+       t.tagName === 'SELECT' ||
+       t.isContentEditable)
+    ) {
+      return; // không xử lý phím, không gọi preventDefault()
+    }
+
+    // 2. Chặn key spam: bỏ qua mọi phím khi người dùng giữ (e.repeat)
+    if (e.repeat) return;
+
     let action = null;
 
     switch (e.key) {
@@ -159,7 +182,7 @@ class UniversalInput {
 
       case 'Enter':
         action = 'NEXT';
-        if (!e.repeat) e.preventDefault();
+        e.preventDefault();
         break;
 
       // ----- PREV -----
@@ -240,7 +263,12 @@ class UniversalInput {
       this._emit('NEXT', { source: 'wheel', deltaY: e.deltaY });
     } else if (e.deltaY < 0) {
       this._emit('PREV', { source: 'wheel', deltaY: e.deltaY });
+    } else {
+      return; // deltaY === 0 → không chặn scroll
     }
+
+    // Chặn trang web bị cuộn lết khi bác sĩ lăn chuột đổi test
+    e.preventDefault();
   }
 
   // ================================================================
@@ -276,6 +304,26 @@ class UniversalInput {
 
     const action = dx < 0 ? 'NEXT' : 'PREV';
     this._emit(action, { source: 'touch', deltaX: dx });
+  }
+
+  /**
+   * Chặn xung đột vuốt trình duyệt (Back/Forward) khi vuốt ngang.
+   * Chỉ gọi preventDefault khi người dùng thực sự vuốt ngang
+   * (|dx| > |dy|) để không cản trở cuộn dọc bình thường.
+   * @param {TouchEvent} e
+   * @private
+   */
+  _onTouchMove(e) {
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+
+    const dx = touch.clientX - this._touchStartX;
+    const dy = touch.clientY - this._touchStartY;
+
+    // Vuốt ngang → chặn trình duyệt điều hướng Back/Forward trên mobile/tablet
+    if (Math.abs(dx) > Math.abs(dy)) {
+      e.preventDefault();
+    }
   }
 
   // ================================================================

@@ -64,26 +64,31 @@ class CreditCardCalibrator {
 
     box.innerHTML = `
       <div class="cc-modal-header">
-        <span class="cc-modal-title">Hiệu chuẩn vật lý (thẻ tín dụng)</span>
+        <span class="cc-modal-title">Hiệu chuẩn vật lý (Thẻ tín dụng)</span>
         <button class="cc-modal-close" aria-label="Đóng">&times;</button>
       </div>
       <div class="cc-modal-body">
-        <p class="cc-instruction">
-          1. Đặt một thẻ tín dụng/chứng minh thư lên màn hình.<br/>
-          2. Kéo thanh trượt bên dưới cho đến khi <b>hình chữ nhật ảo khớp
-          chính xác</b> với chiều rộng thẻ (85.6&nbsp;mm).<br/>
-          3. Nhấn "Xác nhận" để lưu tỷ lệ pixel/mm.
-        </p>
-        <div class="cc-stage">
-          <div class="cc-card" id="ccCard"><span class="cc-card-label">85.6 mm</span></div>
+        <div class="cc-zoom-warning" style="background: #fff3cd; color: #856404; padding: 10px; border-radius: 6px; margin-bottom: 16px; border: 1px solid #ffeeba;">
+          ⚠️ <b>Cảnh báo quang học:</b> Đảm bảo trình duyệt đang ở mức <b>Zoom 100%</b> (Ctrl+0 / Cmd+0) trước khi hiệu chuẩn để tránh sai lệch mật độ điểm ảnh.
         </div>
-        <input type="range" id="ccSlider" class="cc-slider"
-               min="100" max="1200" step="1" value="400" />
-        <div class="cc-readout" id="ccReadout"></div>
+        <p class="cc-instruction">
+          1. Đặt thẻ tín dụng/CCCD chuẩn (85.6 mm) lên màn hình.<br/>
+          2. Dùng thanh trượt, nút bấm [ - ] [ + ] hoặc <b>phím mũi tên (⬅ / ➡)</b> để khung viền ảo khớp chính xác với mép thẻ.<br/>
+        </p>
+        <div class="cc-stage" style="padding: 20px 0; display: flex; justify-content: center;">
+          <div class="cc-card" id="ccCard" style="border: 2px solid #e74c3c; background: rgba(231, 76, 60, 0.1); box-sizing: border-box; display: flex; align-items: center; justify-content: center;">
+            <span class="cc-card-label" style="color: #c0392b; font-weight: bold;">85.6 mm</span>
+          </div>
+        </div>
+        <div class="cc-slider-container" style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+          <button id="ccBtnMinus" style="padding: 8px 16px; font-size: 1.2rem; cursor: pointer;">-</button>
+          <input type="range" id="ccSlider" class="cc-slider" min="100" max="1200" step="0.5" value="400" style="flex: 1; cursor: pointer;" />
+          <button id="ccBtnPlus" style="padding: 8px 16px; font-size: 1.2rem; cursor: pointer;">+</button>
+        </div>
+        <div class="cc-readout" id="ccReadout" style="text-align: center; font-family: monospace; font-size: 1.1em; color: #333;"></div>
       </div>
       <div class="cc-modal-footer">
-        <button class="cc-btn-cancel">Huỷ</button>
-        <button class="cc-btn-confirm">Xác nhận</button>
+        <button class="cc-btn-confirm" style="width: 100%;">Đóng & Hoàn tất</button>
       </div>
     `;
 
@@ -94,6 +99,8 @@ class CreditCardCalibrator {
     const card = box.querySelector('#ccCard');
     const slider = box.querySelector('#ccSlider');
     const readout = box.querySelector('#ccReadout');
+    const btnMinus = box.querySelector('#ccBtnMinus');
+    const btnPlus = box.querySelector('#ccBtnPlus');
 
     // Khởi tạo kích thước từ giá trị đã lưu (nếu có)
     const initPx = this._pxPerMm > 0
@@ -102,18 +109,31 @@ class CreditCardCalibrator {
     slider.value = initPx;
     this._applySize(card, slider.value, readout);
 
+    // Slider input event - real-time auto-save
     slider.addEventListener('input', () => {
       this._applySize(card, slider.value, readout);
+      this._saveAndSync(parseFloat(slider.value));
     });
 
+    // Button minus event
+    btnMinus.addEventListener('click', () => {
+      slider.value = Math.max(parseFloat(slider.min), parseFloat(slider.value) - 0.5);
+      this._applySize(card, slider.value, readout);
+      this._saveAndSync(parseFloat(slider.value));
+    });
+
+    // Button plus event
+    btnPlus.addEventListener('click', () => {
+      slider.value = Math.min(parseFloat(slider.max), parseFloat(slider.value) + 0.5);
+      this._applySize(card, slider.value, readout);
+      this._saveAndSync(parseFloat(slider.value));
+    });
+
+    // Close/Confirm buttons (data already saved in real-time)
     box.querySelector('.cc-modal-close')
       .addEventListener('click', () => this.hideModal());
-    box.querySelector('.cc-btn-cancel')
+    box.querySelector('.cc-btn-confirm')
       .addEventListener('click', () => this.hideModal());
-    box.querySelector('.cc-btn-confirm').addEventListener('click', () => {
-      this._confirm(parseFloat(slider.value));
-      this.hideModal();
-    });
 
     document.addEventListener('keydown', this._boundKeydown);
   }
@@ -132,22 +152,19 @@ class CreditCardCalibrator {
   }
 
   /** @private */
-  _confirm(pxWidth) {
+  _saveAndSync(pxWidth) {
     this._pxPerMm = pxWidth / CREDIT_CARD_WIDTH_MM;
     try { localStorage.setItem(CC_STORAGE_KEY, String(this._pxPerMm)); } catch (e) {}
 
     if (this.calibrator) {
-      // Ghi đè PPI của calibrator bằng giá trị vật lý chính xác
       this.calibrator.ppi = this.ppi;
       this.calibrator.pxPerMm = this._pxPerMm;
       this.calibrator._inputMode = 'cc';
       this.calibrator._saveToStorage();
       this.calibrator._recalculate();
-      console.log(
-        `%c[CreditCardCalibrator]%c ${this._pxPerMm.toFixed(3)} px/mm | ${this.ppi.toFixed(1)} PPI (vật lý)`,
-        'color:#27ae60;font-weight:700;', 'color:#555;'
-      );
     }
+    // Trigger event để hệ thống re-render bảng thị lực ngay lập tức
+    document.dispatchEvent(new CustomEvent('app:calibration_updated'));
   }
 
   hideModal() {
@@ -158,7 +175,29 @@ class CreditCardCalibrator {
   }
 
   _onKeydown(e) {
-    if (e.key === 'Escape') this.hideModal();
+    if (e.key === 'Escape') {
+      this.hideModal();
+      return;
+    }
+    
+    if (!this._overlay) return;
+    const slider = this._overlay.querySelector('#ccSlider');
+    const card = this._overlay.querySelector('#ccCard');
+    const readout = this._overlay.querySelector('#ccReadout');
+    if (!slider || !card || !readout) return;
+
+    const stepValue = 0.5;
+    if (e.key === 'ArrowLeft') {
+      slider.value = Math.max(parseFloat(slider.min), parseFloat(slider.value) - stepValue);
+      this._applySize(card, slider.value, readout);
+      this._saveAndSync(parseFloat(slider.value));
+      e.preventDefault();
+    } else if (e.key === 'ArrowRight') {
+      slider.value = Math.min(parseFloat(slider.max), parseFloat(slider.value) + stepValue);
+      this._applySize(card, slider.value, readout);
+      this._saveAndSync(parseFloat(slider.value));
+      e.preventDefault();
+    }
   }
 }
 

@@ -5,7 +5,7 @@
 /* ---------- CSS Variables ---------- */
 :root {
   /* Sidebar */
-  --sidebar-width: 64px;   /* icon rail; labels show on hover */
+  --sidebar-width: 500px;   /* expanded width for 2-column layout */
   --sidebar-bg: #0d1b2a;
   --sidebar-hover: #1b2d44;
   --sidebar-active: #1e3a5f;
@@ -93,7 +93,8 @@ button {
   overflow-y: auto;                /* allow internal scroll if menu overflows */
   position: relative;             /* establish stacking context above #main-area */
   z-index: 5;
-  overflow-x: hidden;              /* keep header buttons inside the 64px rail */
+  overflow-x: hidden;
+  transition: width 0.25s ease, min-width 0.25s ease, opacity 0.2s ease;
 }
 
 #sidebar::-webkit-scrollbar {
@@ -110,10 +111,10 @@ button {
 /* -- Header (Settings icon + CC icon, stacked to fit 64px rail) -- */
 #sidebar-header {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 6px;
-  padding: 10px 0;
+  gap: 10px;
+  padding: 10px 16px;
   border-bottom: 1px solid rgba(255,255,255,0.08);
   flex-shrink: 0;
 }
@@ -154,82 +155,77 @@ button {
 }
 
 #sidebar-title {
-  display: none;   /* hidden in the 64px icon rail; shown only when expanded */
+  display: block;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--sidebar-text-active);
+  white-space: nowrap;
 }
 
-/* -- Navigation Menu (flat, icon‑only, grouped) -- */
+/* -- Navigation Menu (2-column grid layout) -- */
 #menu {
-  display: flex;
-  flex-direction: column;
-  padding: var(--gap-sm) 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  align-items: start;
+  padding: 10px;
   flex: 1;
-  gap: 2px;
+  overflow-y: auto;
 }
 
-/* Group header (function category) */
+/* Group header (function category) - use display:contents to allow grid layout */
 .menu-group {
-  display: flex;
-  flex-direction: column;
-  margin-top: 6px;
+  display: contents; /* Children participate in #menu grid */
 }
+
 .menu-group-label {
-  font-size: 0.62rem;
+  grid-column: 1 / -1; /* Span both columns */
+  font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(176, 196, 222, 0.45);
-  padding: 8px 0 4px 0;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
+  color: rgba(176, 196, 222, 0.6);
+  padding: 6px 4px 3px 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  margin-top: 4px;
+  text-align: left;
+  white-space: normal;
+  overflow: visible;
 }
 
-/* Icon‑only item; label appears on hover */
+/* Menu item in 2-column grid */
 .menu-item {
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 11px 0;
-  font-size: var(--font-size-sm);
+  gap: 6px;
+  padding: 7px 8px;
+  font-size: 0.82rem;
   font-weight: 500;
   color: var(--sidebar-text);
   transition: background 0.2s, color 0.2s, border-color 0.2s;
   border-left: 3px solid transparent;
-  white-space: nowrap;
+  border-radius: var(--radius-sm);
+  white-space: normal;
+  cursor: pointer;
+  min-width: 0; /* Allow flex items to shrink */
 }
 
 .menu-item svg {
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px !important;
   flex-shrink: 0;
   opacity: 0.7;
   transition: opacity 0.2s;
 }
 
-/* Label tooltip on hover */
+/* Label inline (no tooltip) */
 .menu-item-label {
-  position: absolute;
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%) scale(0.96);
-  background: #1b2d44;
-  color: #fff;
-  padding: 5px 10px;
-  border-radius: 6px;
-  font-size: 0.78rem;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease, transform 0.15s ease;
-  z-index: 50;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
-}
-.menu-item-label::before {
-  content: "";
-  position: absolute;
-  right: 100%;
-  top: 50%;
-  transform: translateY(-50%);
-  border: 5px solid transparent;
-  border-right-color: #1b2d44;
+  font-size: 0.85em;
+  white-space: normal;
+  line-height: 1.15;
+  flex: 1;
+  opacity: 1;
 }
 
 .menu-item:hover {
@@ -238,10 +234,6 @@ button {
 }
 .menu-item:hover svg {
   opacity: 1;
-}
-.menu-item:hover .menu-item-label {
-  opacity: 1;
-  transform: translateY(-50%) scale(1);
 }
 
 .menu-item.active {
@@ -264,6 +256,16 @@ button {
   border: none;
   opacity: 0;
   transition: width 0.25s ease, opacity 0.2s ease, min-width 0.25s ease;
+}
+
+/* Menu group labels in 2-column layout */
+.menu-group-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(176, 196, 222, 0.6);
+  padding: 8px 4px 4px 4px;
+  grid-column: 1 / -1;
 }
 
 .sub-item svg {

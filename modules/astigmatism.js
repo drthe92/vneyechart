@@ -1,9 +1,12 @@
 /**
  * astigmatism.js — Mặt số đồng hồ loạn thị (Astigmatism Sunburst Dial).
- * * Phiên bản đã hiệu chỉnh chuẩn quang học:
+ *
+ * Phiên bản đã hiệu chỉnh chuẩn quang học:
  * - Bề dày vạch tỷ lệ thuận với kích thước Canvas (mô phỏng góc thị giác 20/40 - 20/50).
  * - Tâm rỗng, ngăn ngừa nhòe trung tâm do cầu sai (spherical aberration).
  * - Font chữ số tối ưu hiển thị ở khoảng cách xa.
+ * - Cụm 36 vạch hướng tâm tĩnh, không xoay. Maddox Indicator xoay để chỉ trục loạn thị.
+ * - Tích hợp chế độ Duochrome (Đỏ-Xanh) với phím D.
  */
 
 // ================================================================
@@ -13,8 +16,9 @@
 /** Số vạch trên mặt đồng hồ (36 vạch × 10° = 360°). */
 const NUM_LINES = 36;
 const ANGLE_STEP = 360 / NUM_LINES; 
-const NUM_STEPS = 36;
-const ROTATION_STEPS = Array.from({ length: NUM_STEPS }, (_, i) => i * ANGLE_STEP);
+
+/** Các bước góc xoay từ 0° đến 179° (bước nhảy 1°). */
+const ROTATION_STEPS = Array.from({ length: 180 }, (_, i) => i);
 
 /** Tỷ lệ bán kính vùng trống ở tâm. Cần đủ lớn để tách biệt các vạch hướng tâm. */
 const CENTER_RADIUS_RATIO = 0.08; 
@@ -36,8 +40,9 @@ const LINE_WIDTH_RATIO = 0.018;
  * @param {number} height    Logical height
  * @param {number} dpr       Device pixel ratio
  * @param {number} rotation  Góc xoay (độ)
+ * @param {boolean} isDuochrome  Có sử dụng nền Duochrome hay không
  */
-function drawDial(ctx, width, height, dpr, rotation) {
+function drawDial(ctx, width, height, dpr, rotation, isDuochrome) {
   const cx = (width * dpr) / 2;
   const cy = (height * dpr) / 2;
   // Bán kính hữu dụng chừa lề
@@ -46,16 +51,23 @@ function drawDial(ctx, width, height, dpr, rotation) {
   // Tính toán bề dày nét vẽ chuẩn quang học (tỷ lệ với bán kính)
   const lineWidth = Math.max(1, Math.round(radius * LINE_WIDTH_RATIO));
 
-  // ---- Nền trắng (tương phản tối đa) ----
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, width * dpr, height * dpr);
+  // ---- Nền ----
+  if (isDuochrome) {
+    // Chế độ Duochrome: nửa trái Đỏ, nửa phải Xanh
+    const fullWidth = width * dpr;
+    // Nửa trái - Đỏ
+    ctx.fillStyle = '#FF0000';
+    ctx.fillRect(0, 0, fullWidth / 2, height * dpr);
+    // Nửa phải - Xanh
+    ctx.fillStyle = '#00FF00';
+    ctx.fillRect(fullWidth / 2, 0, fullWidth / 2, height * dpr);
+  } else {
+    // Nền trắng (tương phản tối đa)
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, width * dpr, height * dpr);
+  }
 
-  // ---- Vạch lan toả ----
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate((rotation * Math.PI) / 180);
-  ctx.translate(-cx, -cy);
-
+  // ---- Vạch lan toả (CỐ ĐỊNH - KHÔNG XOAY) ----
   // Cấu hình nét vẽ đen, đầu vạch vuông góc (butt) để sắc nét
   ctx.strokeStyle = '#000000';
   ctx.lineWidth = lineWidth;
@@ -79,7 +91,6 @@ function drawDial(ctx, width, height, dpr, rotation) {
     ctx.lineTo(x2, y2);
   }
   ctx.stroke();
-  ctx.restore();
 
   // ---- Vòng tròn trung tâm (đường viền định tâm) ----
   ctx.beginPath();
@@ -105,6 +116,57 @@ function drawDial(ctx, width, height, dpr, rotation) {
     const ny = cy + numRadius * Math.sin(angle);
     ctx.fillText(String(hour), nx, ny);
   }
+
+  // ---- Maddox Indicator (XOAY theo trục loạn thị) ----
+  drawMaddoxIndicator(ctx, cx, cy, radius, rotation, lineWidth);
+}
+
+/**
+ * Vẽ Maddox Indicator (khối V) để chỉ trục loạn thị.
+ * Sử dụng nét vẽ đậm gấp đôi và xoay theo góc rotation.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} cx        Tâm X
+ * @param {number} cy        Tâm Y
+ * @param {number} radius    Bán kính mặt đồng hồ
+ * @param {number} rotation  Góc xoay (độ)
+ * @param {number} baseLineWidth  Độ dày nét vẽ cơ bản
+ */
+function drawMaddoxIndicator(ctx, cx, cy, radius, rotation, baseLineWidth) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate((rotation * Math.PI) / 180);
+
+  // Nét vẽ đậm gấp đôi
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = baseLineWidth * 2;
+  ctx.lineCap = 'butt';
+
+  const innerR = radius * CENTER_RADIUS_RATIO;
+  const outerR = radius * (1 - NUMBER_MARGIN_RATIO - 0.05);
+
+  // Vẽ khối V (2 vạch cắt nhau một góc 60°)
+  // Góc mở 60°, mỗi vạch lệch ±30° so với trục chính
+  const halfAngle = 30 * Math.PI / 180;
+  
+  ctx.beginPath();
+  
+  // Vạch bên trái của V (góc -30°)
+  const leftAngle = -halfAngle;
+  const leftCos = Math.cos(leftAngle);
+  const leftSin = Math.sin(leftAngle);
+  ctx.moveTo(innerR * leftCos, innerR * leftSin);
+  ctx.lineTo(outerR * leftCos, outerR * leftSin);
+  
+  // Vạch bên phải của V (góc +30°)
+  const rightAngle = halfAngle;
+  const rightCos = Math.cos(rightAngle);
+  const rightSin = Math.sin(rightAngle);
+  ctx.moveTo(innerR * rightCos, innerR * rightSin);
+  ctx.lineTo(outerR * rightCos, outerR * rightSin);
+  
+  ctx.stroke();
+
+  ctx.restore();
 }
 
 // ================================================================
@@ -116,8 +178,30 @@ const astigmatism = {
   label: 'Trục loạn thị',
   steps: ROTATION_STEPS,
   _canvas: null,
+  _isDuochrome: false,
+  _keyHandler: null,
+  _currentIndex: 0,
 
   render(index) {
+    // Thiết lập sự kiện bàn phím (chỉ một lần)
+    if (!this._keyHandler) {
+      this._keyHandler = (e) => {
+        if (e.key === 'd' || e.key === 'D') {
+          // Ngăn chặn sự kiện lan ra các handler khác (tránh nhảy bảng)
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          
+          this._isDuochrome = !this._isDuochrome;
+          // Render lại với index hiện tại
+          this.render(this._currentIndex);
+        }
+      };
+      // Sử dụng capture phase để bắt sự kiện trước các handler khác
+      document.addEventListener('keydown', this._keyHandler, true);
+    }
+
+    this._currentIndex = index;
     const rotation = ROTATION_STEPS[index];
     const dpr = window.devicePixelRatio || 1;
 
@@ -147,7 +231,7 @@ const astigmatism = {
     // Disable image smoothing để cạnh sắc nét tối đa
     ctx.imageSmoothingEnabled = false; 
     
-    drawDial(ctx, logicalW, logicalH, dpr, rotation);
+    drawDial(ctx, logicalW, logicalH, dpr, rotation, this._isDuochrome);
 
     const info = document.createElement('div');
     info.className = 'astig-info';
@@ -157,7 +241,7 @@ const astigmatism = {
     info.style.fontFamily = 'sans-serif';
     info.innerHTML = `
       <span style="background: rgba(255,255,255,0.8); padding: 4px 8px; border-radius: 4px;">
-        Xoay: <strong>${rotation}°</strong> (${index + 1}/${ROTATION_STEPS.length})
+        Trục loạn thị: <strong>${rotation}°</strong> | Nhấn [D] để bật/tắt nền Đỏ-Xanh
       </span>
     `;
     board.appendChild(info);
@@ -167,6 +251,11 @@ const astigmatism = {
     if (this._canvas) {
       this._canvas.remove();
       this._canvas = null;
+    }
+    // Gỡ bỏ event listener (phải khớp với capture phase đã dùng khi add)
+    if (this._keyHandler) {
+      document.removeEventListener('keydown', this._keyHandler, true);
+      this._keyHandler = null;
     }
   },
 };

@@ -20,6 +20,7 @@ import landoltCModule     from '../modules/landolt_c.js';
 import tumblingEModule    from '../modules/tumbling_e.js';
 import numberChartModule  from '../modules/number_chart.js';
 import hotvModule         from '../modules/hotv.js';
+import aucklandLogmar     from '../modules/auckland_logmar.js';
 import worth4dot          from '../modules/worth4dot.js';
 import astigmatism        from '../modules/astigmatism.js';
 import { amslerGrid, ishiharaTest, pelliRobson } from '../modules/retina_subs.js';
@@ -33,6 +34,7 @@ import nearLeaModule      from '../modules/near_lea.js';
 import neuroOknModule from '../modules/neuro_okn.js';
 import redDesatModule from '../modules/red_desat.js';
 import duochromeModule from '../modules/duochrome_test.js';
+import jccSimulationModule from '../modules/astigmatism_jcc.js';
 
 // ================================================================
 //  State Management
@@ -158,6 +160,7 @@ registerTestModule(leaModule);             // id: 'far-vision-lea'
 registerTestModule(landoltCModule);        // id: 'far-vision-landolt'
 registerTestModule(tumblingEModule);       // id: 'far-vision-tumbling-e'
 registerTestModule(numberChartModule);      // id: 'far-vision-numbers'
+registerTestModule(aucklandLogmar);         // id: 'far-vision-auckland'
 
 // ----- Other modules -----
 registerTestModule(hotvModule);            // id: 'far-vision-hotv'
@@ -178,6 +181,9 @@ registerTestModule(nearLeaModule);         // id: 'near-vision-lea'
 registerTestModule(redDesatModule);        // id: 'neuro-red-desat'
 registerTestModule(neuroOknModule);        // id: 'neuro-okn'
 registerTestModule(duochromeModule);       // id: 'neuro-duochrome'
+
+// ----- JCC Simulation module -----
+registerTestModule(jccSimulationModule);   // id: 'jcc-simulation'
 
 // ----- Fallback modules -----
 const DEFAULT_STEPS = ['▲', '▶', '●', '◆', '★', '⬟'];
@@ -269,14 +275,30 @@ function setupSidebar() {
     });
   });
 
-  // Nút phục hồi menu (nhấn đâu trên vùng đo sẽ hiện lại menu).
-  const board = document.getElementById('display-board');
-  if (board) {
-    board.addEventListener('click', () => {
+  // New keyboard/mouse triggers for sidebar toggle
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
       const sidebar = document.getElementById('sidebar');
-      if (sidebar) sidebar.classList.remove('sidebar-hidden');
-    });
-  }
+      if (sidebar) sidebar.classList.toggle('sidebar-hidden');
+    }
+  });
+
+  document.addEventListener('mouseup', (e) => {
+    if (e.button === 4) { // Forward mouse button (button 4)
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar) sidebar.classList.toggle('sidebar-hidden');
+    }
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+    // Show sidebar when mouse enters bottom-right 30x30px corner
+    if (e.clientX > window.innerWidth - 30 && e.clientY > window.innerHeight - 30) {
+      sidebar.classList.remove('sidebar-hidden');
+    }
+  });
 }
 
 // ================================================================

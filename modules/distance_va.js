@@ -1,15 +1,19 @@
 /**
- * distance_va.js — ETDRS Distance VA with Standardised 5×5 Paths
+ * distance_va.js — ETDRS Distance VA with drthe Sloan optotypes
  * ==============================================================
  * Module id: 'far-vision'
+ *
+ * Sử dụng optotype Sloan từ generated/drthe_optotype/sloan (SVG 500×500)
+ * thay vì path mã hóa cứng trong optotype_paths.js.
  */
 
 import { getOptotypeSize } from '../js/calibration.js';
-import { SLOAN } from './optotype_paths.js';
+import { loadOptotype } from './drthe_optotype_loader.js';
 
 const LOGMAR_LEVELS = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0, -0.1, -0.2, -0.3];
 const LETTERS_PER_ROW = 5;
-const LETTER_KEYS = Object.keys(SLOAN);
+// 10 chữ cái Sloan chuẩn (khớp với file trong generated/drthe_optotype/sloan)
+const LETTER_KEYS = ['C', 'D', 'H', 'K', 'N', 'O', 'R', 'S', 'V', 'Z'];
 
 function shuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
@@ -24,7 +28,7 @@ const distanceVATest = {
   steps: LOGMAR_LEVELS,
   _letters: pickRandomLetters(),
 
-  render(index) {
+  async render(index) {
     const logmar = LOGMAR_LEVELS[index];
     let calib;
     const calibrator = window.__calibrator;
@@ -33,13 +37,22 @@ const distanceVATest = {
     const gap = pxSize * 0.3;
     const totalWidth = pxSize * LETTERS_PER_ROW + gap * (LETTERS_PER_ROW - 1);
 
+    // Tải path Sloan từ drthe (async)
+    const paths = {};
+    await Promise.all(this._letters.map(async (letter) => {
+      paths[letter] = await loadOptotype('sloan', letter);
+    }));
+
     const svgParts = [];
     svgParts.push(`<svg class="etdrs-chart" viewBox="0 0 ${totalWidth} ${pxSize}" width="${totalWidth}" height="${pxSize}" xmlns="http://www.w3.org/2000/svg">`);
 
     this._letters.forEach((letter, i) => {
       const x = i * (pxSize + gap);
-      const scale = pxSize / 5;
-      svgParts.push(`<g transform="translate(${x}, 0) scale(${scale})">${SLOAN[letter]}</g>`);
+      const scale = pxSize / 500; // drthe viewBox 500×500
+      const path = paths[letter] || '';
+      if (path) {
+        svgParts.push(`<g transform="translate(${x}, 0) scale(${scale})">${path}</g>`);
+      }
     });
 
     svgParts.push('</svg>');
@@ -56,4 +69,4 @@ const distanceVATest = {
 };
 
 export default distanceVATest;
-export { LOGMAR_LEVELS, SLOAN, distanceVATest };
+export { LOGMAR_LEVELS, distanceVATest };
