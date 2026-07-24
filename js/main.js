@@ -35,6 +35,7 @@ import neuroOknModule from '../modules/neuro_okn.js';
 import redDesatModule from '../modules/red_desat.js';
 import duochromeModule from '../modules/duochrome_test.js';
 import jccSimulationModule from '../modules/astigmatism_jcc.js';
+import stereoAnaglyphModule from '../modules/stereo_anaglyph.js';
 
 // ================================================================
 //  State Management
@@ -166,6 +167,7 @@ registerTestModule(aucklandLogmar);         // id: 'far-vision-auckland'
 registerTestModule(hotvModule);            // id: 'far-vision-hotv'
 registerTestModule(worth4dot);             // id: 'binocular'
 registerTestModule(astigmatism);           // id: 'astigmatism'
+registerTestModule(stereoAnaglyphModule);  // id: 'binocular-stereo'
 
 // ----- Retina sub‑modules -----
 registerTestModule(amslerGrid);            // id: 'retina-amsler'
@@ -362,6 +364,7 @@ function setupCalibrator() {
   }
 
   window.__calibrator = calibrator;
+  window.__ccCal = ccCal;  // Expose for cross-module access (e.g., stereo_anaglyph warning)
   return calibrator;
 }
 
