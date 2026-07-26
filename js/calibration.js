@@ -1,11 +1,9 @@
 /**
  * DisplayCalibrator — Hiệu chỉnh màn hình cho Vision Therapy.
  *
- * Cho phép nhập khoảng cách khám và kích thước màn hình vật lý,
- * tính PPI (Pixel Per Inch) / mật độ điểm ảnh, và tính kích thước
- * pixel của optotype theo LogMAR dựa trên công thức góc thị giác 5 phút cung.
- *
- * Các thông số được lưu vào localStorage và tự động khôi phục.
+ * Đã được đơn giản hóa: Chuyển hướng hiệu chuẩn vật lý sang module
+ * CreditCardCalibrator (hiệu chuẩn bằng thẻ tín dụng - nguồn dữ liệu
+ * duy nhất đạt chuẩn chính xác cho các bài test thị giác).
  *
  * Export:
  *   - default: DisplayCalibrator class
@@ -26,16 +24,12 @@ const MM_PER_INCH = 25.4;
 /** LocalStorage keys */
 const STORAGE_KEYS = {
   distanceM:   'vision-therapy-calibrate-distance-m',
-  diagonalIn:  'vision-therapy-calibrate-diagonal-in',
-  heightMm:    'vision-therapy-calibrate-height-mm',
-  inputMode:   'vision-therapy-calibrate-input-mode',   // 'diagonal' | 'height'
   // Rào cản #1: Hiệu chuẩn vật lý bằng thẻ tín dụng (chính xác nhất).
   // Khóa này PHẢI khớp với CC_STORAGE_KEY trong credit_card_calibration.js.
   ccPxPerMm:   'vision-therapy-cc-pxpermm',
 };
 
 const DEFAULT_DISTANCE_M = 4;    // 4 mét
-const DEFAULT_DIAGONAL_IN = 24;  // 24 inch màn hình desktop phổ biến
 
 // ================================================================
 //  Core Math
@@ -95,9 +89,6 @@ function getOptotypeSize(logmarValue, calib = null) {
 function _loadCalibFromStorage() {
   try {
     const dist   = localStorage.getItem(STORAGE_KEYS.distanceM);
-    const mode   = localStorage.getItem(STORAGE_KEYS.inputMode);
-    const diag   = localStorage.getItem(STORAGE_KEYS.diagonalIn);
-    const hMm    = localStorage.getItem(STORAGE_KEYS.heightMm);
     const ccPx   = localStorage.getItem(STORAGE_KEYS.ccPxPerMm);
 
     const distanceM = dist ? parseFloat(dist) : DEFAULT_DISTANCE_M;
@@ -111,23 +102,6 @@ function _loadCalibFromStorage() {
       return { distanceM, ppi };
     }
 
-    if (mode === 'height' && hMm) {
-      const heightMm = parseFloat(hMm);
-      if (heightMm > 0) {
-        // Dùng CSS pixels — trình duyệt tự ánh xạ sang physical px
-        const pxPerMm = window.screen.height / heightMm;
-        ppi = pxPerMm * MM_PER_INCH; // số thực
-      }
-    } else if (diag) {
-      const diagonal = parseFloat(diag);
-      if (diagonal > 0) {
-        const w = window.screen.width;
-        const h = window.screen.height;
-        ppi = Math.sqrt(w * w + h * h) / diagonal; // số thực
-      }
-    }
-
-    if (ppi > 0) return { distanceM, ppi };
     return null;
   } catch (e) {
     return null;
@@ -140,12 +114,18 @@ function _loadCalibFromStorage() {
  * @returns {number} số thực
  * @private
  */
+/**
+ * Ước lượng PPI từ window.screen và devicePixelRatio.
+ * Chỉ dùng làm mốc dự phòng (fallback) nếu chưa hiệu chuẩn thẻ tín dụng.
+ * @returns {number} số thực
+ * @private
+ */
 function _estimatePPI() {
-  // Dùng CSS pixels — trình duyệt tự ánh xạ sang physical px
   const w = window.screen.width;
   const h = window.screen.height;
   const diagPx = Math.sqrt(w * w + h * h);
-  return diagPx / DEFAULT_DIAGONAL_IN; // số thực
+  const FALLBACK_DIAGONAL_INCH = 24; // Màn hình desktop phổ thông
+  return diagPx / FALLBACK_DIAGONAL_INCH;
 }
 
 // ================================================================
@@ -155,31 +135,17 @@ function _estimatePPI() {
 class DisplayCalibrator {
   /**
    * @param {Object} [options]
-   * @param {number}  [options.distanceM=3]       Khoảng cách khám (mét)
-   * @param {number}  [options.diagonalInch=24]   Đường chéo màn hình (inch)
-   * @param {number}  [options.physicalHeightMm]  Chiều cao vật lý vùng hiển thị (mm)
-   *                                              Nếu có, ưu tiên hơn diagonalInch
+   * @param {number}  [options.distanceM=4]       Khoảng cách khám (mét)
    * @param {boolean} [options.autoLoad=true]     Tự động đọc localStorage
    */
   constructor(options = {}) {
-    this.distanceM        = options.distanceM        ?? DEFAULT_DISTANCE_M;
-    this.diagonalInch     = options.diagonalInch     ?? DEFAULT_DIAGONAL_IN;
-    this.physicalHeightMm = options.physicalHeightMm || null;
-
-    /** 'diagonal' | 'height' */
-    this._inputMode = 'diagonal';
+    this.distanceM = options.distanceM ?? DEFAULT_DISTANCE_M;
 
     /** @type {number} PPI tính được (số thực) */
     this.ppi = 0;
 
     /** @type {number} pixel / mm (số thực) */
     this.pxPerMm = 0;
-
-    /** @type {HTMLDivElement|null} */
-    this._modalOverlay = null;
-
-    /** @private */
-    this._boundKeydown = this._onModalKeydown.bind(this);
 
     // Auto-load
     if (options.autoLoad !== false) {
@@ -200,7 +166,7 @@ class DisplayCalibrator {
     this._loadFromStorage();
     this._recalculate();
     console.log(
-      `%c[DisplayCalibrator]%c ${this.ppi.toFixed(2)} PPI  |  ${this.distanceM}m  |  ${this._inputMode === 'diagonal' ? this.diagonalInch + '″' : this.physicalHeightMm + 'mm'}`,
+      `%c[DisplayCalibrator]%c ${this.ppi.toFixed(2)} PPI  |  ${this.distanceM}m`,
       'color:#4a90d9; font-weight:700;',
       'color:#555; font-weight:400;'
     );
@@ -212,30 +178,17 @@ class DisplayCalibrator {
 
   /**
    * Tính lại PPI và pxPerMm dựa trên thông số hiện tại.
-   * Gọi sau khi thay đổi distanceM / diagonalInch / physicalHeightMm.
-   *
-   * QUAN TRỌNG: Nhân với window.devicePixelRatio để có số pixel
-   * vật lý thật trên màn hình Retina/High-DPI.
+   * Chỉ sử dụng dữ liệu từ hiệu chuẩn thẻ tín dụng (ccPxPerMm).
    */
   _recalculate() {
-    // Dùng CSS pixels (window.screen.width/height) — trình duyệt
-    // tự động ánh xạ CSS px → physical px qua devicePixelRatio.
-    // Không nhân dpr vào đây vì sẽ gây double-counting.
-    const w = window.screen.width;
-    const h = window.screen.height;
-
-    if (this.physicalHeightMm && this._inputMode === 'height') {
-      // Dùng chiều cao vật lý (mm)
-      this.pxPerMm = h / this.physicalHeightMm;
-      this.ppi = this.pxPerMm * MM_PER_INCH; // số thực
-    } else if (this.diagonalInch > 0) {
-      // Dùng đường chéo (inch)
-      const diagPx = Math.sqrt(w * w + h * h);
-      this.ppi = diagPx / this.diagonalInch; // số thực
-      this.pxPerMm = this.ppi / MM_PER_INCH;
-    } else {
-      this.ppi = 0;
-      this.pxPerMm = 0;
+    try {
+      const ccPx = localStorage.getItem(STORAGE_KEYS.ccPxPerMm);
+      if (ccPx && parseFloat(ccPx) > 0) {
+        this.pxPerMm = parseFloat(ccPx);
+        this.ppi = this.pxPerMm * MM_PER_INCH; // số thực
+      }
+    } catch (e) {
+      // ignore
     }
   }
 
@@ -245,28 +198,6 @@ class DisplayCalibrator {
   setDistance(meters) {
     this.distanceM = meters;
     this._saveToStorage();
-    this._recalculate();
-  }
-
-  /**
-   * Cập nhật đường chéo màn hình (inch).
-   */
-  setDiagonal(inches) {
-    this.diagonalInch = inches;
-    this._inputMode = 'diagonal';
-    this.physicalHeightMm = null;
-    this._saveToStorage();
-    this._recalculate();
-  }
-
-  /**
-   * Cập nhật chiều cao vật lý vùng hiển thị (mm).
-   */
-  setPhysicalHeight(mm) {
-    this.physicalHeightMm = mm;
-    this._inputMode = 'height';
-    this._saveToStorage();
-    this._recalculate();
   }
 
   // ================================================================
@@ -293,7 +224,6 @@ class DisplayCalibrator {
   /**
    * Áp dụng preset mặc định cho thị lực nhìn gần (40 cm).
    * Đặt khoảng cách = 0.4 m, giữ nguyên PPI hiện tại.
-   * Gọi hàm này để chuyển nhanh giữa khám xa và gần.
    */
   applyNearVisionPreset() {
     this.setDistance(0.4);
@@ -323,14 +253,7 @@ class DisplayCalibrator {
   /** @private */
   _saveToStorage() {
     try {
-      localStorage.setItem(STORAGE_KEYS.distanceM,   String(this.distanceM));
-      localStorage.setItem(STORAGE_KEYS.diagonalIn,  String(this.diagonalInch));
-      localStorage.setItem(STORAGE_KEYS.inputMode,   this._inputMode);
-      if (this.physicalHeightMm != null) {
-        localStorage.setItem(STORAGE_KEYS.heightMm, String(this.physicalHeightMm));
-      } else {
-        localStorage.removeItem(STORAGE_KEYS.heightMm);
-      }
+      localStorage.setItem(STORAGE_KEYS.distanceM, String(this.distanceM));
     } catch (e) {
       // ignore
     }
@@ -339,335 +262,102 @@ class DisplayCalibrator {
   /** @private */
   _loadFromStorage() {
     try {
-      const dist  = localStorage.getItem(STORAGE_KEYS.distanceM);
-      const diag  = localStorage.getItem(STORAGE_KEYS.diagonalIn);
-      const mode  = localStorage.getItem(STORAGE_KEYS.inputMode);
-      const hMm   = localStorage.getItem(STORAGE_KEYS.heightMm);
-
-      if (dist)  this.distanceM = parseFloat(dist);
-      if (diag)  this.diagonalInch = parseFloat(diag);
-      if (mode)  this._inputMode = mode;
-
-      if (mode === 'height' && hMm) {
-        this.physicalHeightMm = parseFloat(hMm);
-      }
+      const dist = localStorage.getItem(STORAGE_KEYS.distanceM);
+      if (dist) this.distanceM = parseFloat(dist);
     } catch (e) {
       // ignore
     }
   }
 
   // ================================================================
-  //  Modal
+  //  Modal - Redirected to CreditCardCalibrator
   // ================================================================
 
   /**
-   * Hiển thị modal hiệu chỉnh.
+   * Hiển thị modal hiệu chuẩn.
+   * Đã được đơn giản hóa: Chuyển hướng trực tiếp sang module
+   * CreditCardCalibrator để hiệu chuẩn vật lý bằng thẻ tín dụng.
+   * 
+   * Khoảng cách khám (distanceM) phải được thiết lập trước khi gọi hàm này
+   * (thông qua constructor hoặc setDistance()).
    */
   showModal() {
-    if (this._modalOverlay) return;
-
-    // Overlay
+    // Hiển thị hộp thoại chọn khoảng cách khám trước khi mở hiệu chuẩn thẻ tín dụng
     const overlay = document.createElement('div');
     overlay.className = 'calib-modal-overlay';
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) this.hideModal();
-    });
-
-    // Box
-    const box = document.createElement('div');
-    box.className = 'calib-modal-box';
-
-    // ----- Header -----
-    const header = document.createElement('div');
-    header.className = 'calib-modal-header';
-    header.innerHTML = '<span class="calib-modal-title">Hiệu chỉnh màn hình</span>';
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'calib-modal-close';
-    closeBtn.innerHTML = '&times;';
-    closeBtn.setAttribute('aria-label', 'Đóng');
-    closeBtn.addEventListener('click', () => this.hideModal());
-    header.appendChild(closeBtn);
-    box.appendChild(header);
-
-    // ----- Body -----
-    const body = document.createElement('div');
-    body.className = 'calib-modal-body';
-
-    // -- Khoảng cách khám --
-    body.appendChild(this._createFieldGroup(
-      'Khoảng cách khám',
-      'distance-m',
-      'mét',
-      this.distanceM,
-      'number',
-      '0.5',
-      '0.5',
-      '20',
-      (val) => { this.distanceM = parseFloat(val); this._recalculate(); }
-    ));
-
-    // -- Đường chéo màn hình --
-    body.appendChild(this._createFieldGroup(
-      'Đường chéo màn hình',
-      'diagonal-in',
-      'inch',
-      this.diagonalInch,
-      'number',
-      '1',
-      '10',
-      '100',
-      (val) => { this.diagonalInch = parseFloat(val); this._inputMode = 'diagonal'; this._recalculate(); }
-    ));
-
-    // -- Chiều cao vùng hiển thị --
-    body.appendChild(this._createFieldGroup(
-      'Chiều cao vùng hiển thị',
-      'physical-height',
-      'mm',
-      this.physicalHeightMm || 300,
-      'number',
-      '1',
-      '50',
-      '2000',
-      (val) => { this.physicalHeightMm = parseFloat(val); this._inputMode = 'height'; this._recalculate(); }
-    ));
-
-    // -- Chiều cao màn hình vật lý (từ window.screen) --
-    const screenHmm = (window.screen && window.screen.height)
-      ? (window.screen.height / (this.ppi || 1) * 25.4).toFixed(1)
-      : '—';
-    const screenInfo = document.createElement('div');
-    screenInfo.className = 'calib-screen-info';
-    screenInfo.innerHTML = `Màn hình: <b>${window.screen?.width || '?'} × ${window.screen?.height || '?'} px</b> · chiều cao vật lý ≈ <b>${screenHmm} mm</b>`;
-    body.appendChild(screenInfo);
-
-    // -- Kết quả PPI --
-    const result = document.createElement('div');
-    result.className = 'calib-result';
-    result.innerHTML = `
-      <div class="calib-result-row">
-        <span class="calib-result-label">Mật độ điểm ảnh (PPI)</span>
-        <span class="calib-result-value">${this.ppi.toFixed(2)}</span>
-      </div>
-      <div class="calib-result-row">
-        <span class="calib-result-label">Pixel / mm</span>
-        <span class="calib-result-value">${this.pxPerMm.toFixed(4)}</span>
-      </div>
-      <div class="calib-result-row">
-        <span class="calib-result-label">Kích thước màn hình</span>
-        <span class="calib-result-value">${window.screen.width} × ${window.screen.height}</span>
-      </div>
-      <div class="calib-result-row">
-        <span class="calib-result-label">devicePixelRatio</span>
-        <span class="calib-result-value">${(window.devicePixelRatio || 1).toFixed(1)}</span>
+    overlay.innerHTML = `
+      <div class="calib-modal-box" style="max-width: 400px;">
+        <div class="calib-modal-header">
+          <span class="calib-modal-title">Chọn khoảng cách khám</span>
+          <button class="calib-modal-close" aria-label="Đóng">&times;</button>
+        </div>
+        <div class="calib-modal-body">
+          <p style="margin-bottom: 16px; color: #555;">Khoảng cách từ mắt đến màn hình (mét):</p>
+          <div class="calib-field-group">
+            <label class="calib-field-label" for="calib-distance-input">Khoảng cách (m)</label>
+            <div class="calib-field-row">
+              <input type="number" id="calib-distance-input" class="calib-field-input"
+                     value="${this.distanceM}" step="0.1" min="0.5" max="20" inputmode="decimal">
+              <span class="calib-field-unit">mét</span>
+            </div>
+          </div>
+          <div class="calib-preset-row" style="margin-top: 16px;">
+            <button class="calib-btn-preset" data-distance="0.4" title="Thị lực nhìn gần (40 cm)">📖 40 cm</button>
+            <button class="calib-btn-preset" data-distance="3" title="3 mét">🌄 3 m</button>
+            <button class="calib-btn-preset" data-distance="4" title="4 mét">🌄 4 m</button>
+            <button class="calib-btn-preset" data-distance="5" title="5 mét">🌄 5 m</button>
+          </div>
+        </div>
+        <div class="calib-modal-footer">
+          <button class="calib-btn-cancel">Huỷ</button>
+          <button class="calib-btn-save">Tiếp tục →</button>
+        </div>
       </div>
     `;
-    body.appendChild(result);
-
-    // -- Preset buttons --
-    const presetRow = document.createElement('div');
-    presetRow.className = 'calib-preset-row';
-    presetRow.innerHTML = `
-      <button class="calib-btn-preset" data-preset="near" title="Chuyển sang chế độ thị lực nhìn gần (40 cm)">
-        📖 Nhìn gần (40 cm)
-      </button>
-      <button class="calib-btn-preset" data-preset="distance" title="Chuyển sang chế độ thị lực nhìn xa (4 m)">
-        🌄 Nhìn xa (4 m)
-      </button>
-    `;
-    presetRow.querySelector('[data-preset="near"]').addEventListener('click', () => {
-      this.applyNearVisionPreset();
-      this._rebuildModal();
-    });
-    presetRow.querySelector('[data-preset="distance"]').addEventListener('click', () => {
-      this.applyDistanceVisionPreset();
-      this._rebuildModal();
-    });
-    body.appendChild(presetRow);
-
-    // -- Ghi chú --
-    const note = document.createElement('p');
-    note.className = 'calib-note';
-    note.textContent = 'Thông số được tự động lưu và khôi phục khi load lại trang.';
-    body.appendChild(note);
-
-    box.appendChild(body);
-
-    // ----- Footer -----
-    const footer = document.createElement('div');
-    footer.className = 'calib-modal-footer';
-
-    const saveBtn = document.createElement('button');
-    saveBtn.className = 'calib-btn-save';
-    saveBtn.textContent = 'Lưu & Đóng';
-    saveBtn.addEventListener('click', () => {
-      this._saveToStorage();
-      this._recalculate();
-      this.hideModal();
-      console.log(
-        `%c[DisplayCalibrator]%c Saved — ${this.ppi.toFixed(2)} PPI, ${this.distanceM}m`,
-        'color:#4a90d9; font-weight:700;',
-        'color:#555; font-weight:400;'
-      );
-    });
-
-    const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'calib-btn-cancel';
-    cancelBtn.textContent = 'Huỷ';
-    cancelBtn.addEventListener('click', () => {
-      // Restore from storage
-      this._loadFromStorage();
-      this._recalculate();
-      this.hideModal();
-    });
-
-    footer.appendChild(cancelBtn);
-    footer.appendChild(saveBtn);
-    box.appendChild(footer);
-
-    overlay.appendChild(box);
+    
     document.body.appendChild(overlay);
-    this._modalOverlay = overlay;
-
-    // Escape to close
-    document.addEventListener('keydown', this._boundKeydown);
-    requestAnimationFrame(() => box.focus?.());
-  }
-
-  /**
-   * Xây dựng lại modal (khi chuyển chế độ nhập).
-   * @private
-   */
-  _rebuildModal() {
-    this.hideModal();
-    this.showModal();
-  }
-
-  /**
-   * Tạo một nhóm label + input.
-   * @private
-   */
-  _createFieldGroup(label, id, unit, value, type, step, min, max, onChange) {
-    const group = document.createElement('div');
-    group.className = 'calib-field-group';
-
-    const lbl = document.createElement('label');
-    lbl.className = 'calib-field-label';
-    lbl.htmlFor = `calib-${id}`;
-    lbl.textContent = label;
-    group.appendChild(lbl);
-
-    const inputRow = document.createElement('div');
-    inputRow.className = 'calib-field-row';
-
-    // Dùng type="text" + inputMode="decimal" thay vì type="number"
-    // để Backspace và Delete hoạt động đúng trên mọi trình duyệt
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.id = `calib-${id}`;
-    input.className = 'calib-field-input';
-    input.value = String(value);
-    input.inputMode = 'decimal';
-    input.autocomplete = 'off';
-
-    // Cho phép: digits, dấu chấm, dấu gạch ngang, Backspace, Delete, Tab, Enter, Arrow keys
-    input.addEventListener('keydown', (e) => {
-      const allowed = [
-        'Backspace', 'Delete', 'Tab', 'Enter', 'Escape',
-        'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
-        'Home', 'End',
-      ];
-      if (allowed.includes(e.key)) return;  // cho phép
-      if (e.ctrlKey || e.metaKey) return;   // cho phép Ctrl+C, Ctrl+V, etc.
-      // Chỉ cho phép digits, dấu chấm, dấu gạch ngang
-      if (!/^[\d.\-]$/.test(e.key)) {
-        e.preventDefault();
+    
+    const input = overlay.querySelector('#calib-distance-input');
+    const closeBtn = overlay.querySelector('.calib-modal-close');
+    const cancelBtn = overlay.querySelector('.calib-btn-cancel');
+    const saveBtn = overlay.querySelector('.calib-btn-save');
+    const presetBtns = overlay.querySelectorAll('.calib-btn-preset');
+    
+    // Close handlers
+    const closeModal = () => overlay.remove();
+    closeBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+    
+    // Preset buttons
+    presetBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        input.value = btn.dataset.distance;
+      });
+    });
+    
+    // Save and continue
+    saveBtn.addEventListener('click', () => {
+      const dist = parseFloat(input.value);
+      if (!isNaN(dist) && dist > 0) {
+        this.setDistance(dist);
+        closeModal();
+        // Mở hiệu chuẩn thẻ tín dụng
+        if (window.__ccCal) {
+          window.__ccCal.showModal();
+        }
       }
     });
-
-    // Xử lý input: cập nhật giá trị khi người dùng nhập
-    input.addEventListener('input', () => {
-      const raw = input.value.trim();
-      if (raw === '') {
-        // Cho phép ô trống tạm thời (đang xóa để nhập số mới)
-        return;
-      }
-      // Kiểm tra số hợp lệ
-      const num = parseFloat(raw);
-      if (!isNaN(num)) {
-        onChange(String(num));
-        this._updateResultDisplay();
-      }
-    });
-
-    // Khi mất focus: nếu trống → khôi phục giá trị cũ; nếu có số → format lại
-    input.addEventListener('blur', () => {
-      const raw = input.value.trim();
-      if (raw === '') {
-        input.value = String(value);
-        // Không gọi onChange → giữ nguyên giá trị cũ
-        return;
-      }
-      const num = parseFloat(raw);
-      if (!isNaN(num)) {
-        // Format lại số (loại bỏ số 0 thừa, dấu chấm thừa)
-        const clamped = Math.max(parseFloat(min) || 0, Math.min(parseFloat(max) || Infinity, num));
-        const formatted = step && step.indexOf('.') !== -1
-          ? clamped.toFixed(step.split('.')[1]?.length || 1)
-          : String(clamped);
-        input.value = formatted;
-        onChange(formatted);
-        this._updateResultDisplay();
-      } else {
-        // Khôi phục nếu không phải số
-        input.value = String(value);
-      }
-    });
-
-    inputRow.appendChild(input);
-
-    const unitSpan = document.createElement('span');
-    unitSpan.className = 'calib-field-unit';
-    unitSpan.textContent = unit;
-    inputRow.appendChild(unitSpan);
-
-    group.appendChild(inputRow);
-    return group;
+    
+    // Focus input
+    setTimeout(() => input.focus(), 100);
   }
 
   /**
-   * Cập nhật phần hiển thị kết quả PPI trong modal.
-   * @private
-   */
-  _updateResultDisplay() {
-    if (!this._modalOverlay) return;
-    const rows = this._modalOverlay.querySelectorAll('.calib-result-row');
-    if (rows.length >= 4) {
-      rows[0].querySelector('.calib-result-value').textContent = this.ppi.toFixed(2);
-      rows[1].querySelector('.calib-result-value').textContent = this.pxPerMm.toFixed(4);
-    }
-  }
-
-  /**
-   * Ẩn modal.
-   */
-  hideModal() {
-    if (!this._modalOverlay) return;
-    document.removeEventListener('keydown', this._boundKeydown);
-    this._modalOverlay.remove();
-    this._modalOverlay = null;
-  }
-
-  /** @private */
-  _onModalKeydown(e) {
-    if (e.key === 'Escape') this.hideModal();
-  }
-
-  /**
-   * Dọn dẹp.
+   * Dọn dẹp (không còn modal riêng để ẩn).
    */
   destroy() {
-    this.hideModal();
+    // CreditCardCalibrator tự quản lý modal của nó
   }
 }
 
@@ -681,13 +371,6 @@ class DisplayCalibrator {
  * 3 mét, 5 mét và 6 mét.
  *
  * Gọi từ Console: `debugPrintSizes()` hoặc `window.__debugPrintSizes()`
- *
- * Bảng hiển thị:
- *   - LogMAR
- *   - Snellen (ft)
- *   - Góc thị giác (arcmin)
- *   - Chiều cao vật lý (mm) tại mỗi khoảng cách
- *   - Kích thước pixel tại mỗi khoảng cách
  */
 function debugPrintSizes() {
   const distances = [3, 5, 6]; // mét

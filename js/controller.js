@@ -80,6 +80,9 @@ class UniversalInput {
     /** Callback cũ (optional) — giữ tương thích. */
     this.onAction = null;
 
+    /** @type {boolean} - Flag to suspend/resume input handling */
+    this.isSuspended = false;
+
     // --- Bound handlers ---
     this._boundKeydown      = this._onKeydown.bind(this);
     this._boundMouseDown    = this._onMouseDown.bind(this);
@@ -93,6 +96,20 @@ class UniversalInput {
     this._touchStartX = 0;
     this._touchStartY = 0;
     this._isAttached = false;
+  }
+
+  /**
+   * Suspend input handling - all events will be ignored until resume() is called.
+   */
+  suspend() {
+    this.isSuspended = true;
+  }
+
+  /**
+   * Resume input handling - events will be processed again.
+   */
+  resume() {
+    this.isSuspended = false;
   }
 
   // ================================================================
@@ -154,6 +171,9 @@ class UniversalInput {
    * @private
    */
   _onKeydown(e) {
+    // 0. Kiểm tra suspend - bỏ qua nếu đang bị tạm dừng
+    if (this.isSuspended) return;
+
     // 1. Bảo vệ nhập liệu: bỏ qua khi đang gõ trong form / editable
     const t = e.target;
     if (
@@ -223,6 +243,9 @@ class UniversalInput {
    * @private
    */
   _onMouseDown(e) {
+    // Kiểm tra suspend - bỏ qua nếu đang bị tạm dừng
+    if (this.isSuspended) return;
+
     // Bỏ qua tương tác trên button, link, input…
     const tag = e.target?.closest('button, a, input, select, textarea, [role="button"]');
     if (tag) return;
@@ -245,6 +268,9 @@ class UniversalInput {
    * @private
    */
   _onContextMenu(e) {
+    // Kiểm tra suspend - bỏ qua nếu đang bị tạm dừng
+    if (this.isSuspended) return;
+
     e.preventDefault();
   }
 
@@ -259,6 +285,9 @@ class UniversalInput {
    * @private
    */
   _onWheel(e) {
+    // Kiểm tra suspend - bỏ qua nếu đang bị tạm dừng
+    if (this.isSuspended) return;
+
     if (e.deltaY > 0) {
       this._emit('NEXT', { source: 'wheel', deltaY: e.deltaY });
     } else if (e.deltaY < 0) {
@@ -280,6 +309,9 @@ class UniversalInput {
    * @private
    */
   _onTouchStart(e) {
+    // Kiểm tra suspend - bỏ qua nếu đang bị tạm dừng
+    if (this.isSuspended) return;
+
     const touch = e.changedTouches[0];
     if (!touch) return;
     this._touchStartX = touch.clientX;
@@ -292,6 +324,9 @@ class UniversalInput {
    * @private
    */
   _onTouchEnd(e) {
+    // Kiểm tra suspend - bỏ qua nếu đang bị tạm dừng
+    if (this.isSuspended) return;
+
     const touch = e.changedTouches[0];
     if (!touch) return;
 
@@ -314,6 +349,9 @@ class UniversalInput {
    * @private
    */
   _onTouchMove(e) {
+    // Kiểm tra suspend - bỏ qua nếu đang bị tạm dừng
+    if (this.isSuspended) return;
+
     const touch = e.changedTouches[0];
     if (!touch) return;
 

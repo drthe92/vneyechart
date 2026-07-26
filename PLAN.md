@@ -184,6 +184,7 @@ The core of the vision testing system is the accurate sizing of optotypes based 
 - [x] **Neuro OKN** ([`modules/neuro_okn.js`](modules/neuro_okn.js)) - Optokinetic nystagmus
 - [x] **Crosstalk** ([`modules/crosstalk.js`](modules/crosstalk.js))
 - [x] **Stereo Random-Dot (Anaglyph)** ([`modules/stereo_anaglyph.js`](modules/stereo_anaglyph.js)) - WebGL-based RDS with Red/Cyan channels
+- [x] **Schober Test (Heterophoria)** ([`modules/schober_test.js`](modules/schober_test.js)) - Prism diopter measurement for latent strabismus using HTML5 Canvas 2D
 
 #### Retina/Color Vision
 - [x] **Amsler Grid** (in [`modules/retina_subs.js`](modules/retina_subs.js))
@@ -264,7 +265,24 @@ The core of the vision testing system is the accurate sizing of optotypes based 
 
 **Steps**:
 1. Tạo `ResultsManager` class để lưu trữ kết quả (localStorage hoặc IndexedDB)
-2. Định nghĩa cấu trúc dữ liệu kết quả (test ID, date, LogMAR, Snellen, responses)
+2. Định nghĩa cấu trúc dữ liệu kết quả theo Polymorphic JSON Schema (thay vì đóng cứng LogMAR, Snellen):
+   ```json
+   {
+     "testId": "string",
+     "timestamp": "ISO8601",
+     "patientId": "string",
+     "visualAcuity": {
+       "type": "LogMAR | Snellen | ETDRS",
+       "value": "number | string"
+     },
+     "binocularFunction": {
+       "prismDiopter": "number (for heterophoria/phoria measurement)",
+       "stereoAcuityArcsec": "number (stereopsis threshold in arcseconds)"
+     },
+     "responses": ["array of user responses"],
+     "metadata": "object (test-specific data)"
+   }
+   ```
 3. Tích hợp vào `main.js` để tự động lưu khi hoàn thành bài test
 4. Tạo giao diện xem lịch sử kết quả
 5. Thêm chức năng xóa/xuất kết quả
@@ -360,6 +378,29 @@ The core of the vision testing system is the accurate sizing of optotypes based 
 5. Hiển thị xu hướng cải thiện/thuyên giảm
 
 **Estimated complexity**: Medium-High
+
+---
+
+#### Task 2.4: Dynamic Fixation Target (Mục tiêu định thị động) - [ ]
+**Description**: Module sử dụng hình ảnh/âm thanh động tại tâm màn hình để thu hút ánh nhìn trung tâm (central fixation) cho trẻ em, hỗ trợ bác sĩ thực hiện Cover Test
+**Files to create/modify**:
+- `modules/dynamic_fixation.js` (new)
+- `generated/drthe_optotype/` (add: animated fixation targets)
+
+**Steps**:
+1. Tạo animated fixation target với hình ảnh/âm thanh động tại tâm màn hình
+2. Implement thuật toán theo dõi ánh nhìn (gaze tracking simulation)
+3. Tích hợp âm thanh thu hút sự chú ý cho trẻ em
+4. Hỗ trợ bác sĩ thực hiện Cover Test (kiểm tra lác ẩn/lác hiển thị)
+5. Thêm tùy chỉnh tốc độ chuyển động và màu sắc
+
+**Clinical Application**:
+- **Target Population**: Trẻ em cần kiểm tra thị lực hai mắt
+- **Test Purpose**: Duy trì ánh nhìn trung tâm (central fixation) trong khi che một mắt
+- **Age Range**: 3-8 tuổi (hoặc bệnh nhân không hợp tác)
+- **Cover Test Support**: Giúp bác sĩ quan sát sự chuyển động của mắt khi che mắt đối bên
+
+**Estimated complexity**: Medium
 
 ---
 
@@ -572,8 +613,11 @@ stateDiagram-v2
     ProcessingInput --> GoBack: back()
     ProcessingInput --> Shuffle: shuffle()
     Rendering --> Completed: All steps done
-    Completed --> [*]
+    Completed --> Cleanup: module.cleanup()
+    Cleanup --> [*]
 ```
+
+**Note**: The `cleanup()` function call is mandatory for modules that render using WebGL (to release shaders, buffers) or Canvas to prevent memory leaks (memory leak) when the clinic runs the system continuously.
 
 ### Data Storage Strategy
 
@@ -604,7 +648,7 @@ graph TD
 The Stereo Anaglyph module ([`modules/stereo_anaglyph.js`](modules/stereo_anaglyph.js)) implements a clinical Random Dot Stereogram (RDS) test using WebGL fragment shaders for hardware-accelerated rendering. This module enables stereopsis testing using red/cyan anaglyph glasses.
 
 ### Optical Mathematics
-The module converts clinical stereo acuity measurements (arcseconds) to pixel disparities using trigonometric calculations based on the calibration data from `window.__calibrator`:
+The module converts clinical stereo acuity measurements (arcseconds) to pixel disparities using trigonometric calculations based on the physical calibration data from localStorage with key `vision-therapy-cc-pxpermm` (provided by `credit_card_calibration.js`), which is the highest priority calibration source for the entire system:
 
 **Formula** (from [`modules/stereo_anaglyph.js:renderFrame()`](modules/stereo_anaglyph.js:renderFrame)):
 ```

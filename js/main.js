@@ -36,6 +36,10 @@ import redDesatModule from '../modules/red_desat.js';
 import duochromeModule from '../modules/duochrome_test.js';
 import jccSimulationModule from '../modules/astigmatism_jcc.js';
 import stereoAnaglyphModule from '../modules/stereo_anaglyph.js';
+import schoberTestModule from '../modules/schober_test.js';
+import dynamicFixationModule from '../modules/dynamic_fixation.js';
+import hidingHeidiModule from '../modules/hiding_heidi.js';
+import dynamicVergence from '../modules/dynamic_vergence.js';
 
 // ================================================================
 //  State Management
@@ -65,6 +69,20 @@ function loadTest(testId, steps) {
   const prevMod = getTestModule(state.currentTest);
   if (prevMod && typeof prevMod.cleanup === 'function') {
     prevMod.cleanup();
+  }
+
+  // Handle UniversalInput suspend/resume based on module's customControls flag
+  const newMod = getTestModule(testId);
+  if (universalInput) {
+    if (newMod && newMod.customControls === true) {
+      // Module uses custom controls - suspend UniversalInput
+      universalInput.suspend();
+      console.log(`[Main] Suspended UniversalInput for module: ${testId}`);
+    } else {
+      // Module uses standard controls - resume UniversalInput
+      universalInput.resume();
+      console.log(`[Main] Resumed UniversalInput for module: ${testId}`);
+    }
   }
 
   state.history.push({ test: state.currentTest, index: state.stepIndex });
@@ -120,6 +138,20 @@ function back() {
   state.stepIndex   = prev.index;
   const test = getTestModule(state.currentTest);
   state.steps = test ? test.steps : [];
+
+  // Resume UniversalInput when returning to previous module
+  if (universalInput) {
+    if (test && test.customControls === true) {
+      // Previous module also has custom controls - keep suspended
+      universalInput.suspend();
+      console.log(`[Main] Back: Keeping UniversalInput suspended for module: ${state.currentTest}`);
+    } else {
+      // Previous module uses standard controls - resume UniversalInput
+      universalInput.resume();
+      console.log(`[Main] Back: Resumed UniversalInput for module: ${state.currentTest}`);
+    }
+  }
+
   renderStep();
   highlightMenuItem(state.currentTest);
 }
@@ -184,8 +216,19 @@ registerTestModule(redDesatModule);        // id: 'neuro-red-desat'
 registerTestModule(neuroOknModule);        // id: 'neuro-okn'
 registerTestModule(duochromeModule);       // id: 'neuro-duochrome'
 
-// ----- JCC Simulation module -----
 registerTestModule(jccSimulationModule);   // id: 'jcc-simulation'
+
+// ----- Schober Test (Heterophoria) -----
+registerTestModule(schoberTestModule);     // id: 'schober-heterophoria'
+
+// ----- Dynamic Fixation Target (Pediatric) -----
+registerTestModule(dynamicFixationModule); // id: 'dynamic-fixation'
+
+// ----- Hiding Heidi (Pediatric Face Contrast Test) -----
+registerTestModule(hidingHeidiModule);     // id: 'hiding-heidi'
+
+// ----- Dynamic Vergence (Specialized Test) -----
+registerTestModule(dynamicVergence);      // id: 'dynamic-vergence'
 
 // ----- Fallback modules -----
 const DEFAULT_STEPS = ['▲', '▶', '●', '◆', '★', '⬟'];
@@ -307,16 +350,19 @@ function setupSidebar() {
 //  UniversalInput Wiring
 // ================================================================
 
+/** @type {UniversalInput|null} - Global reference to UniversalInput instance */
+let universalInput = null;
+
 function setupInput() {
-  const input = new UniversalInput({ logToConsole: true });
+  universalInput = new UniversalInput({ logToConsole: true });
 
   document.addEventListener('app:next', () => nextStep());
   document.addEventListener('app:prev', () => prevStep());
   document.addEventListener('app:back', () => back());
   document.addEventListener('app:shuffle', () => shuffleStep());
 
-  input.attach();
-  return input;
+  universalInput.attach();
+  return universalInput;
 }
 
 // ================================================================
@@ -355,12 +401,30 @@ function setupCalibrator() {
   });
 
   // Nút riêng trên header sidebar — mở trực tiếp, không cần qua settings.
-  const ccBtn = document.getElementById('cc-calib-btn');
-  if (ccBtn) {
-    ccBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      ccCal.showModal();
-    });
+  // Đảm bảo DOM đã load xong
+  function setupCCButton() {
+    const ccBtn = document.getElementById('cc-calib-btn');
+    if (ccBtn) {
+      console.log('[Main] Credit card button found, adding event listener');
+      ccBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        console.log('[Main] Credit card button clicked');
+        if (window.__ccCal) {
+          window.__ccCal.showModal();
+        } else {
+          console.error('[Main] window.__ccCal is not initialized!');
+        }
+      });
+    } else {
+      console.error('[Main] Credit card button (#cc-calib-btn) not found in DOM!');
+    }
+  }
+  
+  // Đợi DOM ready nếu cần
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupCCButton);
+  } else {
+    setupCCButton();
   }
 
   window.__calibrator = calibrator;
@@ -380,6 +444,14 @@ function init() {
   setupInput();
   setupDisplay();
   setupCalibrator();
+
+  // Listen for visionTestCompleted event to resume UniversalInput
+  document.addEventListener('visionTestCompleted', (e) => {
+    console.log('[Main] visionTestCompleted event received, resuming UniversalInput');
+    if (universalInput) {
+      universalInput.resume();
+    }
+  });
 
   // Load default test
   const mod = getTestModule(state.currentTest);
