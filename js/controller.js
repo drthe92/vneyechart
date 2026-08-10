@@ -96,6 +96,32 @@ class UniversalInput {
     this._touchStartX = 0;
     this._touchStartY = 0;
     this._isAttached = false;
+
+    // --- Gamepad support for flying mouse ---
+    this._gamepadCheckInterval = null;
+  }
+
+  /**
+   * Check for gamepad input (some flying mice appear as gamepads)
+   * @private
+   */
+  _checkGamepads() {
+    if (!navigator.getGamepads) return;
+
+    const gamepads = navigator.getGamepads();
+    for (let i = 0; i < gamepads.length; i++) {
+      const gp = gamepads[i];
+      if (gp && gp.connected) {
+        for (let j = 0; j < gp.buttons.length; j++) {
+          if (gp.buttons[j].pressed && gp.buttons[j].value > 0.5) {
+            // Map gamepad button 0 (A) or 1 (B) to NEXT action
+            if (j === 0 || j === 1) {
+              this._emit('NEXT', { source: 'gamepad', button: j });
+            }
+          }
+        }
+      }
+    }
   }
 
   /**
@@ -127,8 +153,8 @@ class UniversalInput {
     const doc = document;
     const win = window;
 
-    // Keyboard
-    doc.addEventListener('keydown', this._boundKeydown);
+    // Keyboard - with capture to catch all
+    doc.addEventListener('keydown', this._boundKeydown, true);
 
     // Mouse
     doc.addEventListener('mousedown', this._boundMouseDown);
@@ -188,6 +214,14 @@ class UniversalInput {
 
     // 2. Chặn key spam: bỏ qua mọi phím khi người dùng giữ (e.repeat)
     if (e.repeat) return;
+
+    // 3. Handle non-standard keys by keyCode (flying mouse OK button)
+    if (e.keyCode === 18 || e.keyCode === 123) {
+      const keyCodeStr = e.keyCode === 18 ? '18' : '123';
+      this._emit('NEXT', { source: 'keyboard', key: 'OK', keyCode: e.keyCode });
+      e.preventDefault();
+      return;
+    }
 
     let action = null;
 

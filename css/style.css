@@ -5,13 +5,18 @@
 /* ---------- CSS Variables ---------- */
 :root {
   /* Sidebar */
-  --sidebar-width: 500px;   /* expanded width for 2-column layout */
+  --sidebar-width: 100vw;   /* full-screen overlay when visible */
   --sidebar-bg: #0d1b2a;
   --sidebar-hover: #1b2d44;
   --sidebar-active: #1e3a5f;
   --sidebar-text: #b0c4de;
   --sidebar-text-active: #ffffff;
   --sidebar-accent: #4a90d9;
+  /* Large typography for 4m viewing distance */
+  --menu-icon-size: 40px;
+  --menu-item-font: 1.4rem;
+  --menu-group-font: 1.3rem;
+  --menu-title-font: 2rem;
 
   /* Main area */
   --main-bg: #ffffff;
@@ -91,10 +96,12 @@ button {
   color: var(--sidebar-text);
   user-select: none;
   overflow-y: auto;                /* allow internal scroll if menu overflows */
-  position: relative;             /* establish stacking context above #main-area */
-  z-index: 5;
+  position: absolute;              /* full-screen overlay above #main-area */
+  top: 0;
+  left: 0;
+  z-index: 50;
   overflow-x: hidden;
-  transition: width 0.25s ease, min-width 0.25s ease, opacity 0.2s ease;
+  transition: width 0.25s ease, min-width 0.25s ease, opacity 0.2s ease, transform 0.25s ease;
 }
 
 #sidebar::-webkit-scrollbar {
@@ -113,117 +120,160 @@ button {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
+  gap: 20px;
+  padding: 20px 32px;
   border-bottom: 1px solid rgba(255,255,255,0.08);
   flex-shrink: 0;
 }
 
-#settings-btn {
+#settings-btn, #cc-calib-btn, #fullscreen-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 64px;
+  height: 64px;
   border-radius: var(--radius-sm);
   color: var(--sidebar-text);
-  transition: color 0.2s, background 0.2s;
+  transition: all 0.3s ease;
   flex-shrink: 0;
-}
-#settings-btn:hover {
-  color: var(--sidebar-text-active);
-  background: var(--sidebar-hover);
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid transparent;
 }
 
-#cc-calib-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-sm);
-  color: var(--sidebar-text);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: color 0.2s, background 0.2s;
-  flex-shrink: 0;
+#settings-btn svg, #cc-calib-btn svg, #fullscreen-btn svg {
+  width: 40px !important;
+  height: 40px !important;
+  transition: transform 0.3s ease;
 }
-#cc-calib-btn:hover {
+
+#settings-btn:hover, #cc-calib-btn:hover, #fullscreen-btn:hover {
   color: var(--sidebar-text-active);
   background: var(--sidebar-hover);
+  border-color: var(--sidebar-accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(74, 144, 217, 0.3);
 }
+
+#settings-btn:hover svg, #cc-calib-btn:hover svg, #fullscreen-btn:hover svg {
+  transform: scale(1.1);
+}
+
+/* Navigation button focus state for keyboard/air mouse navigation */
+#settings-btn.menu-focus, #cc-calib-btn.menu-focus, #fullscreen-btn.menu-focus {
+  border-color: var(--sidebar-accent);
+  background: var(--sidebar-hover);
+  color: var(--sidebar-text-active);
+  box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.5), 0 4px 12px rgba(74, 144, 217, 0.3);
+  animation: pulseFocus 1.5s infinite;
+}
+
+/* Removed duplicate button styles - now handled by combined rule above */
 
 #sidebar-title {
   display: block;
-  font-size: 1.1rem;
+  font-size: var(--menu-title-font);
   font-weight: 600;
   color: var(--sidebar-text-active);
   white-space: nowrap;
 }
 
-/* -- Navigation Menu (2-column grid layout) -- */
+/* -- Navigation Menu (simple grid layout) -- */
 #menu {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(4, 1fr);  /* 4 columns for modules */
+  gap: 16px;
   align-items: start;
-  padding: 10px;
+  padding: 24px 32px;
   flex: 1;
   overflow-y: auto;
+  max-height: calc(100vh - 120px);
 }
 
-/* Group header (function category) - use display:contents to allow grid layout */
-.menu-group {
-  display: contents; /* Children participate in #menu grid */
+/* All menu items in a 4-column grid */
+.menu-items {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  align-content: start;
+  grid-column: 1 / -1;
 }
 
-.menu-group-label {
-  grid-column: 1 / -1; /* Span both columns */
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: rgba(176, 196, 222, 0.6);
-  padding: 6px 4px 3px 4px;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-  margin-top: 4px;
-  text-align: left;
-  white-space: normal;
-  overflow: visible;
-}
-
-/* Menu item in 2-column grid */
+/* Menu item */
 .menu-item {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 8px;
-  font-size: 0.82rem;
+  gap: 12px;
+  padding: 14px 16px;
+  font-size: var(--menu-item-font);
   font-weight: 500;
   color: var(--sidebar-text);
-  transition: background 0.2s, color 0.2s, border-color 0.2s;
-  border-left: 3px solid transparent;
-  border-radius: var(--radius-sm);
+  transition: all 0.3s ease;
+  border-left: 5px solid transparent;
+  border-radius: var(--radius-md);
   white-space: normal;
   cursor: pointer;
-  min-width: 0; /* Allow flex items to shrink */
+  min-width: 0;
+  line-height: 1.15;
+  background: rgba(255, 255, 255, 0.02);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.menu-item:hover {
+  background: var(--sidebar-hover);
+  color: var(--sidebar-text-active);
+  border-left-color: var(--sidebar-accent);
+  transform: translateX(5px);
+  box-shadow: 0 4px 12px rgba(74, 144, 217, 0.2);
+}
+
+.menu-item.active {
+  background: var(--sidebar-active);
+  color: var(--sidebar-text-active);
+  border-left-color: var(--sidebar-accent);
+  box-shadow: 0 4px 12px rgba(74, 144, 217, 0.3);
+}
+
+.menu-item.menu-focus {
+  border-left-color: var(--sidebar-accent);
+  background: var(--sidebar-hover);
+  color: var(--sidebar-text-active);
+  box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.5), 0 4px 12px rgba(74, 144, 217, 0.3);
+  transform: translateX(5px);
+  animation: pulseFocus 1.5s infinite;
+}
+
+@keyframes pulseFocus {
+  0%, 100% {
+    box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.5), 0 4px 12px rgba(74, 144, 217, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(74, 144, 217, 0.3), 0 4px 12px rgba(74, 144, 217, 0.3);
+  }
 }
 
 .menu-item svg {
-  width: 14px !important;
-  height: 14px !important;
-  min-width: 14px !important;
+  width: var(--menu-icon-size) !important;
+  height: var(--menu-icon-size) !important;
+  min-width: var(--menu-icon-size) !important;
   flex-shrink: 0;
-  opacity: 0.7;
+  opacity: 0.85;
   transition: opacity 0.2s;
+}
+
+/* Keyboard-focus highlight for arrow-key navigation */
+.menu-item.menu-focus {
+  border-left-color: var(--sidebar-accent);
+  background: var(--sidebar-hover);
+  color: var(--sidebar-text-active);
+  box-shadow: 0 0 0 2px var(--sidebar-accent);
 }
 
 /* Label inline (no tooltip) */
 .menu-item-label {
-  font-size: 0.85em;
+  font-size: 1em;
   white-space: normal;
-  line-height: 1.15;
+  line-height: 1.2;
   flex: 1;
   opacity: 1;
 }
@@ -255,17 +305,57 @@ button {
   overflow: hidden;
   border: none;
   opacity: 0;
-  transition: width 0.25s ease, opacity 0.2s ease, min-width 0.25s ease;
+  pointer-events: none;
+  transform: translateX(-100%);
+  transition: width 0.25s ease, opacity 0.2s ease, min-width 0.25s ease, transform 0.25s ease;
 }
 
-/* Menu group labels in 2-column layout */
-.menu-group-label {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: rgba(176, 196, 222, 0.6);
-  padding: 8px 4px 4px 4px;
-  grid-column: 1 / -1;
+/* ============================================================
+   PERSISTENT MENU TOGGLE BUTTON (bottom-left corner)
+   Always visible so technician can re-open menu from 4m away.
+   ============================================================ */
+#menu-toggle-btn {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 90px;
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  border: none;
+  border-top-right-radius: 18px;
+  cursor: pointer;
+  z-index: 60;            /* above sidebar overlay so always clickable */
+  transition: background 0.2s, color 0.2s, transform 0.2s;
+  opacity: 0.35;          /* subtle when idle, not distracting during tests */
+}
+#menu-toggle-btn:hover,
+#menu-toggle-btn:focus {
+  background: var(--sidebar-hover);
+  color: var(--sidebar-text-active);
+  opacity: 1;
+  transform: scale(1.05);
+}
+#menu-toggle-btn svg {
+  width: 48px !important;
+  height: 48px !important;
+}
+/* When sidebar is visible, hide the toggle button (menu itself covers it) */
+#sidebar:not(.sidebar-hidden) ~ #menu-toggle-btn {
+  display: none;
+}
+/* Bottom-left hover hot-zone (invisible trigger area) */
+#menu-hotzone {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 120px;
+  height: 120px;
+  z-index: 55;
+  pointer-events: none;   /* lets clicks fall through to toggle button */
 }
 
 .sub-item svg {
@@ -781,23 +871,46 @@ button {
   background: #3a7bc8;
 }
 
-/* ---------- Small screens: collapse sidebar ---------- */
-@media (max-width: 768px) {
-  #sidebar {
-    width: 56px;
-    min-width: 56px;
+/* ---------- Medium screens: 2 item columns ---------- */
+@media (max-width: 1400px) {
+  #menu {
+    grid-template-columns: 1fr repeat(2, 1fr);
   }
-  #sidebar-title {
-    display: none;
+  .menu-items {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ---------- Small screens: keep full-screen overlay, single column ---------- */
+@media (max-width: 768px) {
+  #menu {
+    grid-template-columns: 1fr;
+  }
+  .menu-group-labels {
+    grid-column: 1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .menu-items {
+    grid-column: 1;
+    grid-template-columns: 1fr;
   }
   .menu-item {
-    justify-content: center;
-    padding: 14px 0;
-    border-left-width: 2px;
+    font-size: 1.2rem;
   }
-  #sidebar-header {
-    justify-content: center;
-    padding: var(--gap-md) 0;
+  .menu-item svg {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+  }
+  #menu-toggle-btn {
+    width: 72px;
+    height: 72px;
+  }
+  #menu-toggle-btn svg {
+    width: 40px !important;
+    height: 40px !important;
   }
 }
 

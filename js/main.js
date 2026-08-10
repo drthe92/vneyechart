@@ -320,30 +320,165 @@ function setupSidebar() {
     });
   });
 
-  // New keyboard/mouse triggers for sidebar toggle
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Tab') {
+  // Centralised sidebar toggle helper
+  function toggleSidebar(forceShow) {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+    if (forceShow === true) {
+      sidebar.classList.remove('sidebar-hidden');
+    } else if (forceShow === false) {
+      sidebar.classList.add('sidebar-hidden');
+    } else {
+      sidebar.classList.toggle('sidebar-hidden');
+    }
+  }
+
+  // Persistent bottom-left toggle button — click to show/hide menu
+  const toggleBtn = document.getElementById('menu-toggle-btn');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', (e) => {
       e.preventDefault();
-      const sidebar = document.getElementById('sidebar');
-      if (sidebar) sidebar.classList.toggle('sidebar-hidden');
+      e.stopPropagation();
+      toggleSidebar();
+    });
+  }
+
+  // ---- Menu keyboard navigation state ----
+  let menuFocusIndex = -1;
+  const getMenuItems = () => Array.from(document.querySelectorAll('.menu-item, .nav-btn'));
+
+  function updateMenuFocus() {
+    const items = getMenuItems();
+    items.forEach((el, i) => {
+      el.classList.toggle('menu-focus', i === menuFocusIndex);
+      // Add visual feedback for nav buttons
+      if (el.classList.contains('nav-btn')) {
+        el.style.outline = i === menuFocusIndex ? '3px solid var(--sidebar-accent)' : '';
+        el.style.outlineOffset = i === menuFocusIndex ? '2px' : '';
+      }
+    });
+    const focused = items[menuFocusIndex];
+    if (focused) {
+      focused.scrollIntoView({ block: 'nearest' });
+      focused.focus();
+    }
+  }
+
+  function isMenuVisible() {
+    const sidebar = document.getElementById('sidebar');
+    return sidebar && !sidebar.classList.contains('sidebar-hidden');
+  }
+
+  // Keyboard: Tab / Home / ContextMenu to toggle menu (as before)
+  // When menu is visible: Arrow keys navigate, Enter/OK selects
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab' || e.key === 'Home' || e.key === 'ContextMenu') {
+      e.preventDefault();
+      toggleSidebar();
+      if (isMenuVisible()) {
+        menuFocusIndex = 0;
+        updateMenuFocus();
+      }
+      return;
+    }
+
+    // Arrow-key navigation only when menu is visible
+    if (isMenuVisible()) {
+      const items = getMenuItems();
+      if (items.length === 0) return;
+
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'OK' || e.key === 'Accept' || e.key === 'Enter' || e.keyCode === 18) {
+        e.preventDefault();
+        if (e.key === 'OK' || e.key === 'Accept' || e.key === 'Enter' || e.keyCode === 18) {
+          // OK/Accept/Enter key selects the focused item
+          const focused = items[menuFocusIndex];
+          if (focused) {
+            focused.click();
+            // If it's a nav button, trigger its action
+            if (focused.dataset.nav === 'settings') {
+              // Trigger settings
+              const settingsBtn = document.getElementById('settings-btn');
+              if (settingsBtn) settingsBtn.click();
+            } else if (focused.dataset.nav === 'calibration') {
+              // Trigger calibration
+              const calibBtn = document.getElementById('cc-calib-btn');
+              if (calibBtn) calibBtn.click();
+            } else if (focused.dataset.nav === 'fullscreen') {
+              // Trigger fullscreen
+              const fsBtn = document.getElementById('fullscreen-btn');
+              if (fsBtn) fsBtn.click();
+            }
+          }
+        } else {
+          menuFocusIndex = (menuFocusIndex + 1) % items.length;
+          updateMenuFocus();
+        }
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        menuFocusIndex = (menuFocusIndex - 1 + items.length) % items.length;
+        updateMenuFocus();
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        // Enter / Space to select the focused module
+        e.preventDefault();
+        const focused = items[menuFocusIndex];
+        if (focused) focused.click();
+      }
     }
   });
 
+  // Mouse: Forward button (button 4) to toggle menu
+  // Air mouse / universal remote: Backward button (button 3) to toggle menu
   document.addEventListener('mouseup', (e) => {
-    if (e.button === 4) { // Forward mouse button (button 4)
-      const sidebar = document.getElementById('sidebar');
-      if (sidebar) sidebar.classList.toggle('sidebar-hidden');
+    if (e.button === 4 || e.button === 3) {
+      e.preventDefault();
+      toggleSidebar();
+      if (isMenuVisible()) {
+        menuFocusIndex = 0;
+        updateMenuFocus();
+      }
     }
   });
 
+  // Also intercept mousedown for these buttons to suppress browser back/forward nav
+  document.addEventListener('mousedown', (e) => {
+    if (e.button === 4 || e.button === 3) {
+      e.preventDefault();
+    }
+  }, true);
+
+  // Fallback: auxclick fires on some browsers for non-primary mouse buttons
+  document.addEventListener('auxclick', (e) => {
+    if (e.button === 4 || e.button === 3) {
+      e.preventDefault();
+      toggleSidebar();
+      if (isMenuVisible()) {
+        menuFocusIndex = 0;
+        updateMenuFocus();
+      }
+    }
+  });
+
+  // Mouse: hover bottom-left corner to reveal menu
   document.addEventListener('mousemove', (e) => {
     const sidebar = document.getElementById('sidebar');
     if (!sidebar) return;
-    // Show sidebar when mouse enters bottom-right 30x30px corner
-    if (e.clientX > window.innerWidth - 30 && e.clientY > window.innerHeight - 30) {
+    // Show sidebar when mouse enters bottom-left 120x120px corner
+    if (e.clientX < 120 && e.clientY > window.innerHeight - 120) {
       sidebar.classList.remove('sidebar-hidden');
     }
   });
+
+  // ---- Fullscreen toggle button (top-right of sidebar header) ----
+  const fsBtn = document.getElementById('fullscreen-btn');
+  if (fsBtn) {
+    fsBtn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen?.().catch(() => {});
+      } else {
+        document.exitFullscreen?.();
+      }
+    });
+  }
 }
 
 // ================================================================

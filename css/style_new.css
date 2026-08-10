@@ -1,0 +1,85 @@
+/* ============================================================
+   Vision Therapy WebApp — Menu Group Styles
+   ============================================================ */
+
+/* -- Navigation Menu -- */
+#menu {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 16px 24px;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Menu Group */
+.menu-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.menu-group-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: rgba(74, 144, 217, 0.1);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--sidebar-accent);
+}
+
+.menu-group-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.menu-group-title {
+  font-size: var(--menu-group-font);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sidebar-text-active);
+  font-weight: 700;
+  margin: 0;
+}
+
+.menu-group-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  padding-left: 16px;
+}
+
+/* Navigation buttons in header */
+.nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-sm);
+  color: var(--sidebar-text);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+  flex-shrink: 0;
+}
+
+.nav-btn svg {
+  width: 40px !important;
+  height: 40px !important;
+}
+
+.nav-btn:hover {
+  color: var(--sidebar-text-active);
+  background: var(--sidebar-hover);
+}
+
+.nav-btn.nav-focus {
+  border-left-color: var(--sidebar-accent);
+  background: var(--sidebar-hover);
+  color: var(--sidebar-text-active);
+  box-shadow: 0 0 0 2px var(--sidebar-accent);
+}

@@ -82,7 +82,7 @@ class CreditCardCalibrator {
         </div>
         <div class="cc-slider-container" style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
           <button id="ccBtnMinus" style="padding: 8px 16px; font-size: 1.2rem; cursor: pointer;">-</button>
-          <input type="range" id="ccSlider" class="cc-slider" min="100" max="1200" step="0.5" value="400" style="flex: 1; cursor: pointer;" />
+          <input type="range" id="ccSlider" class="cc-slider" min="100" max="2500" step="0.5" value="400" style="flex: 1; cursor: pointer;" />
           <button id="ccBtnPlus" style="padding: 8px 16px; font-size: 1.2rem; cursor: pointer;">+</button>
         </div>
         <div class="cc-readout" id="ccReadout" style="text-align: center; font-family: monospace; font-size: 1.1em; color: #333;"></div>
@@ -145,9 +145,10 @@ class CreditCardCalibrator {
     card.style.width = w + 'px';
     card.style.height = h + 'px';
     const ppm = w / CREDIT_CARD_WIDTH_MM;
+    const dpr = window.devicePixelRatio || 1;
     if (readout) {
       readout.textContent =
-        `${w.toFixed(0)} px = ${CREDIT_CARD_WIDTH_MM} mm  →  ${ppm.toFixed(3)} px/mm  (${ (ppm * 25.4).toFixed(1) } PPI)`;
+        `${w.toFixed(0)} px = ${CREDIT_CARD_WIDTH_MM} mm  →  ${ppm.toFixed(3)} px/mm  (${ (ppm * 25.4).toFixed(1) } PPI)  |  DPR: ${dpr}`;
     }
   }
 
