@@ -23,7 +23,9 @@ import hotvModule         from '../modules/hotv.js';
 import aucklandLogmar     from '../modules/auckland_logmar.js';
 import worth4dot          from '../modules/worth4dot.js';
 import astigmatism        from '../modules/astigmatism.js';
-import { amslerGrid, ishiharaTest, pelliRobson } from '../modules/retina_subs.js';
+import amslerGrid from '../modules/retina_amsler.js';
+import ishiharaTest from '../modules/retina_ishihara.js';
+import pelliRobson from '../modules/retina_pelli_robson.js';
 
 // ----- Near vision modules -----
 import nearLogmarModule   from '../modules/near_logmar.js';
@@ -71,18 +73,11 @@ function loadTest(testId, steps) {
     prevMod.cleanup();
   }
 
-  // Handle UniversalInput suspend/resume based on module's customControls flag
-  const newMod = getTestModule(testId);
+  // Ensure UniversalInput is always resumed when loading a test
+  // Modules should NOT have their own conflicting event handlers
   if (universalInput) {
-    if (newMod && newMod.customControls === true) {
-      // Module uses custom controls - suspend UniversalInput
-      universalInput.suspend();
-      console.log(`[Main] Suspended UniversalInput for module: ${testId}`);
-    } else {
-      // Module uses standard controls - resume UniversalInput
-      universalInput.resume();
-      console.log(`[Main] Resumed UniversalInput for module: ${testId}`);
-    }
+    universalInput.resume();
+    console.log(`[Main] Resumed UniversalInput for module: ${testId}`);
   }
 
   state.history.push({ test: state.currentTest, index: state.stepIndex });
@@ -326,10 +321,30 @@ function setupSidebar() {
     if (!sidebar) return;
     if (forceShow === true) {
       sidebar.classList.remove('sidebar-hidden');
+      // Enable module switching when menu is visible
+      if (universalInput) {
+        universalInput.enableModuleSwitching();
+        console.log('[Main] Enabled module switching - menu opened');
+      }
     } else if (forceShow === false) {
       sidebar.classList.add('sidebar-hidden');
+      // Disable module switching when menu is hidden
+      if (universalInput) {
+        universalInput.disableModuleSwitching();
+        console.log('[Main] Disabled module switching - menu closed');
+      }
     } else {
       sidebar.classList.toggle('sidebar-hidden');
+      // Toggle module switching based on menu visibility
+      if (universalInput) {
+        if (sidebar.classList.contains('sidebar-hidden')) {
+          universalInput.disableModuleSwitching();
+          console.log('[Main] Disabled module switching - menu closed');
+        } else {
+          universalInput.enableModuleSwitching();
+          console.log('[Main] Enabled module switching - menu opened');
+        }
+      }
     }
   }
 

@@ -405,7 +405,7 @@ class UniversalInput {
   /**
    * Phát tín hiệu: log console + dispatch CustomEvent + callback cũ.
    *
-   * @param {'NEXT'|'PREV'|'BACK'} action
+   * @param {'NEXT'|'PREV'|'BACK'|'SHUFFLE'} action
    * @param {Object} [detail={}]
    * @private
    */
@@ -423,7 +423,7 @@ class UniversalInput {
     }
 
     // 2. Dispatch CustomEvent lên document
-    const eventName = `app:${action.toLowerCase()}`;  // app:next, app:prev, app:back
+    const eventName = `app:${action.toLowerCase()}`;  // app:next, app:prev, app:back, app:shuffle
     document.dispatchEvent(new CustomEvent(eventName, {
       bubbles: true,
       detail: detail,
