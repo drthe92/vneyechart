@@ -11,6 +11,9 @@
     // LocalStorage key for auto-save
     const SESSION_STORAGE_KEY = 'vision_therapy_active_session';
 
+    // LocalStorage key for clinic settings
+    const CLINIC_SETTINGS_KEY = 'vision_clinic_settings';
+
     // Available test names for manual entry datalist
     const TEST_NAMES_LIST = [
         'Schober Heterophoria',
@@ -48,6 +51,9 @@
     // Manual Entry Modal elements reference
     let manualEntryModal = null;
     let manualFab = null;
+
+    // Clinic Settings Modal element reference
+    let clinicSettingsModal = null;
 
 
     // Global exam state
@@ -141,6 +147,13 @@
 
         // Create Manual Entry Modal
         createManualEntryModal();
+
+        // Create Clinic Settings UI (defensive - wrapped in try/catch)
+        try {
+            createClinicSettingsUI();
+        } catch (e) {
+            console.error('[ExamSessionManager] Failed to create Clinic Settings UI:', e);
+        }
     }
 
 
@@ -389,6 +402,13 @@
         if (isPrintMode) {
             // Print mode HTML structure
             html += `<div class="print-report">`;
+
+            // Inject clinic header if settings exist
+            const clinicHeader = generateClinicHeaderHTML();
+            if (clinicHeader) {
+                html += clinicHeader;
+            }
+
             html += `
                 <div class="print-header">
                     <h1>PHÒNG KHÁM NHÃN KHOA</h1>
@@ -407,6 +427,12 @@
             `;
         } else {
             // Modal view HTML structure
+            // Inject clinic header if settings exist
+            const clinicHeader = generateClinicHeaderHTML();
+            if (clinicHeader) {
+                html += `<div class="clinic-report-header-wrapper">${clinicHeader}</div>`;
+            }
+
             html += `
                 <div class="report-patient-info">
                     <h4>Thông tin bệnh nhân</h4>
@@ -658,6 +684,9 @@
         };
         // Override showModal temporarily for this modal
         window._showManualEntry = _showManualEntry;
+
+        // Protect form inputs from global hotkey listeners
+        allowTypingInModal(manualEntryModal);
     }
 
     // Handle FAB click event
@@ -1089,6 +1118,419 @@
                 }
             }, 300);
         }, 2000);
+    }
+
+    // ===== HELPER: Safe Zone for Modal Input =====
+
+    /**
+     * Protect modal form inputs from global hotkey listeners.
+     * Uses capture phase to stop propagation BEFORE global listeners receive the event.
+     * @param {HTMLElement} modalElement - The modal container element
+     */
+    function allowTypingInModal(modalElement) {
+        if (!modalElement) return;
+
+        const stopGlobalHotkeys = (e) => {
+            const tagName = e.target.tagName.toUpperCase();
+            // If user is typing in Input, Textarea, or Select
+            if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT') {
+                // Only stop propagation outward - NEVER preventDefault() to preserve typing
+                e.stopPropagation();
+            }
+        };
+
+        modalElement.addEventListener('keydown', stopGlobalHotkeys, true);
+        modalElement.addEventListener('keyup', stopGlobalHotkeys, true);
+        modalElement.addEventListener('keypress', stopGlobalHotkeys, true);
+    }
+
+    // ===== CLINIC SETTINGS MODULE =====
+
+    /**
+     * Helper: Compress image file using canvas to avoid LocalStorage overflow
+     * @param {File} file - Image file from input
+     * @param {number} maxWidth - Maximum width in pixels
+     * @param {number} quality - JPEG quality (0-1)
+     * @param {Function} callback - callback(compressedBase64String)
+     */
+    function compressImage(file, maxWidth, quality, callback) {
+        try {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    // Scale down to maxWidth
+                    if (width > maxWidth) {
+                        height = Math.round((height * maxWidth) / width);
+                        width = maxWidth;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Export as compressed JPEG
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', quality || 0.8);
+                    callback(compressedDataUrl);
+                };
+                img.onerror = function() {
+                    console.error('[ClinicSettings] Failed to load image for compression');
+                    callback(null);
+                };
+                img.src = e.target.result;
+            };
+            reader.onerror = function() {
+                console.error('[ClinicSettings] Failed to read file');
+                callback(null);
+            };
+            reader.readAsDataURL(file);
+        } catch (err) {
+            console.error('[ClinicSettings] Compression error:', err);
+            callback(null);
+        }
+    }
+
+    /**
+     * Load clinic settings from localStorage
+     * @returns {Object|null} Settings object or null
+     */
+    function loadClinicSettings() {
+        try {
+            const data = localStorage.getItem(CLINIC_SETTINGS_KEY);
+            if (data) {
+                return JSON.parse(data);
+            }
+        } catch (e) {
+            console.error('[ClinicSettings] Failed to load settings:', e);
+        }
+        return null;
+    }
+
+    /**
+     * Save clinic settings to localStorage
+     */
+    function saveClinicSettings() {
+        try {
+            const settingsForm = document.getElementById('clinic-settings-form');
+            if (!settingsForm) return;
+
+            const clinicName = settingsForm.querySelector('#clinic-name').value.trim();
+            const doctorName = settingsForm.querySelector('#doctor-name').value.trim();
+            const address = settingsForm.querySelector('#address').value.trim();
+            const logoData = settingsForm.querySelector('#logo-base64').value;
+
+            const settings = {
+                clinicName: clinicName,
+                doctorName: doctorName,
+                address: address,
+                logo: logoData || ''
+            };
+
+            localStorage.setItem(CLINIC_SETTINGS_KEY, JSON.stringify(settings));
+            hideModal(clinicSettingsModal);
+            showToast('Đã lưu cài đặt phòng khám');
+        } catch (e) {
+            console.error('[ClinicSettings] Failed to save settings:', e);
+            showToast('Lỗi: Không thể lưu cài đặt');
+        }
+    }
+
+    /**
+     * Create Clinic Settings Modal and Settings Button
+     */
+    function createClinicSettingsUI() {
+        // --- Create Settings Button (⚙️) ---
+        const navbarHeader = document.getElementById('sidebar-header');
+        if (!navbarHeader) {
+            console.warn('[ClinicSettings] Navbar header not found');
+            return;
+        }
+
+        const settingsBtn = document.createElement('button');
+        settingsBtn.id = 'clinic-settings-btn';
+        settingsBtn.className = 'exam-btn settings-btn';
+        settingsBtn.setAttribute('title', 'Cài đặt phòng khám');
+        settingsBtn.innerHTML = '⚙️';
+
+        // Insert before fullscreen button to preserve existing events
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+        if (fullscreenBtn) {
+            navbarHeader.insertBefore(settingsBtn, fullscreenBtn);
+        } else {
+            navbarHeader.appendChild(settingsBtn);
+        }
+
+        // Bind settings button click
+        settingsBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            openClinicSettingsModal();
+        });
+
+        // --- Create Clinic Settings Modal ---
+        clinicSettingsModal = document.createElement('div');
+        clinicSettingsModal.id = 'clinic-settings-modal';
+        clinicSettingsModal.className = 'exam-modal';
+
+        const modalContent = document.createElement('div');
+        modalContent.className = 'exam-modal-content clinic-settings-modal-content';
+
+        // Header
+        const modalHeader = document.createElement('div');
+        modalHeader.className = 'exam-modal-header';
+        const headerH3 = document.createElement('h3');
+        headerH3.textContent = 'Cài đặt Phòng khám';
+        const headerClose = document.createElement('button');
+        headerClose.className = 'exam-modal-close';
+        headerClose.type = 'button';
+        headerClose.innerHTML = '&times;';
+        modalHeader.appendChild(headerH3);
+        modalHeader.appendChild(headerClose);
+
+        // Body
+        const modalBody = document.createElement('div');
+        modalBody.className = 'exam-modal-body';
+
+        const form = document.createElement('form');
+        form.id = 'clinic-settings-form';
+
+        // Clinic Name Input
+        const group1 = document.createElement('div');
+        group1.className = 'form-group';
+        const label1 = document.createElement('label');
+        label1.setAttribute('for', 'clinic-name');
+        label1.textContent = 'Tên phòng khám / Cơ sở y tế:';
+        const input1 = document.createElement('input');
+        input1.type = 'text';
+        input1.id = 'clinic-name';
+        input1.name = 'clinic-name';
+        input1.placeholder = 'VD: Phòng Khám Mắt Quốc Tế';
+        group1.appendChild(label1);
+        group1.appendChild(input1);
+
+        // Doctor Name Input
+        const group2 = document.createElement('div');
+        group2.className = 'form-group';
+        const label2 = document.createElement('label');
+        label2.setAttribute('for', 'doctor-name');
+        label2.textContent = 'Tên Bác sĩ / Kỹ thuật viên:';
+        const input2 = document.createElement('input');
+        input2.type = 'text';
+        input2.id = 'doctor-name';
+        input2.name = 'doctor-name';
+        input2.placeholder = 'VD: BS. Nguyễn Văn A';
+        group2.appendChild(label2);
+        group2.appendChild(input2);
+
+        // Address Input
+        const group3 = document.createElement('div');
+        group3.className = 'form-group';
+        const label3 = document.createElement('label');
+        label3.setAttribute('for', 'address');
+        label3.textContent = 'Địa chỉ:';
+        const input3 = document.createElement('input');
+        input3.type = 'text';
+        input3.id = 'address';
+        input3.name = 'address';
+        input3.placeholder = 'VD: 123 Đường Lê Lợi, Quận 1, TP.HCM';
+        group3.appendChild(label3);
+        group3.appendChild(input3);
+
+        // Logo Upload Input
+        const group4 = document.createElement('div');
+        group4.className = 'form-group';
+        const label4 = document.createElement('label');
+        label4.setAttribute('for', 'logo-upload');
+        label4.textContent = 'Upload Logo (PNG/JPEG):';
+        const input4 = document.createElement('input');
+        input4.type = 'file';
+        input4.id = 'logo-upload';
+        input4.name = 'logo-upload';
+        input4.accept = 'image/png, image/jpeg';
+        group4.appendChild(label4);
+        group4.appendChild(input4);
+
+        // Hidden input for base64 logo data
+        const logoBase64Input = document.createElement('input');
+        logoBase64Input.type = 'hidden';
+        logoBase64Input.id = 'logo-base64';
+        logoBase64Input.name = 'logo-base64';
+        group4.appendChild(logoBase64Input);
+
+        // Logo Preview
+        const previewGroup = document.createElement('div');
+        previewGroup.className = 'logo-preview-group';
+        const previewLabel = document.createElement('span');
+        previewLabel.className = 'logo-preview-label';
+        previewLabel.textContent = 'Xem trước logo:';
+        const previewImg = document.createElement('img');
+        previewImg.id = 'logo-preview';
+        previewImg.className = 'logo-preview';
+        previewImg.alt = 'Logo preview';
+        previewImg.style.display = 'none';
+        previewGroup.appendChild(previewLabel);
+        previewGroup.appendChild(previewImg);
+
+        // Form Actions
+        const formActions = document.createElement('div');
+        formActions.className = 'form-actions';
+
+        const saveBtn = document.createElement('button');
+        saveBtn.type = 'button';
+        saveBtn.className = 'exam-btn save-settings-btn';
+        saveBtn.textContent = 'Lưu Cài Đặt';
+        saveBtn.addEventListener('click', saveClinicSettings);
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'exam-btn cancel-btn';
+        cancelBtn.textContent = 'Hủy';
+        cancelBtn.addEventListener('click', function() {
+            hideModal(clinicSettingsModal);
+        });
+
+        formActions.appendChild(saveBtn);
+        formActions.appendChild(cancelBtn);
+
+        // Assemble form
+        form.appendChild(group1);
+        form.appendChild(group2);
+        form.appendChild(group3);
+        form.appendChild(group4);
+        form.appendChild(previewGroup);
+        form.appendChild(formActions);
+
+        // Handle logo file upload with compression
+        input4.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Validate file type
+            if (!['image/png', 'image/jpeg'].includes(file.type)) {
+                showToast('Chỉ chấp nhận file PNG hoặc JPEG');
+                e.target.value = '';
+                return;
+            }
+
+            // Validate file size (max 5MB before compression)
+            if (file.size > 5 * 1024 * 1024) {
+                showToast('File quá lớn. Tối đa 5MB');
+                e.target.value = '';
+                return;
+            }
+
+            // Compress and set base64
+            compressImage(file, 300, 0.8, function(compressedDataUrl) {
+                if (compressedDataUrl) {
+                    logoBase64Input.value = compressedDataUrl;
+                    previewImg.src = compressedDataUrl;
+                    previewImg.style.display = 'block';
+                    showToast('Đã nén và xem trước logo thành công');
+                } else {
+                    showToast('Lỗi: Không thể xử lý hình ảnh');
+                    e.target.value = '';
+                }
+            });
+        });
+
+        // Close button handler
+        headerClose.addEventListener('click', function() {
+            hideModal(clinicSettingsModal);
+        });
+
+        // Backdrop click handler
+        clinicSettingsModal.addEventListener('click', function(e) {
+            if (e.target === clinicSettingsModal) {
+                hideModal(clinicSettingsModal);
+            }
+        });
+
+        // Assemble modal
+        modalContent.appendChild(modalHeader);
+        modalContent.appendChild(modalBody);
+        modalBody.appendChild(form);
+        clinicSettingsModal.appendChild(modalContent);
+
+        // Append modal to body
+        document.body.appendChild(clinicSettingsModal);
+
+        // Protect form inputs from global hotkey listeners
+        allowTypingInModal(clinicSettingsModal);
+    }
+
+    /**
+     * Open Clinic Settings Modal and auto-fill existing data
+     */
+    function openClinicSettingsModal() {
+        console.log('[ClinicSettings] Opening modal...');
+        const settings = loadClinicSettings();
+        const form = document.getElementById('clinic-settings-form');
+        if (!form) return;
+
+        // Auto-fill fields
+        form.querySelector('#clinic-name').value = settings?.clinicName || '';
+        form.querySelector('#doctor-name').value = settings?.doctorName || '';
+        form.querySelector('#address').value = settings?.address || '';
+        form.querySelector('#logo-base64').value = settings?.logo || '';
+
+        // Show preview if logo exists
+        const previewImg = document.getElementById('logo-preview');
+        if (previewImg && settings?.logo) {
+            previewImg.src = settings.logo;
+            previewImg.style.display = 'block';
+        } else if (previewImg) {
+            previewImg.style.display = 'none';
+        }
+
+        showModal(clinicSettingsModal);
+    }
+
+    /**
+     * Generate clinic header HTML for report
+     * @returns {string} Header HTML or empty string
+     */
+    function generateClinicHeaderHTML() {
+        const settings = loadClinicSettings();
+        if (!settings || (!settings.clinicName && !settings.doctorName)) {
+            return '';
+        }
+
+        let html = '<div class="clinic-report-header">';
+        html += '<div class="clinic-header-left">';
+        if (settings.logo) {
+            html += `<img src="${settings.logo}" alt="Logo" class="clinic-logo-img">`;
+        }
+        html += '</div>';
+        html += '<div class="clinic-header-right">';
+        if (settings.clinicName) {
+            html += `<div class="clinic-name">${escapeHtml(settings.clinicName)}</div>`;
+        }
+        if (settings.address) {
+            html += `<div class="clinic-address">${escapeHtml(settings.address)}</div>`;
+        }
+        if (settings.doctorName) {
+            html += `<div class="clinic-doctor">${escapeHtml(settings.doctorName)}</div>`;
+        }
+        html += '</div>';
+        html += '</div>';
+
+        return html;
+    }
+
+    /**
+     * Escape HTML to prevent XSS
+     * @param {string} text
+     * @returns {string}
+     */
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.appendChild(document.createTextNode(text));
+        return div.innerHTML;
     }
 
     // Initialize when DOM is ready
