@@ -201,13 +201,16 @@ class UniversalInput {
     if (this.isSuspended) return;
 
     // 1. Bảo vệ nhập liệu: bỏ qua khi đang gõ trong form / editable
+    //     Bỏ qua khi focus nằm trong modal (để form submit hoạt động bình thường)
     const t = e.target;
     if (
       t &&
       (t.tagName === 'INPUT' ||
        t.tagName === 'TEXTAREA' ||
        t.tagName === 'SELECT' ||
-       t.isContentEditable)
+       t.isContentEditable ||
+       t.tagName === 'BUTTON' ||
+       t.closest('.exam-modal'))
     ) {
       return; // không xử lý phím, không gọi preventDefault()
     }
