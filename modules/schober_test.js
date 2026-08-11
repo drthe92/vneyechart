@@ -1,15 +1,14 @@
 /**
- * schober_test.js — Schober Test for Heterophoria (Latent Strabismus) Measurement
+ * schober_test.js — Schober Test for Heterophoria (Latent Strabismus)
  *
- * Clinical module to measure heterophoria using prism diopter calculation.
- * Uses HTML5 Canvas 2D (no WebGL).
+ * Thuật toán: Nền Trắng - Trừ Màu (Subtractive Color)
+ * - Nền: Trắng (#FFFFFF) để tương thích màn hình phổ thông.
+ * - Cô lập thị giác: Ẩn TOÀN BỘ giao diện (HUD, Menu) khi test.
+ * - Kính Đỏ (Mắt Phải) nhìn mục tiêu Lục lam (#66FFFF).
+ * - Kính Xanh (Mắt Trái) nhìn mục tiêu Đỏ (#FF6666).
  *
- * Features:
- *   - Black background (#000000)
- *   - 2 concentric circles (Green #00FF00)
- *   - 1 red crosshair (#FF0000) at center, movable with arrow keys
- *   - Real-time Prism Diopter (Δ) calculation and HUD display
- *   - Enter key to lock in results and dispatch visionTestCompleted event
+ * Tính toán Lăng kính (Prism Diopter):
+ * Δ = Displacement (cm) / Distance (m)
  *
  * Module id = 'schober-heterophoria'
  */
@@ -18,24 +17,12 @@
 //  Constants
 // ================================================================
 
-const SCHOBER_BG_COLOR = '#000000';
-const SCHOBER_CIRCLE_COLOR = '#00FF00';
-const SCHOBER_CROSSHAIR_COLOR = '#FF0000';
-const SCHOBER_HUD_BG = 'rgba(0, 0, 0, 0.75)';
-const SCHOBER_HUD_BORDER_DEFAULT = '#00FF00';
-const SCHOBER_HUD_BORDER_LOCKED = '#00FF00';
+const TARGET_RIGHT_EYE = '#66FFFF'; // Cyan (Mắt phải đeo kính Đỏ nhìn)
+const TARGET_LEFT_EYE = '#FF6666';  // Red (Mắt trái đeo kính Xanh nhìn)
+const BG_COLOR = '#FFFFFF';
 
-/** LocalStorage key for ccPxPerMm (must match calibration.js) */
-const CC_PX_PER_MM_KEY = 'vision-therapy-cc-pxpermm';
-
-/** Standard testing distance for Schober test (meters) */
-const SCHOBER_DISTANCE_M = 3.0;
-
-/** Canvas center crosshair size (pixels) */
-const CROSSHAIR_SIZE = 20;
-
-/** Movement step per arrow key press (pixels) */
-const MOVEMENT_STEP = 2;
+const CROSSHAIR_SIZE = 30;
+const MOVEMENT_STEP = 1; // Độ phân giải dịch chuyển (1px)
 
 // ================================================================
 //  Schober Test Module
@@ -43,144 +30,215 @@ const MOVEMENT_STEP = 2;
 
 const schoberTest = {
   id: 'schober-heterophoria',
-  label: 'Schober Test (Heterophoria)',
-
-  /** Steps array (required by framework) */
+  label: 'Schober Test (Độ lác ẩn)',
+  customControls: true,
   steps: ['test'],
 
-  /** Canvas element reference */
   _canvas: null,
-
-  /** 2D rendering context */
   _ctx: null,
 
-  /** Current crosshair offset from center (pixels) */
   _offsetX: 0,
   _offsetY: 0,
-
-  /** Canvas center coordinates */
   _centerX: 0,
   _centerY: 0,
-
-  /** Canvas dimensions */
   _canvasWidth: 0,
   _canvasHeight: 0,
 
-  /** Test started state (Enter pressed to start) */
-  _testStarted: false,
-
-  /** Locked result state */
   _isLocked: false,
+  _isInverted: false, // false: Mắt Trái định thị. true: Mắt Phải định thị.
+  _testActive: false, // Trạng thái Ẩn HUD để đo lường
 
-  /** Bound event handlers (for cleanup) */
   _boundKeydown: null,
-  _boundClick: null,
   _boundResize: null,
 
-  /** Cached ccPxPerMm value */
-  _ccPxPerMm: null,
-
-  /**
-   * Main render entry point.
-   * Called by main.js when the test is selected.
-   * @param {number} idx - Step index (unused, test is single-screen)
-   */
-  render(idx) {
-    console.log('[Schober] render() called with idx:', idx);
-    try {
-      this._init();
-    } catch (e) {
-      console.error('[Schober] Error in _init():', e);
-    }
-  },
-
-  /**
-   * Initialize the test: create canvas, bind events, start render loop.
-   * @private
-   */
-  _init() {
-    console.log('[Schober] _init() started');
-
-    // Reset state
-    this._offsetX = 0;
-    this._offsetY = 0;
-    this._testStarted = false;
-    this._isLocked = false;
-    this._ccPxPerMm = this._getPxPerMm();
-
-    // Get display board element
+  _initDOM() {
     const board = document.getElementById('display-board');
-    if (!board) {
-      console.error('[Schober] display-board element not found');
-      return;
-    }
-
-    console.log('[Schober] Found display-board element');
-
-    // Clear board
     board.innerHTML = '';
-    board.style.backgroundColor = SCHOBER_BG_COLOR;
+    board.style.backgroundColor = BG_COLOR;
+    board.style.position = 'relative';
+    board.style.overflow = 'hidden';
 
-    // Create canvas
+    // --- KHU VỰC THỊ GIÁC (CANVAS Wrapper) ---
+    const canvasContainer = document.createElement('div');
+    canvasContainer.id = 'schober-canvas-container';
+    canvasContainer.style.cssText = `
+      position: absolute; top: 0; left: 0; right: 340px; bottom: 0;
+      background: ${BG_COLOR}; transition: right 0.2s ease-in-out;
+    `;
+
     this._canvas = document.createElement('canvas');
     this._canvas.id = 'schober-canvas';
     this._canvas.style.cssText = 'display: block; width: 100%; height: 100%;';
-    board.appendChild(this._canvas);
+    canvasContainer.appendChild(this._canvas);
+    board.appendChild(canvasContainer);
 
-    console.log('[Schober] Canvas created and appended');
-
-    // Get 2D context
     this._ctx = this._canvas.getContext('2d');
-    if (!this._ctx) {
-      console.error('[Schober] Cannot get 2D context');
-      return;
-    }
 
-    console.log('[Schober] 2D context obtained');
+    // --- KHU VỰC ĐIỀU KHIỂN (SIDEBAR HUD) ---
+    const cal = window.__calibrator;
+    const distanceM = (cal && cal.distanceM > 0) ? cal.distanceM : 3.0;
 
-    // Set initial canvas size
+    const sidebar = document.createElement('div');
+    sidebar.id = 'schober-sidebar';
+    sidebar.style.cssText = `
+      position: absolute; top: 0; right: 0; width: 340px; height: 100%;
+      box-sizing: border-box; background: rgba(255,255,255,0.98);
+      border-left: 1px solid #ddd; box-shadow: -4px 0 15px rgba(0,0,0,0.05);
+      padding: 20px; font-family: sans-serif; color: #333;
+      display: flex; flex-direction: column; z-index: 10; overflow-y: auto;
+    `;
+
+    sidebar.innerHTML = `
+      <div style="border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 15px;">
+        <div style="font-size: 15px; font-weight: 900; color: #2c3e50; margin-bottom: 4px; text-transform: uppercase;">Schober Test (Lác Ẩn)</div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="font-size: 12px; color: #c0392b; font-weight: bold;">[BẮT BUỘC]: ĐỎ MẮT PHẢI - XANH MẮT TRÁI</div>
+          <div style="font-size: 13px; color: #555; font-weight: 600; background: #f1f2f6; padding: 4px 8px; border-radius: 4px;">
+            K/cách: <strong>${distanceM}m</strong>
+          </div>
+        </div>
+      </div>
+
+      <div style="flex-grow: 1;">
+        <!-- TỔNG QUAN LÂM SÀNG -->
+        <div style="font-size: 12px; color: #444; line-height: 1.5; margin-bottom: 15px; padding: 12px; background: #fdfbf7; border-radius: 6px; border: 1px solid #f3e5ab; border-left: 4px solid #f1c40f;">
+          <strong style="color: #d35400;">HƯỚNG DẪN KỸ THUẬT VIÊN:</strong><br>
+          <strong>1.</strong> Đảm bảo môi trường tối, mắt bệnh nhân ngang tầm trung tâm màn hình.<br>
+          <strong>2.</strong> Bấm <strong style="color: #2980b9;">Bắt Đầu Test</strong> để ẩn toàn bộ giao diện (tránh định thị ngoại vi).<br>
+          <strong>3.</strong> Yêu cầu bệnh nhân dùng phím Mũi tên (hoặc báo kỹ thuật viên bấm) để di chuyển <strong>Chữ thập vào chính giữa Vòng tròn</strong>.<br>
+          <strong>4.</strong> Bấm <strong style="color: #2980b9;">[Space]</strong> để đảo mắt định thị (phát hiện lác liệt/ức chế). Bấm <strong style="color: #2980b9;">[Enter]</strong> để chốt kết quả.
+        </div>
+
+        <button id="btn-start-test" style="
+          width: 100%; padding: 12px; border: none; background: #e74c3c; color: white;
+          border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;
+          margin-bottom: 15px; box-shadow: 0 4px 6px rgba(231, 76, 60, 0.2); transition: background 0.2s;
+        ">👁️ Bắt Đầu Test (Ẩn Giao Diện)</button>
+
+        <div style="font-size: 13px; font-weight: bold; color: #555; margin-bottom: 8px;">KẾT QUẢ ĐO LƯỜNG (Δ):</div>
+        
+        <!-- TRẠNG THÁI MẮT -->
+        <div style="margin-bottom: 10px; padding: 10px; background: #e8f4f8; border-radius: 6px; border: 1px solid #bce0fd;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 12px;">
+            <span style="color: #555;">Mắt định thị (Vòng tròn):</span>
+            <strong id="schober-fixing-eye" style="color: #2980b9;">MẮT TRÁI</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px;">
+            <span style="color: #555;">Mắt đo lác (Chữ thập):</span>
+            <strong id="schober-deviating-eye" style="color: #c0392b;">MẮT PHẢI</strong>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 10px; padding: 12px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #3498db;">
+          <div style="font-size: 11px; color: #7f8c8d; font-weight: bold; margin-bottom: 4px;">ĐỘ LỆCH NGANG (HORIZONTAL)</div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span id="schober-prism-h" style="font-size: 20px; font-weight: bold; color: #2c3e50;">0.00Δ</span>
+            <span id="schober-dir-h" style="font-size: 13px; font-weight: bold; color: #3498db;">Chính thị</span>
+          </div>
+        </div>
+        
+        <div style="margin-bottom: 10px; padding: 12px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #e67e22;">
+          <div style="font-size: 11px; color: #7f8c8d; font-weight: bold; margin-bottom: 4px;">ĐỘ LỆCH ĐỨNG (VERTICAL)</div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span id="schober-prism-v" style="font-size: 20px; font-weight: bold; color: #2c3e50;">0.00Δ</span>
+            <span id="schober-dir-v" style="font-size: 13px; font-weight: bold; color: #e67e22;">Chính thị</span>
+          </div>
+        </div>
+      </div>
+
+      <button id="btn-toggle-inv" style="
+        width: 100%; padding: 10px; font-size: 13px; font-weight: bold; margin-top: 5px;
+        background: #f1f2f6; color: #2c3e50; border: 1px solid #ccc; border-radius: 6px; cursor: pointer;
+      ">[Space] Đảo Mắt Định Thị</button>
+
+      <button id="btn-lock-res" style="
+        width: 100%; padding: 12px; font-size: 14px; font-weight: bold;
+        background: #0056b3; color: white; border: none; border-radius: 6px;
+        cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 10px;
+      ">Lưu & Gửi Kết Quả</button>
+
+      <button id="schober-reset-btn" style="
+        width: 100%; padding: 10px; font-size: 13px; font-weight: 600;
+        background: transparent; color: #666; border: 1px solid #ccc; border-radius: 6px;
+        cursor: pointer; margin-top: 10px; display: none;
+      ">Đặt lại tọa độ</button>
+    `;
+
+    board.appendChild(sidebar);
+
+    document.getElementById('btn-start-test').addEventListener('click', () => this._startTest());
+    document.getElementById('btn-lock-res').addEventListener('click', () => this._lockResult());
+    document.getElementById('schober-reset-btn').addEventListener('click', () => this._resetTest());
+    document.getElementById('btn-toggle-inv').addEventListener('click', () => { 
+      this._isInverted = !this._isInverted; 
+      this._draw(); 
+    });
+
     this._resizeCanvas();
-
-    // Bind event handlers
-    this._boundKeydown = this._onKeydown.bind(this);
-    this._boundClick = this._onCanvasClick.bind(this);
-    this._boundResize = this._resizeCanvas.bind(this);
-
-    document.addEventListener('keydown', this._boundKeydown);
-    this._canvas.addEventListener('click', this._boundClick);
     window.addEventListener('resize', this._boundResize);
-
-    console.log('[Schober] Event listeners added');
-
-    // Draw initial frame
-    this._draw();
-
-    // Log calibration status
-    if (this._ccPxPerMm && this._ccPxPerMm > 0) {
-      console.log(`[Schober] Using ccPxPerMm = ${this._ccPxPerMm.toFixed(4)} px/mm`);
-    } else {
-      console.warn('[Schober] ccPxPerMm not found in localStorage. Prism calculation will be inaccurate. Please run credit card calibration first.');
-    }
-
-    console.log('[Schober] _init() completed successfully');
   },
 
   /**
-   * Resize canvas to fill display board.
+   * Bắt đầu Test: Ẩn HUD và Menu toàn cục
    * @private
    */
-  _resizeCanvas() {
-    const board = document.getElementById('display-board');
-    if (!board || !this._canvas) return;
+  _startTest() {
+    this._testActive = true;
+    this._isLocked = false;
 
-    const rect = board.getBoundingClientRect();
+    const sidebar = document.getElementById('schober-sidebar');
+    const container = document.getElementById('schober-canvas-container');
+    if (sidebar) sidebar.style.display = 'none';
+    if (container) container.style.right = '0';
+
+    const globalUI = document.querySelectorAll('#menu-btn, .menu, .nav, header');
+    globalUI.forEach(el => {
+      if (el.style) {
+        el.dataset.oldDisplay = el.style.display;
+        el.style.display = 'none';
+      }
+    });
+
+    if (container) container.style.cursor = 'none';
+    this._resizeCanvas();
+  },
+
+  /**
+   * Kết thúc Test: Khôi phục HUD và Menu
+   * @private
+   */
+  _endTest(saveResult = false) {
+    this._testActive = false;
+
+    const sidebar = document.getElementById('schober-sidebar');
+    const container = document.getElementById('schober-canvas-container');
+    if (sidebar) sidebar.style.display = 'flex';
+    if (container) {
+      container.style.right = '340px';
+      container.style.cursor = 'default';
+    }
+
+    const globalUI = document.querySelectorAll('#menu-btn, .menu, .nav, header');
+    globalUI.forEach(el => {
+      if (el.style && el.dataset.oldDisplay !== undefined) {
+        el.style.display = el.dataset.oldDisplay;
+      }
+    });
+
+    this._resizeCanvas();
+    if (saveResult) this._lockResult();
+    else this._updateHUD();
+  },
+
+  _resizeCanvas() {
+    const container = document.getElementById('schober-canvas-container');
+    if (!container || !this._canvas) return;
+
+    const rect = container.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
 
     this._canvas.width = rect.width * dpr;
     this._canvas.height = rect.height * dpr;
-    this._canvas.style.width = rect.width + 'px';
-    this._canvas.style.height = rect.height + 'px';
-
     this._ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     this._canvasWidth = rect.width;
@@ -191,368 +249,257 @@ const schoberTest = {
     this._draw();
   },
 
-  /**
-   * Main draw function: background, circles, crosshair, HUD.
-   * @private
-   */
   _draw() {
     if (!this._ctx) return;
 
     const ctx = this._ctx;
-    const w = this._canvasWidth;
-    const h = this._canvasHeight;
     const cx = this._centerX;
     const cy = this._centerY;
 
-    // Clear canvas
-    ctx.fillStyle = SCHOBER_BG_COLOR;
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = BG_COLOR;
+    ctx.fillRect(0, 0, this._canvasWidth, this._canvasHeight);
 
-    // Draw 2 concentric circles (green)
-    this._drawConcentricCircles(ctx, cx, cy);
+    // Kích hoạt Subtractive Blending (Trừ màu)
+    ctx.globalCompositeOperation = 'multiply';
 
-    // Draw red crosshair at offset position (only if test started)
-    if (this._testStarted) {
-      const crosshairX = cx + this._offsetX;
-      const crosshairY = cy + this._offsetY;
-      this._drawCrosshair(ctx, crosshairX, crosshairY);
-    }
-
-    // Draw HUD
-    this._drawHUD(ctx, w, h, cx, cy);
-  },
-
-  /**
-   * Draw 2 concentric circles centered on canvas.
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {number} cx - Center X
-   * @param {number} cy - Center Y
-   * @private
-   */
-  _drawConcentricCircles(ctx, cx, cy) {
-    ctx.save();
-    ctx.strokeStyle = SCHOBER_CIRCLE_COLOR;
-    ctx.lineWidth = 2;
-
-    // Outer circle: 40% of smaller dimension
+    // Nếu _isInverted = false: Mắt Trái nhìn vòng tròn (Màu Đỏ -> Kính Xanh chặn -> Trái thấy)
+    // Nếu _isInverted = true: Mắt Phải nhìn vòng tròn (Màu Cyan -> Kính Đỏ chặn -> Phải thấy)
+    ctx.strokeStyle = this._isInverted ? TARGET_RIGHT_EYE : TARGET_LEFT_EYE;
+    ctx.lineWidth = 4;
     const outerR = Math.min(cx, cy) * 0.4;
+    const innerR = Math.min(cx, cy) * 0.2;
+    
     ctx.beginPath();
     ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
     ctx.stroke();
-
-    // Inner circle: 20% of smaller dimension
-    const innerR = Math.min(cx, cy) * 0.2;
+    
     ctx.beginPath();
     ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.restore();
-  },
-
-  /**
-   * Draw red crosshair at specified position.
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {number} x - Crosshair center X
-   * @param {number} y - Crosshair center Y
-   * @private
-   */
-  _drawCrosshair(ctx, x, y) {
-    ctx.save();
-    ctx.strokeStyle = SCHOBER_CROSSHAIR_COLOR;
-    ctx.lineWidth = 2;
-
-    // Horizontal line
+    // Chữ thập dành cho Mắt đo lác
+    const crossX = cx + this._offsetX;
+    const crossY = cy + this._offsetY;
+    
+    ctx.strokeStyle = this._isInverted ? TARGET_LEFT_EYE : TARGET_RIGHT_EYE;
+    ctx.lineWidth = 4;
+    
     ctx.beginPath();
-    ctx.moveTo(x - CROSSHAIR_SIZE, y);
-    ctx.lineTo(x + CROSSHAIR_SIZE, y);
+    ctx.moveTo(crossX - CROSSHAIR_SIZE, crossY);
+    ctx.lineTo(crossX + CROSSHAIR_SIZE, crossY);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(crossX, crossY - CROSSHAIR_SIZE);
+    ctx.lineTo(crossX, crossY + CROSSHAIR_SIZE);
     ctx.stroke();
 
-    // Vertical line
-    ctx.beginPath();
-    ctx.moveTo(x, y - CROSSHAIR_SIZE);
-    ctx.lineTo(x, y + CROSSHAIR_SIZE);
-    ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
 
-    ctx.restore();
+    if (!this._testActive) this._updateHUD();
   },
 
-  /**
-   * Draw HUD overlay with real-time prism diopter values.
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {number} w - Canvas width
-   * @param {number} h - Canvas height
-   * @param {number} crosshairX - Current crosshair X
-   * @param {number} crosshairY - Current crosshair Y
-   * @private
-   */
-  _drawHUD(ctx, w, h, cx, cy) {
-    ctx.save();
+  _updateHUD() {
+    const prismH = this._calcPrismDiopter(this._offsetX);
+    const prismV = this._calcPrismDiopter(this._offsetY);
 
-    // Only show HUD if test not started OR test is locked
-    // During test (testStarted=true, isLocked=false), HUD is hidden for black screen
-    if (!this._testStarted || this._isLocked) {
-      // Calculate prism diopters (only if locked)
-      const prismH = this._isLocked ? this._calcPrismDiopter(this._offsetX) : 0;
-      const prismV = this._isLocked ? this._calcPrismDiopter(this._offsetY) : 0;
+    const elFixEye = document.getElementById('schober-fixing-eye');
+    const elDevEye = document.getElementById('schober-deviating-eye');
+    
+    const elPrismH = document.getElementById('schober-prism-h');
+    const elDirH = document.getElementById('schober-dir-h');
+    const elPrismV = document.getElementById('schober-prism-v');
+    const elDirV = document.getElementById('schober-dir-v');
 
-      // HUD background
-      const hudW = 320;
-      const hudH = this._isLocked ? 120 : 100;
-      const hudX = 20;
-      const hudY = 20;
+    if (elFixEye) elFixEye.textContent = this._isInverted ? 'MẮT PHẢI' : 'MẮT TRÁI';
+    if (elDevEye) elDevEye.textContent = this._isInverted ? 'MẮT TRÁI' : 'MẮT PHẢI';
 
-      ctx.fillStyle = SCHOBER_HUD_BG;
-      ctx.fillRect(hudX, hudY, hudW, hudH);
+    if (elPrismH) elPrismH.textContent = `${Math.abs(prismH).toFixed(2)}Δ`;
+    if (elPrismV) elPrismV.textContent = `${Math.abs(prismV).toFixed(2)}Δ`;
 
-      // HUD border (green when locked, green otherwise)
-      ctx.strokeStyle = this._isLocked ? SCHOBER_HUD_BORDER_LOCKED : SCHOBER_HUD_BORDER_DEFAULT;
-      ctx.lineWidth = this._isLocked ? 3 : 1;
-      ctx.strokeRect(hudX, hudY, hudW, hudH);
+    // Phân tích Không gian (Projection Law)
+    const devEyeName = this._isInverted ? "Mắt Trái" : "Mắt Phải";
 
-      // HUD text
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = '16px monospace';
-      ctx.textBaseline = 'top';
-
-      let lineY = hudY + 12;
-      const lineH = 22;
-
-      ctx.fillText('SCHOBER TEST — HETEROPHORIA', hudX + 12, lineY);
-      lineY += lineH;
-
-      ctx.fillText(`Khoảng cách đo: ${SCHOBER_DISTANCE_M.toFixed(1)} m`, hudX + 12, lineY);
-      lineY += lineH;
-
-      // Only show prism values if locked
-      if (this._isLocked) {
-        ctx.fillText(`Δ Ngang (H): ${prismH.toFixed(2)} \u0394`, hudX + 12, lineY);
-        lineY += lineH;
-
-        ctx.fillText(`Δ Đứng (V): ${prismV.toFixed(2)} \u0394`, hudX + 12, lineY);
-        lineY += lineH;
-
-        // Show pixel offset for debugging
-        ctx.fillStyle = '#888888';
-        ctx.font = '12px monospace';
-        ctx.fillText(`Offset: (${this._offsetX}, ${this._offsetY}) px`, hudX + 12, lineY);
-        lineY += 18;
-      }
-
-      // Status indicator
-      if (this._isLocked) {
-        ctx.fillStyle = '#00FF00';
-        ctx.font = 'bold 16px monospace';
-        ctx.fillText('Đã chốt kết quả', hudX + 12, lineY);
+    if (elDirH) {
+      if (Math.abs(prismH) < 0.1) {
+        elDirH.textContent = "Chính thị";
+        elDirH.style.color = "#27ae60";
       } else {
-        ctx.fillStyle = '#FFFF00';
-        ctx.font = 'bold 14px monospace';
-        ctx.fillText('Nhấn ENTER hoặc Click chuột trái để bắt đầu', hudX + 12, lineY);
+        // Nếu Chữ thập (ảnh) bị lệch hướng nào, nhãn cầu đang lác hướng ngược lại.
+        // Bệnh nhân di chuyển chữ thập (+) theo trục X (về bên phải) -> Nhãn cầu lác ngoài.
+        const isExo = (this._offsetX > 0 && !this._isInverted) || (this._offsetX < 0 && this._isInverted);
+        elDirH.textContent = isExo ? `${devEyeName}: Lác Ngoài (Exo)` : `${devEyeName}: Lác Trong (Eso)`;
+        elDirH.style.color = isExo ? "#3498db" : "#c0392b";
       }
     }
 
-    ctx.restore();
+    if (elDirV) {
+      if (Math.abs(prismV) < 0.1) {
+        elDirV.textContent = "Chính thị";
+        elDirV.style.color = "#27ae60";
+      } else {
+        // Tọa độ Y Canvas: đi xuống (+)
+        // Bệnh nhân đẩy chữ thập lên trên (-) -> Nhãn cầu thực tế lác lên trên (Hyper).
+        const isHyper = this._offsetY < 0; 
+        elDirV.textContent = isHyper ? `${devEyeName}: Lác Lên (Hyper)` : `${devEyeName}: Lác Xuống (Hypo)`;
+        elDirV.style.color = isHyper ? "#8e44ad" : "#e67e22";
+      }
+    }
   },
 
-  /**
-   * Calculate Prism Diopter from pixel offset.
-   * Formula: Δ = Displacement (cm) / Distance (m)
-   *
-   * @param {number} pixelOffset - Offset in pixels
-   * @returns {number} Prism diopter value (Δ)
-   * @private
-   */
   _calcPrismDiopter(pixelOffset) {
-    if (!this._ccPxPerMm || this._ccPxPerMm <= 0) return 0;
-
-    // Convert pixel offset to mm
-    const offsetMm = pixelOffset / this._ccPxPerMm;
-
-    // Convert mm to cm
+    const cal = window.__calibrator;
+    if (!cal || cal.pxPerMm <= 0) return 0;
+    
+    const distanceM = cal.distanceM > 0 ? cal.distanceM : 3.0; 
+    const offsetMm = pixelOffset / cal.pxPerMm;
     const offsetCm = offsetMm / 10.0;
-
-    // Calculate prism diopter
-    const delta = offsetCm / SCHOBER_DISTANCE_M;
-
-    return delta;
+    return offsetCm / distanceM; 
   },
 
-  /**
-   * Read ccPxPerMm from localStorage.
-   * @returns {number|null} Pixels per mm, or null if not found
-   * @private
-   */
-  _getPxPerMm() {
-    try {
-      const val = localStorage.getItem(CC_PX_PER_MM_KEY);
-      if (val) {
-        const num = parseFloat(val);
-        if (!isNaN(num) && num > 0) return num;
-      }
-    } catch (e) {
-      console.warn('[Schober] Error reading ccPxPerMm from localStorage:', e);
-    }
-    return null;
-  },
-
-  /**
-   * Handle keyboard events.
-   * @param {KeyboardEvent} e
-   * @private
-   */
-  _onKeydown(e) {
-    // If locked, only allow re-test (Escape to exit)
-    if (this._isLocked) {
-      if (e.key === 'Escape') {
-        this.cleanup();
-      }
-      return;
-    }
-
-    // If test not started, only allow Enter to start
-    if (!this._testStarted) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        this._testStarted = true;
-        this._draw();
-      }
-      return;
-    }
-
-    // Test started - handle movement and lock
-    switch (e.key) {
-      case 'ArrowUp':
-        e.preventDefault();
-        this._offsetY -= MOVEMENT_STEP;
-        this._draw();
-        break;
-
-      case 'ArrowDown':
-        e.preventDefault();
-        this._offsetY += MOVEMENT_STEP;
-        this._draw();
-        break;
-
-      case 'ArrowLeft':
-        e.preventDefault();
-        this._offsetX -= MOVEMENT_STEP;
-        this._draw();
-        break;
-
-      case 'ArrowRight':
-        e.preventDefault();
-        this._offsetX += MOVEMENT_STEP;
-        this._draw();
-        break;
-
-      case 'Enter':
-        e.preventDefault();
-        this._lockResult();
-        break;
-
-      default:
-        // Ignore other keys
-        break;
-    }
-  },
-
-  /**
-   * Handle canvas click events (left-click only, e.button === 0).
-   * Mirrors Enter key behavior:
-   * - If test not started: starts the test
-   * - If test started: locks in the result
-   * @param {MouseEvent} e
-   * @private
-   */
-  _onCanvasClick(e) {
-    // Only accept left-click (button === 0)
-    if (e.button !== 0) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    // If locked, ignore click (only Escape to exit)
-    if (this._isLocked) return;
-
-    // If test not started, start the test
-    if (!this._testStarted) {
-      this._testStarted = true;
-      this._draw();
-      return;
-    }
-
-    // Test started - lock in the result
-    this._lockResult();
-  },
-
-  /**
-   * Lock in the current result: package data and dispatch event.
-   * @private
-   */
   _lockResult() {
     if (this._isLocked) return;
-
     this._isLocked = true;
 
-    // Calculate final prism values
-    const horizontalPrism = this._calcPrismDiopter(this._offsetX);
-    const verticalPrism = this._calcPrismDiopter(this._offsetY);
+    const btnLock = document.getElementById('btn-lock-res');
+    const btnReset = document.getElementById('schober-reset-btn');
+    const btnStart = document.getElementById('btn-start-test');
 
-    // Build payload
+    if (btnLock) {
+      btnLock.textContent = 'Đã Lưu & Gửi Kết Quả';
+      btnLock.style.background = '#27ae60';
+      btnLock.style.cursor = 'default';
+    }
+    if (btnReset) btnReset.style.display = 'block';
+    if (btnStart) btnStart.style.display = 'none';
+
+    const prismH = this._calcPrismDiopter(this._offsetX);
+    const prismV = this._calcPrismDiopter(this._offsetY);
+
+    const devEyeName = this._isInverted ? "OS" : "OD";
+
     const payload = {
       test_type: 'Schober_Heterophoria',
-      eye_tested: 'OU',
-      score_primary: {
-        horizontal_prism: parseFloat(horizontalPrism.toFixed(4)),
-        vertical_prism: parseFloat(verticalPrism.toFixed(4)),
-      },
-      raw_data: {
-        pixel_offset_x: this._offsetX,
-        pixel_offset_y: this._offsetY,
-        ccPxPerMm: this._ccPxPerMm,
-        distance_m: SCHOBER_DISTANCE_M,
-      },
+      fixing_eye: this._isInverted ? 'OD' : 'OS',
+      deviating_eye: devEyeName,
+      clinical_metrics: {
+        horizontal_prism: parseFloat(prismH.toFixed(2)),
+        vertical_prism: parseFloat(prismV.toFixed(2)),
+      }
     };
 
-    // Dispatch custom event
-    const event = new CustomEvent('visionTestCompleted', { detail: payload });
+    const event = new CustomEvent('visionTestCompleted', { detail: payload, bubbles: true });
     document.dispatchEvent(event);
+  },
 
-    console.log('[Schober] Test completed. Payload dispatched:', payload);
+  _resetTest() {
+    this._offsetX = 0;
+    this._offsetY = 0;
+    this._isLocked = false;
+    this._testActive = false;
+    
+    const btnLock = document.getElementById('btn-lock-res');
+    const btnReset = document.getElementById('schober-reset-btn');
+    const btnStart = document.getElementById('btn-start-test');
 
-    // Redraw HUD to show locked state
+    if (btnLock) {
+      btnLock.textContent = 'Lưu & Gửi Kết Quả';
+      btnLock.style.background = '#0056b3';
+      btnLock.style.cursor = 'pointer';
+    }
+    if (btnReset) btnReset.style.display = 'none';
+    if (btnStart) btnStart.style.display = 'block';
+
     this._draw();
   },
 
-  /**
-   * Cleanup: remove event listeners, clear canvas.
-   */
-  cleanup() {
-    if (this._boundKeydown) {
-      document.removeEventListener('keydown', this._boundKeydown);
-      this._boundKeydown = null;
-    }
-    if (this._boundClick) {
-      if (this._canvas) {
-        this._canvas.removeEventListener('click', this._boundClick);
+  _showCalibrationWarning() {
+    const board = document.getElementById('display-board');
+    board.innerHTML = `
+      <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f8f9fa;">
+        <div style="text-align: center; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 500px;">
+          <h2 style="color: #d32f2f; margin-bottom: 15px;">⚠️ Yêu Cầu Hiệu Chuẩn</h2>
+          <p style="color: #555; line-height: 1.6;">Module Schober yêu cầu đo lường kích thước pixel (PPD) và khoảng cách khám để tính toán chính xác Lăng kính (Prism Diopters).</p>
+        </div>
+      </div>
+    `;
+  },
+
+  _onKeydown(e) {
+    if (this._isLocked && e.key !== 'Escape') return;
+
+    if (this._testActive) {
+      let updated = false;
+      switch (e.key) {
+        case 'ArrowUp': e.preventDefault(); this._offsetY -= MOVEMENT_STEP; updated = true; break;
+        case 'ArrowDown': e.preventDefault(); this._offsetY += MOVEMENT_STEP; updated = true; break;
+        case 'ArrowLeft': e.preventDefault(); this._offsetX -= MOVEMENT_STEP; updated = true; break;
+        case 'ArrowRight': e.preventDefault(); this._offsetX += MOVEMENT_STEP; updated = true; break;
+        case ' ': 
+          e.preventDefault(); 
+          this._isInverted = !this._isInverted; 
+          updated = true; 
+          break;
+        case 'Enter': 
+          e.preventDefault(); 
+          this._endTest(true); 
+          return;
+        case 'Escape': 
+          e.preventDefault(); 
+          this._endTest(false); 
+          return;
       }
-      this._boundClick = null;
+      if (updated) this._draw();
+    } else {
+      if (e.key === ' ') {
+        e.preventDefault();
+        this._isInverted = !this._isInverted;
+        this._draw();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        this._startTest();
+      }
     }
-    if (this._boundResize) {
-      window.removeEventListener('resize', this._boundResize);
-      this._boundResize = null;
+  },
+
+  render(idx) {
+    const cal = window.__calibrator;
+    if (!cal || cal.pxPerMm <= 0) {
+      this._showCalibrationWarning();
+      return;
     }
 
+    this._boundResize = this._resizeCanvas.bind(this);
+    this._boundKeydown = this._onKeydown.bind(this);
+
+    this._initDOM();
+    document.addEventListener('keydown', this._boundKeydown);
+  },
+
+  cleanup() {
+    if (this._testActive) {
+      const globalUI = document.querySelectorAll('#menu-btn, .menu, .nav, header');
+      globalUI.forEach(el => {
+        if (el.style && el.dataset.oldDisplay !== undefined) {
+          el.style.display = el.dataset.oldDisplay;
+        }
+      });
+    }
+
+    if (this._boundKeydown) document.removeEventListener('keydown', this._boundKeydown);
+    if (this._boundResize) window.removeEventListener('resize', this._boundResize);
+    
+    this._boundKeydown = null;
+    this._boundResize = null;
+    this._canvas = null;
+    this._ctx = null;
+    
     const board = document.getElementById('display-board');
     if (board) {
       board.innerHTML = '';
       board.style.backgroundColor = '';
+      board.style.cursor = 'default';
     }
-
-    this._canvas = null;
-    this._ctx = null;
-    this._isLocked = false;
-
-    console.log('[Schober] Module cleaned up');
   },
 };
 
