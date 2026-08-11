@@ -387,16 +387,19 @@ function setupSidebar() {
   // Keyboard: Tab / Home / ContextMenu to toggle menu (as before)
   // When menu is visible: Arrow keys navigate, Enter/OK selects
   document.addEventListener('keydown', (e) => {
-    // Allow Tab and Enter to work normally when manual entry modal is open
+    // Allow Tab and Enter to work normally when any exam modal is open
+    const startExamModal = document.getElementById('start-exam-modal');
     const manualEntryModal = document.getElementById('manual-entry-modal');
+    const isInStartExamModal = startExamModal && startExamModal.style.display === 'flex';
     const isInManualModal = manualEntryModal && manualEntryModal.style.display === 'flex';
+    const isInAnyExamModal = isInStartExamModal || isInManualModal;
 
-    if (e.key === 'Tab' && isInManualModal) {
-      return; // Let browser handle Tab navigation in manual entry modal
+    if (e.key === 'Tab' && isInAnyExamModal) {
+      return; // Let browser handle Tab navigation in exam modals
     }
 
-    if ((e.key === 'Enter' || e.key === ' ') && isInManualModal) {
-      return; // Let browser handle Enter/Space for form submission in manual entry modal
+    if ((e.key === 'Enter' || e.key === ' ') && isInAnyExamModal) {
+      return; // Let browser handle Enter/Space for form submission in exam modals
     }
 
     if (e.key === 'Tab' || e.key === 'Home' || e.key === 'ContextMenu') {

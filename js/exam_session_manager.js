@@ -14,6 +14,9 @@
     // LocalStorage key for clinic settings
     const CLINIC_SETTINGS_KEY = 'vision_clinic_settings';
 
+    // LocalStorage key for exam history (EMR History Viewer)
+    const EMR_HISTORY_KEY = 'vision_emr_history_v1';
+
     // Available test names for manual entry datalist
     const TEST_NAMES_LIST = [
         'Schober Heterophoria',
@@ -54,6 +57,9 @@
 
     // Clinic Settings Modal element reference
     let clinicSettingsModal = null;
+
+    // History Modal element reference
+    let historyModal = null;
 
 
     // Global exam state
@@ -154,6 +160,13 @@
         } catch (e) {
             console.error('[ExamSessionManager] Failed to create Clinic Settings UI:', e);
         }
+
+        // Create History Viewer UI (defensive - wrapped in try/catch)
+        try {
+            createHistoryViewerUI();
+        } catch (e) {
+            console.error('[ExamSessionManager] Failed to create History Viewer UI:', e);
+        }
     }
 
 
@@ -172,21 +185,21 @@
                     <form id="start-exam-form">
                         <div class="form-group">
                             <label for="patient-name">Họ và Tên:</label>
-                            <input type="text" id="patient-name" name="patient-name" required>
+                            <input type="text" id="patient-name" name="patient-name" required placeholder="VD: Nguyễn Văn B" tabindex="1">
                         </div>
                         <div class="form-group">
-                            <label for="patient-age">Tuổi:</label>
-                            <input type="number" id="patient-age" name="patient-age" min="0" max="150" required>
+                            <label for="patient-yob">Năm sinh:</label>
+                            <input type="number" id="patient-yob" name="patient-yob" min="1900" max="2099" placeholder="VD: 1990" required tabindex="2">
                         </div>
                         <div class="form-group checkbox-group">
                             <label>
-                                <input type="checkbox" id="anonymous-check">
+                                <input type="checkbox" id="anonymous-check" tabindex="3">
                                 <span>Khám ẩn danh</span>
                             </label>
                         </div>
                         <div class="form-actions">
-                            <button type="submit" class="exam-btn submit-btn">Bắt đầu khám</button>
-                            <button type="button" class="exam-btn cancel-btn">Hủy</button>
+                            <button type="submit" class="exam-btn submit-btn" tabindex="4">Bắt đầu khám</button>
+                            <button type="button" class="exam-btn cancel-btn" tabindex="5">Hủy</button>
                         </div>
                     </form>
                 </div>
@@ -194,46 +207,83 @@
         `;
         document.body.appendChild(startExamModal);
 
+        // Put modal in Safe Zone - protect Tab, Space keys from global hotkey conflict
+        allowTypingInModal(startExamModal);
+
         // Bind modal events
         const closeBtn = startExamModal.querySelector('.exam-modal-close');
         const cancelBtn = startExamModal.querySelector('.cancel-btn');
         const form = startExamModal.querySelector('#start-exam-form');
         const anonymousCheck = startExamModal.querySelector('#anonymous-check');
         const nameInput = startExamModal.querySelector('#patient-name');
-        const ageInput = startExamModal.querySelector('#patient-age');
+        const yobInput = startExamModal.querySelector('#patient-yob');
+        const submitBtn = startExamModal.querySelector('.submit-btn');
 
         closeBtn.addEventListener('click', () => hideModal(startExamModal));
         cancelBtn.addEventListener('click', () => hideModal(startExamModal));
 
+        // Anonymous checkbox logic: disable patient-yob when checked
         anonymousCheck.addEventListener('change', function() {
             if (this.checked) {
                 nameInput.value = 'Ẩn danh';
-                ageInput.value = 'N/A';
+                yobInput.value = '';
                 nameInput.disabled = true;
-                ageInput.disabled = true;
+                yobInput.disabled = true;
             } else {
                 nameInput.value = '';
-                ageInput.value = '';
+                yobInput.value = '';
                 nameInput.disabled = false;
-                ageInput.disabled = false;
+                yobInput.disabled = false;
             }
         });
+
+        // Enter key listener for quick submit on inputs AND submit button
+        const handleEnterSubmit = function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                // Trigger form submit programmatically
+                form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+            }
+        };
+        
+        // Add modal-level keydown handler for Enter key on ANY element (including submit button)
+        // This uses capture phase to intercept BEFORE UniversalInput catches it
+        const modalKeydownHandler = function(e) {
+            // Allow Tab to pass through naturally for focus management
+            if (e.key === 'Tab') {
+                return; // Let browser handle tab order naturally
+            }
+            
+            // Handle Enter key on any element - trigger form submit
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                // Trigger form submit programmatically
+                form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+            }
+        };
+        startExamModal.addEventListener('keydown', modalKeydownHandler, true);
+
+        nameInput.addEventListener('keydown', handleEnterSubmit);
+        yobInput.addEventListener('keydown', handleEnterSubmit);
 
         form.addEventListener('submit', function(e) {
             e.preventDefault();
             const patientName = nameInput.value.trim();
-            const patientAge = ageInput.value.trim();
+            const patientYOB = yobInput.value.trim();
 
             if (!patientName) {
                 alert('Vui lòng nhập tên bệnh nhân');
+                nameInput.focus();
                 return;
             }
 
-            startExam(patientName, patientAge);
+            startExam(patientName, patientYOB);
             hideModal(startExamModal);
             form.reset();
             nameInput.disabled = false;
-            ageInput.disabled = false;
+            yobInput.disabled = false;
         });
 
         // Close on backdrop click
@@ -374,8 +424,14 @@
      * @param {boolean} isPrintMode - true for print layout, false for modal layout
      * @returns {string}
      */
-    function generateReportHTML(isPrintMode) {
-        const exam = window.__currentExam;
+    /**
+     * Helper: Generate report HTML for both Modal View and Print
+     * @param {boolean} isPrintMode - true for print layout, false for modal layout
+     * @param {Object|null} examData - Optional exam data object. Defaults to window.__currentExam
+     * @returns {string}
+     */
+    function generateReportHTML(isPrintMode, examData = null) {
+        const exam = examData || window.__currentExam;
         const startDate = new Date(exam.startTime);
         
         let formattedDate, formattedTime;
@@ -395,6 +451,25 @@
                 hour: '2-digit',
                 minute: '2-digit'
             });
+        }
+
+        // Build patient info rows (supports both old format with patientYOB and legacy format without)
+        const patientYOB = exam.patientYOB || 'N/A';
+        const patientAge = exam.patientAge || 'N/A';
+        let patientInfoRows = '';
+        
+        if (isPrintMode) {
+            patientInfoRows = `
+                <tr><td class="label">Họ và tên:</td><td>${exam.patientName}</td></tr>
+                <tr><td class="label">Năm sinh:</td><td>${patientYOB}${patientYOB !== 'N/A' && patientAge !== 'N/A' ? ' (' + patientAge + ' tuổi)' : ''}</td></tr>
+                <tr><td class="label">Ngày khám:</td><td>${formattedDate}</td></tr>
+            `;
+        } else {
+            patientInfoRows = `
+                <tr><td class="label">Họ và tên:</td><td>${exam.patientName}</td></tr>
+                <tr><td class="label">Năm sinh:</td><td>${patientYOB}${patientYOB !== 'N/A' && patientAge !== 'N/A' ? ' (' + patientAge + ' tuổi)' : ''}</td></tr>
+                <tr><td class="label">Ngày khám:</td><td>${formattedDate} ${formattedTime || ''}</td></tr>
+            `;
         }
 
         let html = '';
@@ -417,9 +492,7 @@
                 <div class="print-patient-info">
                     <h3>THÔNG TIN BỆNH NHÂN</h3>
                     <table class="print-table">
-                        <tr><td class="label">Họ và tên:</td><td>${exam.patientName}</td></tr>
-                        <tr><td class="label">Tuổi:</td><td>${exam.patientAge}</td></tr>
-                        <tr><td class="label">Ngày khám:</td><td>${formattedDate}</td></tr>
+                        ${patientInfoRows}
                     </table>
                 </div>
                 <div class="print-results">
@@ -437,9 +510,7 @@
                 <div class="report-patient-info">
                     <h4>Thông tin bệnh nhân</h4>
                     <table class="report-table">
-                        <tr><td class="label">Họ và tên:</td><td>${exam.patientName}</td></tr>
-                        <tr><td class="label">Tuổi:</td><td>${exam.patientAge}</td></tr>
-                        <tr><td class="label">Ngày khám:</td><td>${formattedDate} ${formattedTime || ''}</td></tr>
+                        ${patientInfoRows}
                     </table>
                 </div>
                 <div class="report-results">
@@ -813,7 +884,16 @@
     // Bind event listeners
     function bindEvents() {
         if (startExamBtn) {
-            startExamBtn.addEventListener('click', () => showModal(startExamModal));
+            startExamBtn.addEventListener('click', () => {
+                showModal(startExamModal);
+                // Auto-focus into patient name input after modal opens
+                setTimeout(() => {
+                    const nameInput = document.getElementById('patient-name');
+                    if (nameInput) {
+                        nameInput.focus();
+                    }
+                }, 100);
+            });
         }
 
         if (endExamBtn) {
@@ -895,10 +975,16 @@
     }
 
     // Start exam
-    function startExam(patientName, patientAge) {
+    function startExam(patientName, patientYOB) {
+        // Calculate age from Year of Birth
+        const age = patientYOB && !isNaN(parseInt(patientYOB))
+            ? (new Date().getFullYear() - parseInt(patientYOB))
+            : 'N/A';
+
         window.__currentExam = {
             patientName: patientName,
-            patientAge: patientAge,
+            patientYOB: patientYOB || 'N/A',
+            patientAge: age,
             startTime: Date.now(),
             results: []
         };
@@ -927,26 +1013,56 @@
         }
 
         if (examStatusText) {
-            examStatusText.innerHTML = `👤 ${window.__currentExam.patientName} - ${window.__currentExam.patientAge} (Đang khám)`;
+            const exam = window.__currentExam;
+            examStatusText.innerHTML = `👤 ${exam.patientName} - SN: ${exam.patientYOB || 'N/A'} (Đang khám)`;
         }
     }
 
     /**
      * Show report in modal view ("Chỉ xem kết quả")
+     * @param {Object|null} examData - Optional exam data object. Defaults to window.__currentExam
+     * @param {boolean} isFromHistory - True if viewing from history (prevents saveToHistory on close)
      */
-    function showReportModal() {
-        if (!window.__currentExam) return;
+    function showReportModal(examData = null, isFromHistory = false) {
+        const exam = examData || window.__currentExam;
+        if (!exam) return;
+
+        // Temporarily replace current exam for rendering
+        const originalExam = window.__currentExam;
+        window.__currentExam = exam;
 
         const reportContent = document.getElementById('report-content');
-        if (!reportContent) return;
+        if (!reportContent) {
+            window.__currentExam = originalExam;
+            return;
+        }
 
         // Generate and inject report HTML using shared helper
-        reportContent.innerHTML = generateReportHTML(false);
+        reportContent.innerHTML = generateReportHTML(false, exam);
 
-        // Change button text to "Đóng & Hoàn Tất Khám"
+        // Get the reset button and remove old listeners before adding new ones
         const resetBtn = document.getElementById('reset-session-btn');
         if (resetBtn) {
-            resetBtn.textContent = 'Đóng & Hoàn Tất Khám';
+            // Clone and replace to remove all event listeners
+            const newResetBtn = resetBtn.cloneNode(true);
+            resetBtn.parentNode.replaceChild(newResetBtn, resetBtn);
+
+            if (isFromHistory === true) {
+                // History mode: Just close modal, NO resetSession
+                newResetBtn.textContent = 'Đóng';
+                newResetBtn.addEventListener('click', function() {
+                    hideModal(reportModal);
+                    // Restore original exam state
+                    window.__currentExam = originalExam;
+                });
+            } else {
+                // Normal mode: Close and reset session
+                newResetBtn.textContent = 'Đóng & Hoàn Tất Khám';
+                newResetBtn.addEventListener('click', function() {
+                    hideModal(reportModal);
+                    resetSession();
+                });
+            }
         }
 
         showModal(reportModal);
@@ -990,8 +1106,13 @@
      * Export report as PDF file using html2pdf.js
      * Creates a temporary element, renders it to PDF, and triggers download
      */
-    function exportPDF() {
-        if (!window.__currentExam) return;
+    /**
+     * Export report as PDF file using html2pdf.js
+     * @param {Object|null} examData - Optional exam data object. Defaults to window.__currentExam
+     */
+    function exportPDF(examData = null) {
+        const exam = examData || window.__currentExam;
+        if (!exam) return;
 
         // Check if html2pdf library is loaded
         if (typeof html2pdf === 'undefined') {
@@ -1002,16 +1123,16 @@
 
         // Generate report HTML using shared helper (print mode)
         const element = document.createElement('div');
-        element.innerHTML = generateReportHTML(true);
+        element.innerHTML = generateReportHTML(true, exam);
         element.style.padding = '20px';
         element.style.color = '#000';
         element.style.fontFamily = "'Times New Roman', serif";
         element.style.backgroundColor = '#fff';
 
         // Create safe filename from patient name and date
-        const date = new Date(window.__currentExam.startTime);
+        const date = new Date(exam.startTime);
         const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
-        const safeName = window.__currentExam.patientName
+        const safeName = exam.patientName
             .replace(/[^a-z0-9A-Z_À-ỹ]/gi, '_')
             .replace(/\s+/g, '_');
         const filename = `Kham_Mat_${safeName}_${dateStr}.pdf`;
@@ -1037,8 +1158,39 @@
         });
     }
 
+    /**
+     * Save current exam to local EMR history
+     */
+    function saveToHistory(exam) {
+        // Safety check: only save if we have valid exam data with results
+        if (!exam || !exam.results || exam.results.length === 0) return;
+
+        try {
+            let history = localStorage.getItem(EMR_HISTORY_KEY);
+            history = history ? JSON.parse(history) : [];
+            
+            // Add to beginning of array
+            history.unshift({ ...exam, viewedAt: null });
+            
+            // Memory protection: remove oldest if > 200 items
+            if (history.length > 200) {
+                history.pop();
+            }
+            
+            localStorage.setItem(EMR_HISTORY_KEY, JSON.stringify(history));
+            console.log('[ExamSessionManager] Saved to EMR history. Total records:', history.length);
+        } catch (e) {
+            console.error('[ExamSessionManager] Failed to save to history:', e);
+        }
+    }
+
     // Reset session
     function resetSession() {
+        // Save completed exam to history BEFORE clearing
+        if (window.__currentExam && window.__currentExam.results && window.__currentExam.results.length > 0) {
+            saveToHistory(window.__currentExam);
+        }
+
         // Exit fullscreen
         if (document.fullscreenElement) {
             document.exitFullscreen().catch(err => {
@@ -1120,11 +1272,466 @@
         }, 2000);
     }
 
+
+    // ===== EMR HISTORY VIEWER MODULE =====
+
+    /**
+     * Format timestamp to Vietnamese date string (dd/mm/yyyy HH:MM)
+     * @param {number} timestamp - Unix timestamp in milliseconds
+     * @returns {string}
+     */
+    function formatHistoryDate(timestamp) {
+        const date = new Date(timestamp);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${day}/${month}/${year} ${hours}:${minutes}`;
+    }
+
+    /**
+     * Create History Viewer UI (Button + Modal)
+     */
+    function createHistoryViewerUI() {
+        const navbarHeader = document.getElementById('sidebar-header');
+        if (!navbarHeader) {
+            console.warn('[EMRHistory] Navbar header not found');
+            return;
+        }
+
+        const historyBtn = document.createElement('button');
+        historyBtn.id = 'history-viewer-btn';
+        historyBtn.className = 'exam-btn history-btn';
+        historyBtn.setAttribute('title', 'Kho bệnh án');
+        historyBtn.innerHTML = '\uD83D\uDDC2\uFE0F';
+
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+        if (fullscreenBtn) {
+            navbarHeader.insertBefore(historyBtn, fullscreenBtn);
+        } else {
+            navbarHeader.appendChild(historyBtn);
+        }
+
+        historyBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            openHistoryModal();
+        });
+
+        historyModal = document.createElement('div');
+        historyModal.id = 'history-modal';
+        historyModal.className = 'exam-modal';
+
+        const modalContent = document.createElement('div');
+        modalContent.className = 'exam-modal-content history-modal-content';
+        modalContent.style.maxWidth = '900px';
+        modalContent.style.width = '94%';
+
+        const modalHeader = document.createElement('div');
+        modalHeader.className = 'exam-modal-header';
+        const headerH3 = document.createElement('h3');
+        headerH3.textContent = '\uD83D\uDCCB Kho Benh An';
+        const headerClose = document.createElement('button');
+        headerClose.className = 'exam-modal-close';
+        headerClose.type = 'button';
+        headerClose.innerHTML = '&times;';
+        modalHeader.appendChild(headerH3);
+        modalHeader.appendChild(headerClose);
+
+        const modalBody = document.createElement('div');
+        modalBody.className = 'exam-modal-body history-modal-body';
+
+        // Create search container with export button wrapper
+        const searchWrapper = document.createElement('div');
+        searchWrapper.className = 'search-export-wrapper';
+        searchWrapper.style.cssText = 'display: flex; gap: 10px; align-items: center; margin-bottom: 8px;';
+
+        const searchContainer = document.createElement('div');
+        searchContainer.className = 'history-search-container';
+        searchContainer.style.cssText = 'flex: 1;';
+
+        const searchInput = document.createElement('input');
+        searchInput.type = 'text';
+        searchInput.id = 'history-search';
+        searchInput.placeholder = '\uD83D\uDD0D Tim ten benh nhan...';
+        searchInput.addEventListener('input', function() {
+            renderHistoryTable(this.value.trim());
+        });
+        searchContainer.appendChild(searchInput);
+
+        // Export CSV Button
+        const exportCsvBtn = document.createElement('button');
+        exportCsvBtn.id = 'btn-export-csv';
+        exportCsvBtn.className = 'exam-btn export-csv-btn';
+        exportCsvBtn.textContent = '\uD83D\uDCCA Xuất Excel';
+        exportCsvBtn.setAttribute('title', 'Xuất dữ liệu lịch sử ra file CSV (Excel)');
+        exportCsvBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            exportHistoryToCSV();
+        });
+
+        searchWrapper.appendChild(searchContainer);
+        searchWrapper.appendChild(exportCsvBtn);
+
+        const resultsCount = document.createElement('div');
+        resultsCount.id = 'history-results-count';
+        resultsCount.style.cssText = 'font-size: 13px; color: var(--gray-500); margin-top: 8px; font-weight: 500;';
+        searchWrapper.appendChild(resultsCount);
+
+        // Record count info (current/200)
+        const recordCountInfo = document.createElement('div');
+        recordCountInfo.id = 'history-record-count-info';
+        recordCountInfo.style.cssText = 'font-size: 12px; color: var(--gray-400); margin-top: 4px; font-style: italic;';
+        searchWrapper.appendChild(recordCountInfo);
+
+        const tableContainer = document.createElement('div');
+        tableContainer.id = 'history-table-container';
+        tableContainer.className = 'history-table-container';
+        tableContainer.style.cssText = 'margin-top: 16px; border: 1px solid var(--gray-200); border-radius: var(--radius-md); overflow: auto; max-height: 500px; box-shadow: var(--shadow-sm);';
+
+        const table = document.createElement('table');
+        table.id = 'history-table';
+        table.className = 'history-table';
+        table.style.cssText = 'width: 100%; border-collapse: collapse; font-size: 13.5px;';
+
+        const thead = document.createElement('thead');
+        thead.style.cssText = 'position: sticky; top: 0; z-index: 10;';
+        const theadRow = document.createElement('tr');
+        theadRow.style.cssText = 'background: linear-gradient(180deg, var(--exam-primary) 0%, #1d4ed8 100%);';
+        ['Ngay kham', 'Benh nhan', 'Nam sinh', 'Thao tac'].forEach(text => {
+            const th = document.createElement('th');
+            th.textContent = text;
+            th.style.cssText = 'padding: 12px 14px; text-align: left; font-weight: 600; font-size: 12.5px; letter-spacing: 0.04em; text-transform: uppercase; color: white; border: none;';
+            if (text === 'Thao tac') {
+                th.style.textAlign = 'center';
+                th.style.width = '140px';
+            }
+            theadRow.appendChild(th);
+        });
+        thead.appendChild(theadRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        tbody.id = 'history-tbody';
+        tbody.style.cssText = 'background: white;';
+        table.appendChild(tbody);
+        tableContainer.appendChild(table);
+
+        const emptyState = document.createElement('div');
+        emptyState.id = 'history-empty-state';
+        emptyState.style.cssText = 'text-align: center; padding: 40px 20px; color: var(--gray-400); font-style: italic; display: none;';
+        emptyState.textContent = 'Chua co benh an nao trong lich su.';
+
+        const formActions = document.createElement('div');
+        formActions.className = 'form-actions';
+        formActions.style.marginTop = '20px';
+
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'exam-btn cancel-btn';
+        closeBtn.textContent = 'Dong';
+        closeBtn.addEventListener('click', function() {
+            hideModal(historyModal);
+        });
+        formActions.appendChild(closeBtn);
+
+        modalBody.appendChild(searchWrapper);
+        modalBody.appendChild(tableContainer);
+        modalBody.appendChild(emptyState);
+        modalBody.appendChild(formActions);
+
+        modalContent.appendChild(modalHeader);
+        modalContent.appendChild(modalBody);
+        historyModal.appendChild(modalContent);
+
+        headerClose.addEventListener('click', function() {
+            hideModal(historyModal);
+        });
+
+        historyModal.addEventListener('click', function(e) {
+            if (e.target === historyModal) {
+                hideModal(historyModal);
+            }
+        });
+
+        document.body.appendChild(historyModal);
+        allowTypingInModal(historyModal);
+        renderHistoryTable();
+    }
+
+    /**
+     * Open History Modal and render table
+     */
+    function openHistoryModal() {
+        renderHistoryTable();
+        showModal(historyModal);
+    }
+
+    /**
+     * Render history table with optional search filter
+     * @param {string} searchTerm - Optional search term
+     */
+    function renderHistoryTable(searchTerm = '') {
+        try {
+            let history = localStorage.getItem(EMR_HISTORY_KEY);
+            history = history ? JSON.parse(history) : [];
+
+            const tbody = document.getElementById('history-tbody');
+            const emptyState = document.getElementById('history-empty-state');
+            const resultsCount = document.getElementById('history-results-count');
+
+            if (!tbody) return;
+
+            let filtered = history;
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                filtered = history.filter(exam => 
+                    exam.patientName && exam.patientName.toLowerCase().includes(term)
+                );
+            }
+
+            if (resultsCount) {
+                resultsCount.textContent = filtered.length === history.length
+                    ? `Hien thi tat ca: ${history.length} benh an`
+                    : `Tim thay: ${filtered.length} / ${history.length} benh an`;
+            }
+
+            // Update record count info (current/200)
+            const recordCountInfo = document.getElementById('history-record-count-info');
+            if (recordCountInfo) {
+                recordCountInfo.textContent = 'Dang hien thi: ' + history.length + '/200 ban ghi';
+            }
+
+            tbody.innerHTML = '';
+
+            if (filtered.length === 0) {
+                if (emptyState) {
+                    emptyState.style.display = 'block';
+                    emptyState.textContent = searchTerm 
+                        ? `Khong tim thay benh an nao phu hop với "${searchTerm}"`
+                        : 'Chua co benh an nao trong lich su.';
+                }
+                return;
+            }
+
+            if (emptyState) {
+                emptyState.style.display = 'none';
+            }
+
+            filtered.forEach((exam, index) => {
+                const tr = document.createElement('tr');
+                tr.style.cssText = 'transition: background var(--transition-fast);';
+                tr.addEventListener('mouseenter', function() {
+                    this.style.background = 'var(--primary-light)';
+                });
+                tr.addEventListener('mouseleave', function() {
+                    this.style.background = index % 2 === 0 ? 'white' : 'var(--gray-50)';
+                });
+
+                const tdDate = document.createElement('td');
+                tdDate.textContent = formatHistoryDate(exam.startTime);
+                tdDate.style.cssText = 'padding: 11px 14px; border-bottom: 1px solid var(--gray-100); color: var(--gray-600); white-space: nowrap;';
+                tr.appendChild(tdDate);
+
+                const tdName = document.createElement('td');
+                tdName.textContent = exam.patientName || 'N/A';
+                tdName.style.cssText = 'padding: 11px 14px; border-bottom: 1px solid var(--gray-100); color: var(--gray-800); font-weight: 600;';
+                tr.appendChild(tdName);
+
+                const tdYOB = document.createElement('td');
+                const yob = exam.patientYOB || 'N/A';
+                const age = exam.patientAge || 'N/A';
+                // Display "1990 (36 tuổi)" format if both available, otherwise just show what we have
+                if (yob !== 'N/A' && age !== 'N/A') {
+                    tdYOB.textContent = `${yob} (${age} tuổi)`;
+                } else {
+                    tdYOB.textContent = yob;
+                }
+                tdYOB.style.cssText = 'padding: 11px 14px; border-bottom: 1px solid var(--gray-100); color: var(--gray-600);';
+                tr.appendChild(tdYOB);
+
+                const tdActions = document.createElement('td');
+                tdActions.style.cssText = 'padding: 11px 14px; border-bottom: 1px solid var(--gray-100); text-align: center; white-space: nowrap;';
+
+                const actionsWrapper = document.createElement('div');
+                actionsWrapper.style.cssText = 'display: flex; gap: 8px; justify-content: center;';
+
+                const viewBtn = document.createElement('button');
+                viewBtn.className = 'history-action-btn view-history-btn';
+                viewBtn.innerHTML = '\uD83D\uDC41\uFE0F Xem';
+                viewBtn.setAttribute('title', 'Xem chi tiet');
+                viewBtn.style.cssText = 'padding: 6px 12px; border: 1px solid var(--gray-300); border-radius: var(--radius-sm); background: white; color: var(--gray-700); font-size: 12px; font-weight: 600; cursor: pointer; transition: all var(--transition-fast); font-family: inherit;';
+                viewBtn.addEventListener('mouseenter', function() {
+                    this.style.background = 'var(--primary-light)';
+                    this.style.borderColor = 'var(--exam-primary)';
+                    this.style.color = 'var(--exam-primary)';
+                });
+                viewBtn.addEventListener('mouseleave', function() {
+                    this.style.background = 'white';
+                    this.style.borderColor = 'var(--gray-300)';
+                    this.style.color = 'var(--gray-700)';
+                });
+                viewBtn.addEventListener('click', function() {
+                    hideModal(historyModal);
+                    showReportModal(exam, true);
+                });
+                actionsWrapper.appendChild(viewBtn);
+
+                const pdfBtn = document.createElement('button');
+                pdfBtn.className = 'history-action-btn pdf-history-btn';
+                pdfBtn.innerHTML = '\uD83D\uDCC4 PDF';
+                pdfBtn.setAttribute('title', 'Xuat PDF');
+                pdfBtn.style.cssText = 'padding: 6px 12px; border: 1px solid var(--gray-300); border-radius: var(--radius-sm); background: white; color: var(--gray-700); font-size: 12px; font-weight: 600; cursor: pointer; transition: all var(--transition-fast); font-family: inherit;';
+                pdfBtn.addEventListener('mouseenter', function() {
+                    this.style.background = 'var(--teal-light)';
+                    this.style.borderColor = 'var(--exam-teal)';
+                    this.style.color = 'var(--exam-teal)';
+                });
+                pdfBtn.addEventListener('mouseleave', function() {
+                    this.style.background = 'white';
+                    this.style.borderColor = 'var(--gray-300)';
+                    this.style.color = 'var(--gray-700)';
+                });
+                pdfBtn.addEventListener('click', function() {
+                    exportPDF(exam);
+                });
+                actionsWrapper.appendChild(pdfBtn);
+
+                tdActions.appendChild(actionsWrapper);
+                tr.appendChild(tdActions);
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            console.error('[EMRHistory] Failed to render history table:', e);
+            showToast('Loi: Khong the tai danh sach benh an');
+        }
+    }
+
+
+    // ===== EXPORT CSV FUNCTION =====
+    /**
+     * Export exam history to CSV file with UTF-8 BOM for Excel compatibility
+     */
+    function exportHistoryToCSV() {
+        try {
+            var history = localStorage.getItem(EMR_HISTORY_KEY);
+            history = history ? JSON.parse(history) : [];
+
+            if (!history || history.length === 0) {
+                showToast('Khong co du lieu de xuat');
+                return;
+            }
+
+            // Initialize CSV content with UTF-8 BOM and header row
+            var csvContent = "\uFEFF" + "Ngay Kham,Ten Benh Nhan,Nam sinh (Tuoi),Ket Qua Lam Sang\n";
+
+            // Process each exam record
+            var i, exam, result, idx, testName, metrics, resultParts, clinicalResults, formattedDate, patientName, patientAge, row;
+            
+            for (i = 0; i < history.length; i++) {
+                exam = history[i];
+
+                // Helper to escape cell values for CSV safety
+                function escapeCell(value) {
+                    if (value === null || value === undefined) {
+                        return '';
+                    }
+                    var str = String(value);
+                    if (str.indexOf(',') !== -1 || str.indexOf('"') !== -1 || str.indexOf('\n') !== -1) {
+                        return '"' + str.replace(/"/g, '""') + '"';
+                    }
+                    return str;
+                }
+
+                // Format date
+                formattedDate = formatHistoryDate(exam.startTime);
+
+                // Patient info
+                patientName = exam.patientName || 'N/A';
+                const patientYOB = exam.patientYOB || 'N/A';
+                const patientAge = exam.patientAge || 'N/A';
+                // Combine YOB and age for display: "1990 (36 tuổi)"
+                patientAge = (patientYOB !== 'N/A' && patientAge !== 'N/A')
+                    ? patientYOB + ' (' + patientAge + ' tuổi)'
+                    : patientYOB;
+
+                // Flatten clinical results
+                clinicalResults = 'N/A';
+                if (exam.results && exam.results.length > 0) {
+                    resultParts = [];
+                    for (idx = 0; idx < exam.results.length; idx++) {
+                        result = exam.results[idx];
+                        testName = result.test_type || ('Test ' + (idx + 1));
+                        metrics = result.clinical_metrics || {};
+
+                        if (typeof metrics === 'object' && Object.keys(metrics).length > 0) {
+                            var metricEntries = Object.entries(metrics);
+                            var metricsStr = '';
+                            var m;
+                            for (m = 0; m < metricEntries.length; m++) {
+                                if (m > 0) metricsStr += ', ';
+                                metricsStr += metricEntries[m][0] + ': ' + metricEntries[m][1];
+                            }
+                            resultParts.push('[' + testName + '] ' + metricsStr);
+                        } else if (typeof metrics === 'string' && metrics !== 'N/A') {
+                            resultParts.push('[' + testName + '] ' + metrics);
+                        } else {
+                            resultParts.push('[' + testName + ']');
+                        }
+                    }
+                    clinicalResults = resultParts.join(' | ');
+                }
+
+                // Build CSV row
+                row = [
+                    escapeCell(formattedDate),
+                    escapeCell(patientName),
+                    escapeCell(patientAge),
+                    escapeCell(clinicalResults)
+                ].join(',');
+
+                csvContent += row + '\n';
+            }
+
+            // Create Blob with UTF-8 encoding
+            var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+
+            // Create hidden anchor for download
+            var link = document.createElement('a');
+            var url = URL.createObjectURL(blob);
+            var now = new Date();
+            var dateStr = now.getFullYear() +
+                String(now.getMonth() + 1).padStart(2, '0') +
+                String(now.getDate()).padStart(2, '0') + '_' +
+                String(now.getHours()).padStart(2, '0') +
+                String(now.getMinutes()).padStart(2, '0') +
+                String(now.getSeconds()).padStart(2, '0');
+            var filename = 'Thong_Ke_Kham_Mat_' + dateStr + '.csv';
+
+            link.href = url;
+            link.download = filename;
+            link.style.display = 'none';
+
+            // Append, click, cleanup
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            showToast('Da tai xuong file Excel (' + history.length + ' ban ghi)');
+        } catch (e) {
+            console.error('[ExamSessionManager] CSV export failed:', e);
+            showToast('Loi: Khong the tao file CSV');
+        }
+    }
+    // ===== END EXPORT CSV FUNCTION =====
+
     // ===== HELPER: Safe Zone for Modal Input =====
 
     /**
      * Protect modal form inputs from global hotkey listeners.
      * Uses capture phase to stop propagation BEFORE global listeners receive the event.
+     * Also protects Tab/Shift+Tab navigation and Enter key on buttons.
      * @param {HTMLElement} modalElement - The modal container element
      */
     function allowTypingInModal(modalElement) {
@@ -1132,9 +1739,9 @@
 
         const stopGlobalHotkeys = (e) => {
             const tagName = e.target.tagName.toUpperCase();
-            // If user is typing in Input, Textarea, or Select
-            if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT') {
-                // Only stop propagation outward - NEVER preventDefault() to preserve typing
+            // If user is typing in Input, Textarea, Select, or Button
+            if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || tagName === 'BUTTON') {
+                // Stop propagation outward - NEVER preventDefault() to preserve native behavior
                 e.stopPropagation();
             }
         };

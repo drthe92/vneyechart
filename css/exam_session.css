@@ -1041,3 +1041,231 @@
         max-width: 150px;
     }
 }
+
+
+/* ===== EMR HISTORY VIEWER STYLES ===== */
+
+/* Search Export Wrapper */
+.search-export-wrapper {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.search-export-wrapper .history-search-container {
+    flex: 1;
+}
+
+/* Export CSV Button */
+.export-csv-btn {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    padding: 10px 18px;
+    font-size: 13.5px;
+    font-weight: 600;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    font-family: inherit;
+    letter-spacing: 0.015em;
+    position: relative;
+    overflow: hidden;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3), var(--shadow-sm);
+    flex-shrink: 0;
+}
+
+.export-csv-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 100%);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.export-csv-btn:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4), var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.export-csv-btn:hover::before {
+    opacity: 1;
+}
+
+.export-csv-btn:active {
+    transform: translateY(0);
+}
+
+/* History Button in Navbar */
+.history-btn {
+    background: linear-gradient(135deg, var(--exam-teal) 0%, #14b8a6 100%);
+    color: white;
+    padding: 8px 12px;
+    font-size: 16px;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    line-height: 1;
+}
+
+.history-btn:hover {
+    background: linear-gradient(135deg, var(--teal-hover) 0%, var(--exam-teal) 100%);
+    box-shadow: var(--shadow-md);
+    transform: scale(1.1);
+}
+
+/* History Modal Content */
+.history-modal-content {
+    max-width: 900px;
+    width: 94%;
+}
+
+/* Search Container */
+.history-search-container input#history-search {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1.5px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-family: inherit;
+    background: #ffffff;
+    color: var(--gray-900);
+    transition: all var(--transition-base);
+    box-sizing: border-box;
+}
+
+.history-search-container input#history-search:hover {
+    border-color: var(--gray-400);
+}
+
+.history-search-container input#history-search:focus {
+    outline: none;
+    border-color: var(--exam-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12), var(--shadow-sm);
+}
+
+.history-search-container input#history-search::placeholder {
+    color: var(--gray-400);
+}
+
+/* History Table Container */
+.history-table-container {
+    margin-top: 16px;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    overflow: auto;
+    max-height: 500px;
+    box-shadow: var(--shadow-sm);
+}
+
+/* History Table */
+.history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+}
+
+.history-table thead tr {
+    background: linear-gradient(180deg, var(--exam-primary) 0%, #1d4ed8 100%);
+}
+
+.history-table thead th {
+    padding: 12px 14px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: white;
+    border: none;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.history-table tbody {
+    background: white;
+}
+
+.history-table tbody tr {
+    transition: background var(--transition-fast);
+}
+
+.history-table tbody tr:nth-child(even) {
+    background: var(--gray-50);
+}
+
+.history-table tbody tr:hover {
+    background: var(--primary-light);
+}
+
+.history-table tbody td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--gray-100);
+    color: var(--gray-700);
+}
+
+/* History Action Buttons */
+.history-action-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    background: white;
+    color: var(--gray-700);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-family: inherit;
+}
+
+.history-action-btn:hover {
+    background: var(--primary-light);
+    border-color: var(--exam-primary);
+    color: var(--exam-primary);
+}
+
+.history-action-btn.pdf-history-btn:hover {
+    background: var(--teal-light);
+    border-color: var(--exam-teal);
+    color: var(--exam-teal);
+}
+
+/* Empty State */
+#history-empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--gray-400);
+    font-style: italic;
+}
+
+/* Results Count */
+#history-results-count {
+    font-size: 13px;
+    color: var(--gray-500);
+    margin-top: 8px;
+    font-weight: 500;
+}
+
+/* Responsive for History Modal */
+@media (max-width: 768px) {
+    .history-modal-content {
+        width: 98%;
+        max-height: 85vh;
+    }
+
+    .history-table-container {
+        max-height: 400px;
+    }
+
+    .history-action-btn {
+        padding: 5px 10px;
+        font-size: 11px;
+    }
+}
