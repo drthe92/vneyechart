@@ -17,6 +17,18 @@
     // LocalStorage key for exam history (EMR History Viewer)
     const EMR_HISTORY_KEY = 'vision_emr_history_v1';
 
+    // LocalStorage key for anaglyph color calibration
+    const CALIBRATION_KEY = 'vision_color_calibration';
+
+    // Global calibrated colors (default: pure Red and Cyan)
+    window.__anaglyphColors = { red: '#FF0000', cyan: '#00FFFF' };
+
+    // Color calibration palettes - 8 shades from dark to light
+    const CALIBRATION_PALETTES = {
+        red: ['#FF0000', '#FF1A1A', '#FF3333', '#FF4D4D', '#FF6666', '#FF8080', '#FF9999', '#FFB3B3'],
+        cyan: ['#00FFFF', '#1AFFFF', '#33FFFF', '#4DFFFF', '#66FFFF', '#80FFFF', '#99FFFF', '#B3FFFF']
+    };
+
     // Available test names for manual entry datalist
     const TEST_NAMES_LIST = [
         'Schober Heterophoria',
@@ -78,11 +90,36 @@
 
     // Initialize the module
     function init() {
+        loadColorCalibration();
         createUI();
         bindEvents();
         setupVisionTestListener();
         setupGlobalHotkey();
         restoreSession();
+    }
+
+    /**
+     * Load color calibration from localStorage and apply to CSS variables
+     */
+    function loadColorCalibration() {
+        try {
+            const data = localStorage.getItem(CALIBRATION_KEY);
+            if (data) {
+                const calibrated = JSON.parse(data);
+                if (calibrated.red) {
+                    window.__anaglyphColors.red = calibrated.red;
+                }
+                if (calibrated.cyan) {
+                    window.__anaglyphColors.cyan = calibrated.cyan;
+                }
+            }
+        } catch (e) {
+            console.error('[ColorCalibration] Failed to load calibration:', e);
+        }
+
+        // Apply to CSS custom properties
+        document.documentElement.style.setProperty('--calibrated-red', window.__anaglyphColors.red);
+        document.documentElement.style.setProperty('--calibrated-cyan', window.__anaglyphColors.cyan);
     }
 
     // Create all UI elements
@@ -1839,6 +1876,16 @@
                 logo: logoData || ''
             };
 
+            // Save calibration colors from active swatches
+            const selectedRed = document.querySelector('.palette-row.red .color-swatch.active')?.dataset.color || '#FF0000';
+            const selectedCyan = document.querySelector('.palette-row.cyan .color-swatch.active')?.dataset.color || '#00FFFF';
+
+            window.__anaglyphColors = { red: selectedRed, cyan: selectedCyan };
+            localStorage.setItem(CALIBRATION_KEY, JSON.stringify(window.__anaglyphColors));
+
+            document.documentElement.style.setProperty('--calibrated-red', selectedRed);
+            document.documentElement.style.setProperty('--calibrated-cyan', selectedCyan);
+
             localStorage.setItem(CLINIC_SETTINGS_KEY, JSON.stringify(settings));
             hideModal(clinicSettingsModal);
             showToast('Đã lưu cài đặt phòng khám');
@@ -1873,11 +1920,7 @@
             navbarHeader.appendChild(settingsBtn);
         }
 
-        // Bind settings button click
-        settingsBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            openClinicSettingsModal();
-        });
+        // Note: Settings button click is now handled by Global Event Delegation (see bottom of file)
 
         // --- Create Clinic Settings Modal ---
         clinicSettingsModal = document.createElement('div');
@@ -2010,6 +2053,7 @@
         form.appendChild(group3);
         form.appendChild(group4);
         form.appendChild(previewGroup);
+        form.appendChild(createCalibrationSection());
         form.appendChild(formActions);
 
         // Handle logo file upload with compression
@@ -2061,6 +2105,66 @@
         modalContent.appendChild(modalHeader);
         modalContent.appendChild(modalBody);
         modalBody.appendChild(form);
+
+        // --- BẮT ĐẦU UI HIỆU CHUẨN ---
+        try {
+            const calibrationSection = document.createElement('div');
+            calibrationSection.className = 'calibration-section';
+            
+            const calTitle = document.createElement('h4');
+            calTitle.style.cssText = 'margin: 0 0 5px 0; font-size: 14px; color: var(--gray-800); font-weight: 700;';
+            calTitle.textContent = 'Hiệu chuẩn màng lọc khử xuyên âm (Khuyên dùng)';
+            calibrationSection.appendChild(calTitle);
+
+            const calDesc = document.createElement('p');
+            calDesc.style.cssText = 'font-size: 12px; color: var(--gray-500); margin: 0 0 15px 0;';
+            calDesc.textContent = 'Chọn ô màu biến mất hoàn toàn khi nhìn qua kính lọc tương ứng.';
+            calibrationSection.appendChild(calDesc);
+
+            // Helper function to create palette rows
+            const createPalette = (type, titleStr, colorArray) => {
+                const wrapper = document.createElement('div');
+                const label = document.createElement('span');
+                label.style.cssText = 'font-size: 13px; color: var(--gray-600); font-weight: 600; min-width: 60px;';
+                label.textContent = titleStr;
+                
+                const row = document.createElement('div');
+                row.className = `palette-row ${type}`;
+                row.style.cssText = 'display: flex; gap: 10px; margin-bottom: 15px; align-items: center;';
+
+                colorArray.forEach(color => {
+                    const swatch = document.createElement('div');
+                    swatch.className = 'color-swatch';
+                    swatch.style.backgroundColor = color;
+                    swatch.dataset.color = color;
+                    swatch.dataset.type = type;
+                    swatch.style.cssText = 'width: 40px; height: 40px; border-radius: 4px; cursor: pointer; transition: transform 0.2s, border 0.2s, box-shadow 0.2s; border: 1px solid #ccc; background-color: ' + color + ';';
+
+                    swatch.addEventListener('click', () => {
+                        row.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+                        swatch.classList.add('active');
+                    });
+                    row.appendChild(swatch);
+                });
+                
+                const rowWrapper = document.createElement('div');
+                rowWrapper.style.cssText = 'display: flex; align-items: center;';
+                rowWrapper.appendChild(label);
+                rowWrapper.appendChild(row);
+                
+                wrapper.appendChild(rowWrapper);
+                calibrationSection.appendChild(wrapper);
+            };
+
+            createPalette('red', 'Đỏ:', CALIBRATION_PALETTES.red);
+            createPalette('cyan', 'Lục Lam:', CALIBRATION_PALETTES.cyan);
+
+            modalBody.appendChild(calibrationSection);
+        } catch (error) {
+            console.error('[ExamSessionManager] Lỗi khi tạo UI Hiệu chuẩn màu:', error);
+        }
+        // --- KẾT THÚC UI HIỆU CHUẨN ---
+
         clinicSettingsModal.appendChild(modalContent);
 
         // Append modal to body
@@ -2070,32 +2174,197 @@
         allowTypingInModal(clinicSettingsModal);
     }
 
-    /**
-     * Open Clinic Settings Modal and auto-fill existing data
-     */
-    function openClinicSettingsModal() {
-        console.log('[ClinicSettings] Opening modal...');
-        const settings = loadClinicSettings();
-        const form = document.getElementById('clinic-settings-form');
-        if (!form) return;
+function openClinicSettingsModal() {
+    console.log('[System] Settings button clicked');
+    
+    // 1. Tìm modal trong DOM
+    let modal = document.getElementById('clinic-settings-modal') || document.querySelector('.clinic-settings-modal');
+    
+    // 2. NẾU CHƯA CÓ, TỰ ĐỘNG TẠO MỚI TOÀN BỘ DOM CHO MODAL CÀI ĐẶT
+    if (!modal) {
+        console.log('[System] Modal chưa tồn tại, đang tự động khởi tạo giao diện...');
+        
+        modal = document.createElement('div');
+        modal.id = 'clinic-settings-modal';
+        modal.className = 'custom-modal';
+        modal.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;';
 
-        // Auto-fill fields
-        form.querySelector('#clinic-name').value = settings?.clinicName || '';
-        form.querySelector('#doctor-name').value = settings?.doctorName || '';
-        form.querySelector('#address').value = settings?.address || '';
-        form.querySelector('#logo-base64').value = settings?.logo || '';
+        const modalContent = document.createElement('div');
+        modalContent.className = 'modal-content custom-modal-content';
+        modalContent.style.cssText = 'background:#fff; padding:25px; border-radius:12px; width:500px; max-width:90%; box-shadow:0 4px 20px rgba(0,0,0,0.2); max-height:90vh; overflow-y:auto; text-align:left;';
 
-        // Show preview if logo exists
-        const previewImg = document.getElementById('logo-preview');
-        if (previewImg && settings?.logo) {
-            previewImg.src = settings.logo;
-            previewImg.style.display = 'block';
-        } else if (previewImg) {
-            previewImg.style.display = 'none';
+        modalContent.innerHTML = `
+            <h2 style="margin-top:0; font-size:20px; color:#111; margin-bottom:15px;">Cấu hình Phòng khám</h2>
+            <form id="clinic-settings-form">
+                <div style="margin-bottom:12px;">
+                    <label style="display:block; font-size:13px; font-weight:600; margin-bottom:5px;">Tên phòng khám</label>
+                    <input type="text" id="clinic-name" style="width:100%; padding:8px; box-sizing:border-box; border:1px solid #ccc; border-radius:4px;" />
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="display:block; font-size:13px; font-weight:600; margin-bottom:5px;">Bác sĩ phụ trách</label>
+                    <input type="text" id="doctor-name" style="width:100%; padding:8px; box-sizing:border-box; border:1px solid #ccc; border-radius:4px;" />
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="display:block; font-size:13px; font-weight:600; margin-bottom:5px;">Địa chỉ</label>
+                    <input type="text" id="address" style="width:100%; padding:8px; box-sizing:border-box; border:1px solid #ccc; border-radius:4px;" />
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="display:block; font-size:13px; font-weight:600; margin-bottom:5px;">Logo (Base64 hoặc URL)</label>
+                    <input type="text" id="logo-base64" style="width:100%; padding:8px; box-sizing:border-box; border:1px solid #ccc; border-radius:4px;" />
+                    
+                    <!-- THÊM KHUNG PREVIEW NÀY VÀO DƯỚI INPUT -->
+                    <div id="logo-preview-container" style="margin-top:8px; display:none; align-items:center;">
+                        <img id="logo-preview" src="" alt="Logo Preview" style="max-height:50px; max-width:150px; object-fit:contain; border:1px solid #ddd; border-radius:4px; padding:2px;" />
+                    </div>
+                </div>
+            </form>
+            
+            <div class="calibration-section" style="margin-top: 15px; border-top: 1px solid #ddd; padding-top: 15px;">
+                <h3 style="margin-bottom: 5px; font-size: 15px;">Hiệu chuẩn màng lọc khử xuyên âm</h3>
+                <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Chọn ô màu biến mất hoàn toàn khi nhìn qua kính lọc tương ứng.</p>
+                
+                <h4 style="margin: 5px 0; font-size: 13px;">Kính Đỏ (Mắt Phải)</h4>
+                <div class="palette-row red" style="display: flex; gap: 8px; margin-bottom: 10px;"></div>
+                
+                <h4 style="margin: 5px 0; font-size: 13px;">Kính Xanh/Lục Lam (Mắt Trái)</h4>
+                <div class="palette-row cyan" style="display: flex; gap: 8px; margin-bottom: 15px;"></div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button type="button" id="close-settings-btn" style="padding: 8px 16px; background:#e5e7eb; border:none; border-radius:4px; cursor:pointer;">Hủy</button>
+                <button type="button" id="save-settings-btn" style="padding: 8px 16px; background:#2563eb; color:#fff; border:none; border-radius:4px; cursor:pointer;">Lưu cấu hình</button>
+            </div>
+        `;
+
+        modal.appendChild(modalContent);
+        document.body.appendChild(modal);
+
+        // Sinh palette màu tự động
+        const renderPalettes = (type, colorArray, containerClass) => {
+            const container = modal.querySelector(`.${containerClass}`);
+            if (!container) return;
+            colorArray.forEach(color => {
+                const swatch = document.createElement('div');
+                swatch.className = 'color-swatch';
+                swatch.style.cssText = `width:32px; height:32px; background-color:${color}; border-radius:4px; cursor:pointer; border:1px solid #ccc; transition:transform 0.2s;`;
+                swatch.dataset.color = color;
+                swatch.dataset.type = type;
+                swatch.addEventListener('click', () => {
+                    container.querySelectorAll('.color-swatch').forEach(s => {
+                        s.classList.remove('active');
+                        s.style.border = '1px solid #ccc';
+                        s.style.transform = 'none';
+                    });
+                    swatch.classList.add('active');
+                    swatch.style.border = '3px solid #000';
+                    swatch.style.transform = 'scale(1.1)';
+                });
+                container.appendChild(swatch);
+            });
+        };
+
+        if (typeof CALIBRATION_PALETTES !== 'undefined') {
+            renderPalettes('red', CALIBRATION_PALETTES.red, 'palette-row.red');
+            renderPalettes('cyan', CALIBRATION_PALETTES.cyan, 'palette-row.cyan');
         }
 
-        showModal(clinicSettingsModal);
+        // Gắn event Đóng / Lưu
+        modal.querySelector('#close-settings-btn').addEventListener('click', () => { modal.style.display = 'none'; });
+        modal.querySelector('#save-settings-btn').addEventListener('click', () => {
+            const form = document.getElementById('clinic-settings-form');
+            if (form) {
+                const settings = {
+                    clinicName: form.querySelector('#clinic-name')?.value || '',
+                    doctorName: form.querySelector('#doctor-name')?.value || '',
+                    address: form.querySelector('#address')?.value || '',
+                    logo: form.querySelector('#logo-base64')?.value || ''
+                };
+                if (typeof saveClinicSettings === 'function') {
+                    // Dùng hàm save gốc nếu có
+                    saveClinicSettings(settings);
+                } else {
+                    localStorage.setItem('vision_clinic_settings', JSON.stringify(settings));
+                }
+            }
+            // Lưu màu
+            const selectedRed = modal.querySelector('.palette-row.red .color-swatch.active')?.dataset.color || '#FF0000';
+            const selectedCyan = modal.querySelector('.palette-row.cyan .color-swatch.active')?.dataset.color || '#00FFFF';
+            window.__anaglyphColors = { red: selectedRed, cyan: selectedCyan };
+            if (typeof CALIBRATION_KEY !== 'undefined') {
+                localStorage.setItem(CALIBRATION_KEY, JSON.stringify(window.__anaglyphColors));
+            }
+            document.documentElement.style.setProperty('--calibrated-red', selectedRed);
+            document.documentElement.style.setProperty('--calibrated-cyan', selectedCyan);
+            
+            modal.style.display = 'none';
+            alert('Đã lưu cấu hình thành công!');
+        });
+
+        // Bảo vệ phím gõ
+        if (typeof allowTypingInModal === 'function') {
+            allowTypingInModal(modal);
+        }
     }
+
+    // 3. Ép hiển thị
+    modal.style.display = 'flex';
+    console.log('[System] Modal set to display: flex successfully!');
+
+    // 4. Điền dữ liệu cũ vào form
+    const settings = typeof loadClinicSettings === 'function' ? loadClinicSettings() : JSON.parse(localStorage.getItem('vision_clinic_settings') || '{}');
+    const form = document.getElementById('clinic-settings-form');
+    if (form && settings) {
+        if (form.querySelector('#clinic-name')) form.querySelector('#clinic-name').value = settings.clinicName || settings.name || '';
+        if (form.querySelector('#doctor-name')) form.querySelector('#doctor-name').value = settings.doctorName || settings.doctor || '';
+        if (form.querySelector('#address')) form.querySelector('#address').value = settings.address || '';
+        
+        const logoVal = settings.logo || settings.logoBase64 || '';
+        if (form.querySelector('#logo-base64')) {
+            form.querySelector('#logo-base64').value = logoVal;
+        }
+
+        const previewImg = document.getElementById('logo-preview');
+        const previewContainer = document.getElementById('logo-preview-container');
+        if (previewImg && previewContainer) {
+            if (logoVal) {
+                previewImg.src = logoVal;
+                previewContainer.style.display = 'flex';
+            } else {
+                previewContainer.style.display = 'none';
+            }
+        }
+    }
+
+    // 5. Tô sáng màu active hiện tại
+    setTimeout(function() {
+        const activeRed = window.__anaglyphColors?.red || '#FF0000';
+        const activeCyan = window.__anaglyphColors?.cyan || '#00FFFF';
+
+        modal.querySelectorAll('.palette-row.red .color-swatch').forEach(s => {
+            const isActive = s.dataset.color === activeRed;
+            s.classList.toggle('active', isActive);
+            s.style.border = isActive ? '3px solid #000' : '1px solid #ccc';
+            s.style.transform = isActive ? 'scale(1.1)' : 'none';
+        });
+        modal.querySelectorAll('.palette-row.cyan .color-swatch').forEach(s => {
+            const isActive = s.dataset.color === activeCyan;
+            s.classList.toggle('active', isActive);
+            s.style.border = isActive ? '3px solid #000' : '1px solid #ccc';
+            s.style.transform = isActive ? 'scale(1.1)' : 'none';
+        });
+    }, 50);
+}
+
+// ===== GLOBAL EVENT DELEGATION FOR SETTINGS BUTTON =====
+document.addEventListener('click', function(e) {
+    // Kiểm tra xem có bấm vào nút Settings không (dựa vào class .settings-btn hoặc icon bánh răng)
+    if (e.target.closest('.settings-btn') || e.target.closest('.fa-cog')) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[System] Settings button clicked via Delegation');
+        openClinicSettingsModal();
+    }
+});
 
     /**
      * Generate clinic header HTML for report
