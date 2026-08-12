@@ -598,6 +598,112 @@ function setupCalibrator() {
 }
 
 // ================================================================
+//  Workspace Toggle — Diagnostic / Therapeutic Switching
+// ================================================================
+
+/**
+ * Current workspace: 'diagnostic' | 'therapeutic'
+ */
+let currentWorkspace = 'diagnostic';
+
+/**
+ * Toggle between Diagnostic (Phòng khám) and Therapeutic (Huấn luyện) workspaces.
+ * Dispatches CustomEvent 'onWorkspaceChanged' for modules to cleanup.
+ */
+function toggleWorkspace() {
+  const diagnosticEl = document.getElementById('workspace-diagnostic');
+  const therapeuticEl = document.getElementById('workspace-therapeutic');
+  const toggleBtn = document.getElementById('workspace-toggle-btn');
+  
+  // Menu elements for workspace switching
+  const menuDiag = document.getElementById('menu-diagnostic');
+  const menuTher = document.getElementById('menu-therapeutic');
+
+  if (!diagnosticEl || !therapeuticEl || !toggleBtn) {
+    console.warn('[Workspace] One or more elements not found!');
+    return;
+  }
+
+  if (currentWorkspace === 'diagnostic') {
+    // Switch TO Therapeutic
+    // IMPORTANT: Dispatch event BEFORE changing visibility, so modules can cleanup
+    document.dispatchEvent(new CustomEvent('onWorkspaceChanged', {
+      detail: { fromWorkspace: 'diagnostic', toWorkspace: 'therapeutic', timestamp: Date.now() }
+    }));
+
+    // Switch main workspace area
+    diagnosticEl.classList.remove('active');
+    diagnosticEl.style.display = 'none';
+    therapeuticEl.classList.add('active');
+    therapeuticEl.style.display = 'flex';
+
+    // Switch sidebar menu
+    if (menuDiag) menuDiag.style.display = 'none';
+    if (menuTher) {
+      menuTher.style.display = 'flex';
+      menuTher.style.alignItems = 'center';
+      menuTher.style.justifyContent = 'center';
+    }
+
+    // Update toggle button icon → clinic-medical (return to diagnostic)
+    const icon = toggleBtn.querySelector('i');
+    if (icon) {
+      icon.className = 'fas fa-clinic-medical';
+    }
+    toggleBtn.setAttribute('title', 'Quay lại Phòng khám');
+    toggleBtn.setAttribute('aria-label', 'Quay lại Phòng khám');
+
+    currentWorkspace = 'therapeutic';
+    console.log('[Workspace] Switched to: Huấn luyện thị giác (Therapeutic)');
+
+  } else {
+    // Switch TO Diagnostic
+    document.dispatchEvent(new CustomEvent('onWorkspaceChanged', {
+      detail: { fromWorkspace: 'therapeutic', toWorkspace: 'diagnostic', timestamp: Date.now() }
+    }));
+
+    // Switch main workspace area
+    therapeuticEl.classList.remove('active');
+    therapeuticEl.style.display = 'none';
+    diagnosticEl.classList.add('active');
+    diagnosticEl.style.display = 'flex';
+
+    // Switch sidebar menu
+    if (menuTher) menuTher.style.display = 'none';
+    if (menuDiag) menuDiag.style.display = 'grid';
+
+    // Update toggle button icon → gamepad (go to therapeutic)
+    const icon = toggleBtn.querySelector('i');
+    if (icon) {
+      icon.className = 'fas fa-gamepad';
+    }
+    toggleBtn.setAttribute('title', 'Huấn luyện thị giác');
+    toggleBtn.setAttribute('aria-label', 'Chuyển đổi sang Huấn luyện thị giác');
+
+    currentWorkspace = 'diagnostic';
+    console.log('[Workspace] Switched to: Phòng khám (Diagnostic)');
+  }
+}
+
+/**
+ * Setup workspace toggle button event listener.
+ * Must be called after DOM is ready.
+ */
+function setupWorkspaceToggle() {
+  const toggleBtn = document.getElementById('workspace-toggle-btn');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleWorkspace();
+    });
+    console.log('[Workspace] Toggle button wired up successfully');
+  } else {
+    console.warn('[Workspace] Toggle button #workspace-toggle-btn not found in DOM!');
+  }
+}
+
+// ================================================================
 //  Bootstrap
 // ================================================================
 
@@ -609,6 +715,7 @@ function init() {
   setupInput();
   setupDisplay();
   setupCalibrator();
+  setupWorkspaceToggle(); // Wire up workspace toggle button
 
   // Listen for visionTestCompleted event to resume UniversalInput
   document.addEventListener('visionTestCompleted', (e) => {

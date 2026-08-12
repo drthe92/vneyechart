@@ -18,8 +18,17 @@
 //  Constants
 // ================================================================
 
-const TARGET_RIGHT_EYE = '#66FFFF'; // Cyan (Mắt phải đeo kính Đỏ nhìn)
-const TARGET_LEFT_EYE = '#FF6666';  // Red (Mắt trái đeo kính Xanh nhìn)
+/**
+ * Dynamic color getters for anaglyph tests.
+ * Uses window.__anaglyphColors if available, falls back to clinical defaults.
+ */
+function getDynamicVergenceRightEyeColor() {
+    return (window.__anaglyphColors?.cyan || '#4DFFFF');
+}
+
+function getDynamicVergenceLeftEyeColor() {
+    return (window.__anaglyphColors?.red || '#FF4D4D');
+}
 
 const RECORD_STEPS = ['blur', 'break', 'recovery'];
 const TEST_LETTERS = ['E', 'T', 'V'];
@@ -96,7 +105,7 @@ const dynamicVergence = {
     this._redLayer.style.cssText = `
       position: absolute; display: flex; flex-direction: column;
       align-items: center; gap: 30px; font-family: 'Arial', sans-serif;
-      font-weight: 900; font-size: 100px; color: ${TARGET_RIGHT_EYE};
+      font-weight: 900; font-size: 100px; color: ${getDynamicVergenceRightEyeColor()};
       mix-blend-mode: multiply; pointer-events: none; transition: transform 0.1s linear;
     `;
 
@@ -104,7 +113,7 @@ const dynamicVergence = {
     this._cyanLayer.style.cssText = `
       position: absolute; display: flex; flex-direction: column;
       align-items: center; gap: 30px; font-family: 'Arial', sans-serif;
-      font-weight: 900; font-size: 100px; color: ${TARGET_LEFT_EYE};
+      font-weight: 900; font-size: 100px; color: ${getDynamicVergenceLeftEyeColor()};
       mix-blend-mode: multiply; pointer-events: none; transition: transform 0.1s linear;
     `;
 

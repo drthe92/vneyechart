@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/credit_card_calibration.css">
   <link rel="stylesheet" href="css/exam_session.css">
+  <!-- FontAwesome for workspace toggle icon -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 </head>
 <body>
   <div id="app">
@@ -32,9 +34,16 @@
           </svg>
         </button>
         <span id="sidebar-title">Eye Chart Cầu vồng</span>
+        <!-- ===== WORKSPACE TOGGLE BUTTON (Header) ===== -->
+        <!-- Added: Workspace toggle button to switch between Diagnostic and Therapeutic workspaces -->
+        <!-- Placed last with margin-left: auto to push it to the far right -->
+        <button id="workspace-toggle-btn" class="nav-btn" aria-label="Chuyển đổi sang Huấn luyện thị giác" title="Huấn luyện thị giác" data-nav="workspace-toggle">
+          <i class="fas fa-gamepad" style="font-size: 24px;"></i>
+        </button>
       </div>
 
-      <nav id="menu">
+      <!-- Menu Workspace 1: Diagnostic (Phòng khám) -->
+      <nav id="menu-diagnostic">
         <!-- All modules in a grid layout -->
         <div class="menu-items">
           <!-- Group: Far Vision (far-vision) -->
@@ -238,6 +247,15 @@
           </a>
         </div>
       </nav>
+
+      <!-- Menu Workspace 2: Therapeutic (Huấn luyện thị giác) -->
+      <nav id="menu-therapeutic" style="display: none;">
+        <div style="display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; color: #888; padding: 20px;">
+          <i class="fas fa-gamepad" style="font-size: 3rem; margin-bottom: 1rem; color: #ccc;"></i>
+          <p style="font-size: 1.1rem; font-weight: 500;">Chưa có module Game</p>
+          <p style="font-size: 0.85rem; color: #aaa; margin-top: 0.5rem;">Khu vực huấn luyện thị giác đang được phát triển...</p>
+        </div>
+      </nav>
     </aside>
 
     <!-- Persistent menu toggle button (bottom-left corner) -->
@@ -251,10 +269,23 @@
     <!-- Invisible bottom-left hover hot-zone -->
     <div id="menu-hotzone"></div>
 
-    <!-- ===== MAIN DISPLAY ===== -->
+    <!-- ===== MAIN DISPLAY AREA WITH WORKSPACE CONTAINERS ===== -->
     <main id="main-area">
-      <div id="display-board">
-        <!-- Nội dung được controller cập nhật động -->
+      <!-- Workspace 1: Diagnostic Room (Phòng khám) - Current existing content -->
+      <div id="workspace-diagnostic" class="workspace-view active">
+        <div id="display-board">
+          <!-- Nội dung được controller cập nhật động -->
+        </div>
+      </div>
+
+      <!-- Workspace 2: Therapeutic / Vision Training (Huấn luyện thị giác) - Future games go here -->
+      <div id="workspace-therapeutic" class="workspace-view">
+        <!-- Placeholder: Vision training games will be loaded here dynamically -->
+        <div id="therapeutic-content" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; flex-direction: column; color: #888;">
+          <i class="fas fa-gamepad" style="font-size: 4rem; margin-bottom: 1rem; color: #ccc;"></i>
+          <h2 style="font-weight: 300; letter-spacing: 1px;">Khu vực Huấn luyện Thị giác</h2>
+          <p style="font-size: 0.9rem; margin-top: 0.5rem;">Sắp ra mắt...</p>
+        </div>
       </div>
     </main>
   </div>
@@ -262,6 +293,19 @@
   <!-- PDF Export Library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script src="js/exam_session_manager.js"></script>
+
+  <!-- ===== Vision Training Games: Lazy Loading Order (Dependency Hierarchy) ===== -->
+  <!-- Priority 1 (Core): Base Engine — must load first -->
+  <script src="modules/binocular_game_engine.js"></script>
+
+  <!-- Priority 2 (Modules): Game classes — inherit from BinocularGameEngine -->
+  <script src="modules/anti_suppression_catch.js"></script>
+  <script src="modules/shape_alignment.js"></script>
+  <script src="modules/vergence_tracker_game.js"></script>
+
+  <!-- Priority 3 (Controller): Menu controller — depends on all game classes -->
+  <script src="modules/therapeutic_menu_controller.js"></script>
+
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

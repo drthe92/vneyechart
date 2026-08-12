@@ -178,7 +178,9 @@ button {
 }
 
 /* -- Navigation Menu (simple grid layout) -- */
-#menu {
+#menu,
+#menu-diagnostic,
+#menu-therapeutic {
   display: grid;
   grid-template-columns: repeat(4, 1fr);  /* 4 columns for modules */
   gap: 16px;
@@ -187,6 +189,13 @@ button {
   flex: 1;
   overflow-y: auto;
   max-height: calc(100vh - 120px);
+}
+
+/* Therapeutic menu has different layout (centered content) */
+#menu-therapeutic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* All menu items in a 4-column grid */
@@ -2317,5 +2326,70 @@ button {
     width: auto;
   }
 }
-  }
+}
+}
+
+/* ============================================================
+ WORKSPACE TOGGLE — Diagnostic / Therapeutic Switching
+ ============================================================ */
+
+.workspace-view {
+display: none;
+width: 100%;
+height: 100%;
+}
+
+.workspace-view.active {
+display: flex;
+align-items: center;
+justify-content: center;
+}
+
+/* ============================================================
+   WORKSPACE TOGGLE — Diagnostic / Therapeutic Switching
+   ============================================================ */
+
+.workspace-view {
+  display: none;
+  width: 100%;
+  height: 100%;
+}
+
+.workspace-view.active {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Style cho nút workspace toggle trên header */
+/* margin-left: auto đẩy nút về tận cùng bên phải trong flex container (#sidebar-header) */
+#workspace-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-sm);
+  color: var(--sidebar-text);
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid transparent;
+  margin-left: auto !important; /* Đẩy nút về tận cùng bên phải */
+}
+
+#workspace-toggle-btn:hover {
+  color: var(--sidebar-text-active);
+  background: var(--sidebar-hover);
+  border-color: var(--sidebar-accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(74, 144, 217, 0.3);
+}
+
+#workspace-toggle-btn:hover i {
+  transform: scale(1.1);
+}
+
+#workspace-toggle-btn i {
+  transition: transform 0.3s ease;
 }

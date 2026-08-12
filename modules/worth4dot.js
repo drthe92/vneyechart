@@ -14,8 +14,18 @@
 //  Constants
 // ================================================================
 
-const TARGET_RED_EYE = '#66FFFF';   // Cyan
-const TARGET_GREEN_EYE = '#FF6666'; // Red
+/**
+ * Dynamic color getters for anaglyph tests.
+ * Uses window.__anaglyphColors if available, falls back to clinical defaults.
+ */
+function getTargetRedEyeColor() {
+    return (window.__anaglyphColors?.cyan || '#4DFFFF');
+}
+
+function getTargetGreenEyeColor() {
+    return (window.__anaglyphColors?.red || '#FF4D4D');
+}
+
 const TARGET_BOTH_EYES = '#000000'; // Black
 
 const SPACING_STEPS = [400, 360, 320, 280, 240, 200, 160, 120, 80, 40];
@@ -71,15 +81,15 @@ const worth4dot = {
     };
 
     const topShape = this._isInverted ? 'triangle' : 'square';
-    const topFill = this._isInverted ? TARGET_BOTH_EYES : TARGET_RED_EYE;
+    const topFill = this._isInverted ? TARGET_BOTH_EYES : getTargetRedEyeColor();
     
     const bottomShape = this._isInverted ? 'square' : 'triangle';
-    const bottomFill = this._isInverted ? TARGET_RED_EYE : TARGET_BOTH_EYES;
+    const bottomFill = this._isInverted ? getTargetRedEyeColor() : TARGET_BOTH_EYES;
 
     const shapesSVG = [
       drawShape(topShape, CX, CY - spacing, currentRadius, topFill, topOpacity),
-      drawShape('circle', CX - spacing, CY, currentRadius, TARGET_GREEN_EYE, sideOpacity),
-      drawShape('cross', CX + spacing, CY, currentRadius, TARGET_GREEN_EYE, sideOpacity),
+      drawShape('circle', CX - spacing, CY, currentRadius, getTargetGreenEyeColor(), sideOpacity),
+      drawShape('cross', CX + spacing, CY, currentRadius, getTargetGreenEyeColor(), sideOpacity),
       drawShape(bottomShape, CX, CY + spacing, currentRadius, bottomFill, bottomOpacity)
     ].join('');
 

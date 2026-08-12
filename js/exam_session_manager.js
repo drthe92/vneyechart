@@ -20,13 +20,13 @@
     // LocalStorage key for anaglyph color calibration
     const CALIBRATION_KEY = 'vision_color_calibration';
 
-    // Global calibrated colors (default: pure Red and Cyan)
-    window.__anaglyphColors = { red: '#FF0000', cyan: '#00FFFF' };
+    // Global calibrated colors (default: soft Red and Cyan for anaglyph)
+    window.__anaglyphColors = { red: '#FF4D4D', cyan: '#4DFFFF' };
 
     // Color calibration palettes - 8 shades from dark to light
     const CALIBRATION_PALETTES = {
-        red: ['#FF0000', '#FF1A1A', '#FF3333', '#FF4D4D', '#FF6666', '#FF8080', '#FF9999', '#FFB3B3'],
-        cyan: ['#00FFFF', '#1AFFFF', '#33FFFF', '#4DFFFF', '#66FFFF', '#80FFFF', '#99FFFF', '#B3FFFF']
+        red: ['#FF4D4D', '#FF6666', '#FF8080', '#FF9999', '#FFB3B3', '#FFCCCC', '#FFE0E0', '#FFF0F0'],
+        cyan: ['#4DFFFF', '#66FFFF', '#80FFFF', '#99FFFF', '#B3FFFF', '#CCFFFF', '#E0FFFF', '#F0FFFF']
     };
 
     // Available test names for manual entry datalist
@@ -455,6 +455,45 @@
         }
         return String(metrics);
     }
+
+    /**
+     * Global function to refresh all active test views with new anaglyph colors.
+     * Called after saveClinicSettings() updates window.__anaglyphColors.
+     */
+    window.refreshTestViews = function() {
+        // Schober Test: check if canvas is visible on DOM
+        const schoberCanvas = document.getElementById('schober-canvas');
+        if (schoberCanvas && schoberCanvas.offsetParent !== null && typeof SchoberTestRender === 'function') {
+            SchoberTestRender();
+        }
+
+        // Worth 4 Dot: check if SVG container is visible
+        const worthSvg = document.querySelector('.worth4dot-svg');
+        if (worthSvg && typeof Worth4DotRender === 'function') {
+            Worth4DotRender();
+        }
+
+        // Stereo Anaglyph: check if canvas is visible
+        const stereoCanvas = document.getElementById('stereo-canvas');
+        if (stereoCanvas && stereoCanvas.offsetParent !== null && typeof StereoAnaglyphRefresh === 'function') {
+            StereoAnaglyphRefresh();
+        }
+
+        // Dynamic Vergence: check if layers exist
+        const redLayer = document.getElementById('dv-red-layer');
+        const cyanLayer = document.getElementById('dv-cyan-layer');
+        if (redLayer && cyanLayer && typeof DynamicVergenceRefresh === 'function') {
+            DynamicVergenceRefresh();
+        }
+
+        // Dynamic Fixation: check if fixation container exists
+        const dfContainer = document.getElementById('dynamic-fixation-container');
+        if (dfContainer && dfContainer.offsetParent !== null && typeof DynamicFixationRefresh === 'function') {
+            DynamicFixationRefresh();
+        }
+
+        console.log('[refreshTestViews] All active test views refreshed with new anaglyph colors.');
+    };
 
     /**
      * Helper: Generate report HTML for both Modal View and Print
@@ -1889,6 +1928,11 @@
             localStorage.setItem(CLINIC_SETTINGS_KEY, JSON.stringify(settings));
             hideModal(clinicSettingsModal);
             showToast('Đã lưu cài đặt phòng khám');
+
+            // Refresh all test views with new anaglyph colors
+            if (typeof refreshTestViews === 'function') {
+                refreshTestViews();
+            }
         } catch (e) {
             console.error('[ClinicSettings] Failed to save settings:', e);
             showToast('Lỗi: Không thể lưu cài đặt');

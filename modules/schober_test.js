@@ -17,8 +17,18 @@
 //  Constants
 // ================================================================
 
-const TARGET_RIGHT_EYE = '#66FFFF'; // Cyan (Mắt phải đeo kính Đỏ nhìn)
-const TARGET_LEFT_EYE = '#FF6666';  // Red (Mắt trái đeo kính Xanh nhìn)
+/**
+ * Dynamic color getters for anaglyph tests.
+ * Uses window.__anaglyphColors if available, falls back to clinical defaults.
+ */
+function getTargetRightEyeColor() {
+    return (window.__anaglyphColors?.cyan || '#4DFFFF');
+}
+
+function getTargetLeftEyeColor() {
+    return (window.__anaglyphColors?.red || '#FF4D4D');
+}
+
 const BG_COLOR = '#FFFFFF';
 
 const CROSSHAIR_SIZE = 30;
@@ -264,7 +274,7 @@ const schoberTest = {
 
     // Nếu _isInverted = false: Mắt Trái nhìn vòng tròn (Màu Đỏ -> Kính Xanh chặn -> Trái thấy)
     // Nếu _isInverted = true: Mắt Phải nhìn vòng tròn (Màu Cyan -> Kính Đỏ chặn -> Phải thấy)
-    ctx.strokeStyle = this._isInverted ? TARGET_RIGHT_EYE : TARGET_LEFT_EYE;
+    ctx.strokeStyle = this._isInverted ? getTargetRightEyeColor() : getTargetLeftEyeColor();
     ctx.lineWidth = 4;
     const outerR = Math.min(cx, cy) * 0.4;
     const innerR = Math.min(cx, cy) * 0.2;
@@ -281,7 +291,7 @@ const schoberTest = {
     const crossX = cx + this._offsetX;
     const crossY = cy + this._offsetY;
     
-    ctx.strokeStyle = this._isInverted ? TARGET_LEFT_EYE : TARGET_RIGHT_EYE;
+    ctx.strokeStyle = this._isInverted ? getTargetLeftEyeColor() : getTargetRightEyeColor();
     ctx.lineWidth = 4;
     
     ctx.beginPath();
