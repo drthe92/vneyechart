@@ -1,10 +1,15 @@
 /**
- * Module 1: Anti-suppression Catch (Hứng hạt)
+ * Module 1: Anti-suppression Catch (Hứng hạt) - Adaptive Staircase Edition
  * 
  * Trò chơi huấn luyện thị giác hai mắt (Dichoptic):
- * - Hạt màu (Left Eye): Rơi từ trên xuống, kích thích mắt trái
- * - Thanh hứng (Right Eye): Di chuyển ngang bằng chuột, kích thích mắt phải
- * - Mục tiêu: Ngăn ngừa ức chế mắt (suppression) bằng cách duy trì hoạt động đồng thời hai mắt
+ * - Hạt màu (Left Eye): Rơi từ trên xuống, kích thích mắt trái (Alpha = 1.0 cố định)
+ * - Thanh hứng (Right Eye): Di chuyển ngang bằng chuột, kích thích mắt phải (Alpha thay đổi)
+ * - Thuật toán Cầu thang Thích ứng (Adaptive Staircase): Điều chỉnh tương phản mắt lành
+ * 
+ * Cơ chế tương phản (Contrast Mechanism):
+ * - Khi HỨNG TRÚNG (Collision): Giảm healthyAlpha (tăng độ khó) → Math.max(0.1, alpha - 0.05)
+ * - Khi HỨNG TRƯỢT (Miss): Tăng healthyAlpha (giảm độ khó) → Math.min(1.0, alpha + 0.1)
+ * - Alpha của thanh hứng được áp dụng qua ctx.globalAlpha trước khi vẽ
  * 
  * Kế thừa từ BinocularGameEngine để tái sử dụng:
  * - Ràng buộc y khoa: Kiểm tra anaglyph colors, canvas setup
@@ -14,27 +19,46 @@
 
 class CatchGame extends BinocularGameEngine {
     /**
-     * Khởi tạo trò chơi Catch
-     * Thiết lập vật thể rơi (hạt màu left-eye) và thanh hứng (right-eye)
+     * Khởi tạo trò chơi Catch với cơ chế Cầu thang Thích ứng
+     * Sử dụng mảng drops (thay vì particles) và paddle (thay vì catcher)
      */
     constructor() {
         super(); // Khởi tạo cha: kiểm tra anaglyphColors, tạo canvas, bind event SPA
 
-        // --- Cấu hình trò chơi ---
-        this.score = 0;              // Điểm số (hứng trúng hạt)
-        this.spawnRate = 45;         // Tần suất tạo hạt mới (mỗi 45 frames ≈ 0.75s @ 60fps)
-        this.frameCount = 0;         // Đếm frame để trigger spawn
+        // --- Tên game cho EMR identification ---
+        this.gameName = 'M1: Hứng hạt (Anti-suppression)';
 
-        // --- Vật thể rơi: Mảng hạt màu left-eye (đỏ) ---
-        this.particles = [];
+        // --- Cấu hình điểm số và mục tiêu ---
+        this.score = 0;                    // Điểm số hiện tại
+        this.targetScore = 30;             // Điểm mục tiêu để hoàn thành bài tập
+        this.hits = 0;                     // Số lần hứng trúng
+        this.misses = 0;                   // Số lần hứng trượt
+        this.startTime = Date.now();       // Thời gian bắt đầu (ms)
+        this.gameOver = false;             // Cờ kết thúc bài tập
 
-        // --- Thanh hứng: Right-eye (cyan) ở đáy màn hình ---
-        this.catcher = {
-            x: this.canvas.width / 2 - 60,   // Căn giữa ban đầu
-            y: this.canvas.height - 40,       // Cách đáy 40px
-            width: 120,                        // Chiều rộng thanh hứng
-            height: 20                         // Chiều cao thanh hứng
+        // --- Cơ chế Cầu thang Thích ứng (Adaptive Staircase) ---
+        // healthyAlpha: Độ trong suốt của thanh hứng (mắt lành)
+        // Bắt đầu ở 1.0 (đầy đủ tương phản), giảm dần khi người chơi thành công
+        this.healthyAlpha = 1.0;
+
+        // --- Vật thể rơi: Mảng drops (thay vì particles) ---
+        // Mỗi drop là hình chữ nhật {x, y, width, height} dành cho mắt nhược thị
+        this.drops = [];
+
+        // --- Thanh hứng: paddle (thay vì catcher) ở đáy màn hình ---
+        this.paddle = {
+            x: 0,                          // Cập nhật theo chuột trong update()
+            y: this.canvas.height - 40,    // Cố định sát đáy màn hình
+            width: 100,                    // Chiều rộng thanh hứng
+            height: 20                     // Chiều cao thanh hứng
         };
+
+        // --- Biến đếm thời gian sinh hạt (time-based spawning) ---
+        this.lastSpawnTime = Date.now();   // Lần sinh hạt cuối cùng (ms)
+        this.spawnInterval = 1000;         // 1 hạt / 1 giây
+
+        // --- Tọa độ chuột hiện tại để căn giữa paddle ---
+        this._mouseX = this.canvas.width / 2;
 
         // --- Sự kiện chuột: Điều khiển thanh hứng ngang màn hình ---
         this.handleMouseMove = this._handleMouseMove.bind(this);
@@ -46,14 +70,183 @@ class CatchGame extends BinocularGameEngine {
     }
 
     /**
-     * Xử lý sự kiện di chuyển chuột → cập nhật vị trí thanh hứng
-     * Giới hạn trong biên canvas để không bị tràn ra ngoài
+     * Cập nhật logic vật lý, điểm số và thuật toán Cầu thang Thích ứng
+     * Bao gồm: sinh hạt theo thời gian, cập nhật paddle theo chuột, va chạm AABB
+     */
+    update() {
+        if (this.gameOver) return;
+
+        // 1. Kiểm tra điều kiện kết thúc: Đạt điểm mục tiêu
+        if (this.score >= this.targetScore) {
+            this._endGame();
+            return;
+        }
+
+        // 2. Cập nhật lại bounding rect của canvas (để xử lý resize cửa sổ)
+        this._canvasRect = this.canvas.getBoundingClientRect();
+
+        // 3. Sinh hạt mới theo khoảng thời gian (1 giây/hạt)
+        const now = Date.now();
+        if (now - this.lastSpawnTime > this.spawnInterval) {
+            this.drops.push({
+                x: Math.random() * (this.canvas.width - 30), // Vị trí ngang ngẫu nhiên
+                y: -30,                                        // Bắt đầu từ trên mép màn hình
+                width: 30,                                     // Kích thước hạt vuông
+                height: 30
+            });
+            this.lastSpawnTime = now; // Reset thời gian sinh
+        }
+
+        // 4. Cập nhật vị trí paddle theo tọa độ chuột (căn giữa chuột)
+        this.paddle.x = Math.max(0, Math.min(this._mouseX - this.paddle.width / 2, this.canvas.width - this.paddle.width));
+
+        // 5. Duyệt ngược mảng drops để xử lý động học và va chạm (tránh lỗi index khi splice)
+        for (let i = this.drops.length - 1; i >= 0; i--) {
+            const d = this.drops[i];
+
+            // --- Động học: Cho hạt rơi xuống (tăng trục y) ---
+            d.y += 3; // Tốc độ rơi cố định 3 px/frame (@ 60fps ≈ 180 px/s)
+
+            // --- AABB Collision Detection: Va chạm drop ↔ paddle ---
+            // Kiểm tra giao cắt giữa hình chữ nhật drop và hình chữ nhật paddle
+            if (
+                d.x < this.paddle.x + this.paddle.width &&     // Ranh trái drop < Ranh phải paddle
+                d.x + d.width > this.paddle.x &&               // Ranh phải drop > Ranh trái paddle
+                d.y < this.paddle.y + this.paddle.height &&    // Ranh trên drop < Ranh dưới paddle
+                d.y + d.height > this.paddle.y                  // Ranh dưới drop > Ranh trên paddle
+            ) {
+                // ============================================
+                // HỨNG TRÚNG (Collision Success)
+                // ============================================
+                this.score += 1;           // Cộng 1 điểm
+                this.hits += 1;            // Tăng bộ đếm trúng
+
+                // TĂNG ĐỘ KHÓ: Giảm tương phản mắt lành
+                // Công thức: healthyAlpha = max(0.1, healthyAlpha - 0.05)
+                // Giảm 5% tương phản mỗi lần trúng, giới hạn dưới 10%
+                this.healthyAlpha = Math.max(0.1, this.healthyAlpha - 0.05);
+
+                // Cắt hạt khỏi mảng
+                this.drops.splice(i, 1);
+                continue;
+            }
+
+            // ============================================
+            // HỨNG TRƯỢT (Miss - Hạt rơi quá mép dưới)
+            // ============================================
+            if (d.y > this.canvas.height) {
+                this.score = Math.max(0, this.score - 1);  // Trừ 1 điểm (không âm)
+                this.misses += 1;                            // Tăng bộ đếm trượt
+
+                // GIẢM ĐỘ KHÓ: Tăng tương phản mắt lành
+                // Công thức: healthyAlpha = min(1.0, healthyAlpha + 0.1)
+                // Tăng 10% tương phản mỗi lần trượt, giới hạn trên 100%
+                this.healthyAlpha = Math.min(1.0, this.healthyAlpha + 0.1);
+
+                // Cắt hạt khỏi mảng
+                this.drops.splice(i, 1);
+            }
+        }
+    }
+
+    /**
+     * Kết thúc bài tập: Tính toán thống kê và hiển thị overlay kết quả
+     */
+    _endGame() {
+        this.gameOver = true;
+
+        // --- Đóng gói sessionMetrics trước khi stop ---
+        this.sessionMetrics.score = this.score;
+        this.sessionMetrics.hits = this.hits;
+        this.sessionMetrics.misses = this.misses;
+        this.sessionMetrics.customData = { finalAlpha: this.healthyAlpha };
+        this.finishSession();
+
+        // Hiện lại chuột để bệnh nhân có thể click nút chuyển Module
+        this.canvas.style.cursor = 'default';
+
+        // Dừng game ngay lập tức
+        this.stop();
+
+        // ============================================
+        // TÍNH TOÁN THỐNG KÊ
+        // ============================================
+        
+        // Thời gian chơi (giây)
+        const timeSec = Math.round((Date.now() - this.startTime) / 1000);
+
+        // Tổng số lần thử
+        const totalAttempts = this.hits + this.misses;
+
+        // Tỷ lệ chính xác (%)
+        const hitRate = totalAttempts > 0 ? Math.round((this.hits / totalAttempts) * 100) : 0;
+
+        // Ngưỡng tương dung hợp (C-Ratio): healthyAlpha cuối cùng
+        const cRatio = this.healthyAlpha.toFixed(2);
+
+        // ============================================
+        // TẠO OVERLAY KẾT QUẢ
+        // ============================================
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed; inset: 0; z-index: 10000;
+            background: rgba(15, 23, 42, 0.95);
+            color: white;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; padding: 30px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        `;
+
+        overlay.innerHTML = `
+            <h1 style="font-size: 32px; color: #10b981; margin-bottom: 20px;">
+                ✅ BÁO CÁO LÂM SÀNG: ĐÃ ĐẠT MỤC TIÊU ĐIỀU TRỊ
+            </h1>
+
+            <div style="max-width: 600px; background: rgba(255,255,255,0.05); border-radius: 12px; padding: 25px; margin-bottom: 25px;">
+                <p style="font-size: 20px; margin: 8px 0;"><strong>⏱ Thời gian:</strong> ${timeSec} giây</p>
+                <p style="font-size: 20px; margin: 8px 0;"><strong>🎯 Hứng trúng:</strong> <span style="color: #10b981;">${this.hits}</span></p>
+                <p style="font-size: 20px; margin: 8px 0;"><strong>❌ Hứng trượt:</strong> <span style="color: #ef4444;">${this.misses}</span></p>
+                <p style="font-size: 20px; margin: 8px 0;"><strong>📊 Tỷ lệ chính xác:</strong> <span style="color: #fbbf24;">${hitRate}%</span></p>
+                <p style="font-size: 20px; margin: 8px 0;"><strong>🔬 Ngưỡng tương phản dung hợp (C-Ratio):</strong> <span style="color: #60a5fa;">${cRatio}</span></p>
+            </div>
+
+            <button id="btn-next-module" style="
+                padding: 15px 40px; font-size: 18px; cursor: pointer;
+                background: #3b82f6; color: white; border: none; border-radius: 8px;
+                font-weight: bold; transition: background 0.3s;
+            ">Chuyển sang Module 2: Khớp khung</button>
+        `;
+
+        // Thêm overlay vào body
+        document.body.appendChild(overlay);
+
+        // Sự kiện hover cho nút
+        const nextBtn = document.getElementById('btn-next-module');
+        nextBtn.onmouseover = () => nextBtn.style.background = '#2563eb';
+        nextBtn.onmouseout = () => nextBtn.style.background = '#3b82f6';
+
+        // ============================================
+        // SỰ KIỆN CHUYỂN MODULE
+        // ============================================
+        nextBtn.onclick = () => {
+            // Xóa overlay
+            document.body.removeChild(overlay);
+
+            // Phát sự kiện CustomEvent để Controller chuyển sang Module 2
+            const module2Event = new CustomEvent('requestLaunchModule2', {
+                detail: { fromGame: 'CatchGame' }
+            });
+            window.dispatchEvent(module2Event);
+        };
+    }
+
+    /**
+     * Xử lý sự kiện di chuyển chuột → cập nhật vị trí paddle
      * @param {MouseEvent} e
      */
     _handleMouseMove(e) {
         const rect = this.canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        this.catcher.x = Math.max(0, Math.min(mouseX - this.catcher.width / 2, this.canvas.width - this.catcher.width));
+        this._mouseX = e.clientX - rect.left;
     }
 
     /**
@@ -63,61 +256,7 @@ class CatchGame extends BinocularGameEngine {
     _handleTouchMove(e) {
         if (e.touches.length === 0) return;
         const rect = this.canvas.getBoundingClientRect();
-        const touchX = e.touches[0].clientX - rect.left;
-        this.catcher.x = Math.max(0, Math.min(touchX - this.catcher.width / 2, this.canvas.width - this.catcher.width));
-    }
-
-    /**
-     * Tạo hạt mới ngẫu nhiên ở mép trên màn hình
-     * Hạt có kích thước và tốc độ rơi khác nhau để tăng độ thách thức
-     */
-    _spawnParticle() {
-        const size = 18 + Math.random() * 16; // Kích thước: 18–34px
-        this.particles.push({
-            x: Math.random() * (this.canvas.width - size), // Vị trí ngang ngẫu nhiên
-            y: -size,                                        // Bắt đầu từ trên mép màn hình
-            size: size,                                      // Kích thước hạt
-            speed: 2 + Math.random() * 2.5                  // Tốc độ rơi: 2–4.5 px/frame
-        });
-    }
-
-    /**
-     * Cập nhật logic vật lý và điểm số
-     * Được subclass ghi đè hoàn toàn từ BinocularGameEngine.update()
-     */
-    update() {
-        this.frameCount++;
-
-        // 1. Tạo hạt mới theo chu kỳ spawnRate
-        if (this.frameCount % this.spawnRate === 0) {
-            this._spawnParticle();
-        }
-
-        // 2. Duyệt ngược mảng để xử lý (tránh lỗi index khi splice)
-        for (let i = this.particles.length - 1; i >= 0; i--) {
-            const p = this.particles[i];
-
-            // Cập nhật tọa độ Y (rơi xuống)
-            p.y += p.speed;
-
-            // --- AABB Collision Detection: Va chạm hạt ↔ thanh hứng ---
-            if (
-                p.x < this.catcher.x + this.catcher.width &&     // Ranh trái hạt < Ranh phải thanh
-                p.x + p.size > this.catcher.x &&                 // Ranh phải hạt > Ranh trái thanh
-                p.y < this.catcher.y + this.catcher.height &&    // Ranh trên hạt < Ranh dưới thanh
-                p.y + p.size > this.catcher.y                     // Ranh dưới hạt > Ranh trên thanh
-            ) {
-                // Hứng trúng: cộng điểm + xóa hạt khỏi mảng
-                this.score++;
-                this.particles.splice(i, 1);
-                continue;
-            }
-
-            // Xóa hạt nếu rơi ra khỏi dưới màn hình (không được hứng)
-            if (p.y > this.canvas.height) {
-                this.particles.splice(i, 1);
-            }
-        }
+        this._mouseX = e.touches[0].clientX - rect.left;
     }
 
     /**
@@ -132,29 +271,51 @@ class CatchGame extends BinocularGameEngine {
 
         const ctx = this.ctx;
 
-        // B. Vẽ thanh hứng (Right Eye – màu cyan)
-        ctx.fillStyle = this.colors.right;
-        ctx.fillRect(this.catcher.x, this.catcher.y, this.catcher.width, this.catcher.height);
+        // Đảm bảo composite operation về mặc định (source-over)
+        ctx.globalCompositeOperation = 'source-over';
 
-        // C. Vẽ các hạt rơi (Left Eye – màu đỏ)
-        ctx.fillStyle = this.colors.left;
-        for (const p of this.particles) {
-            ctx.beginPath();
-            ctx.arc(
-                p.x + p.size / 2,           // Tâm X
-                p.y + p.size / 2,           // Tâm Y
-                p.size / 2,                 // Bán kính
-                0,                          // Góc bắt đầu
-                Math.PI * 2                 // Góc kết thúc (full circle)
-            );
-            ctx.fill();
-        }
-
-        // D. Hiển thị điểm số (màu đen – cả hai mắt cùng nhìn thấy, không phân biệt mắt)
+        // ============================================
+        // HIỂN THỊ HUD (Heads-Up Display)
+        // ============================================
+        ctx.globalAlpha = 1.0;
         ctx.fillStyle = '#000000';
         ctx.font = 'bold 22px Arial, sans-serif';
         ctx.textBaseline = 'top';
-        ctx.fillText(`Điểm: ${this.score}`, 15, 18);
+
+        // Hiển thị điểm số: "Điểm số: X / 30"
+        ctx.fillText(`Điểm số: ${this.score} / 30`, 15, 18);
+
+        // Vẽ text mờ hướng dẫn thoát toàn màn hình (góc trên bên phải)
+        ctx.fillStyle = 'rgba(150, 150, 150, 0.5)';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'right';
+        ctx.fillText('Nhấn ESC để thoát toàn màn hình', this.canvas.width - 20, 18);
+        // Reset textAlign về mặc định
+        ctx.textAlign = 'left';
+
+        // Hiển thị mức tương phản mắt lành: "Tương phản mắt lành: YY%"
+        const contrastPercent = Math.round(this.healthyAlpha * 100);
+        ctx.fillText(`Tương phản mắt lành: ${contrastPercent}%`, 15, 48);
+
+        // ============================================
+        // VẼ MẮT NHƯỢC THỊ (Hạt rơi – Left Eye)
+        // Alpha luôn cố định ở 1.0 (không thay đổi theo staircase)
+        // ============================================
+        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = this.colors.left; // Màu mắt trái (đỏ trong anaglyph)
+
+        for (const d of this.drops) {
+            ctx.fillRect(d.x, d.y, d.width, d.height);
+        }
+
+        // ============================================
+        // VẼ MẮT LÀNH (Thanh hứng – Right Eye)
+        // Alpha thay đổi theo thuật toán Cầu thang Thích ứng
+        // healthyAlpha: 1.0 (đầy đủ) → giảm dần khi người chơi thành công
+        // ============================================
+        ctx.globalAlpha = this.healthyAlpha;
+        ctx.fillStyle = this.colors.right; // Màu mắt phải (cyan trong anaglyph)
+        ctx.fillRect(this.paddle.x, this.paddle.y, this.paddle.width, this.paddle.height);
     }
 
     /**
@@ -162,12 +323,22 @@ class CatchGame extends BinocularGameEngine {
      * Đảm bảo không rò rỉ bộ nhớ khi chuyển không gian làm việc
      */
     stop() {
-        // Dọn dẹp event listener trước khi unmount canvas
+        // Hiện lại chuột khi force stop
         if (this.canvas) {
+            this.canvas.style.cursor = 'default';
             this.canvas.removeEventListener('mousemove', this.handleMouseMove);
             this.canvas.removeEventListener('touchmove', this.handleTouchMove);
         }
         super.stop(); // Gọi cha: cancelAnimationFrame, remove DOM, clear SPA listener
+    }
+
+    /**
+     * Ghi đè start() để ẩn chuột khi bắt đầu chơi
+     */
+    start() {
+        super.start();
+        // Ẩn con trỏ chuột khi vào fullscreen gameplay
+        this.canvas.style.cursor = 'none';
     }
 }
 
@@ -175,3 +346,4 @@ class CatchGame extends BinocularGameEngine {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { CatchGame };
 }
+

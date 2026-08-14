@@ -572,7 +572,8 @@
                     </table>
                 </div>
                 <div class="print-results">
-                    <h3>KẾT QUẢ CÁC BÀI TEST</h3>
+                    <!-- PHẦN I: KHÁM & CHẨN ĐOÁN -->
+                    <h3 style="font-size: 18px; font-weight: bold; color: #1e293b; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #10b981;">PHẦN I: KHÁM & CHẨN ĐOÁN</h3>
             `;
         } else {
             // Modal view HTML structure
@@ -590,7 +591,8 @@
                     </table>
                 </div>
                 <div class="report-results">
-                    <h4>Kết quả các bài test</h4>
+                    <!-- PHẦN I: KHÁM & CHẨN ĐOÁN -->
+                    <h4 style="font-size: 16px; font-weight: bold; color: #1e293b; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #10b981;">PHẦN I: KHÁM & CHẨN ĐOÁN</h4>
             `;
         }
 
@@ -647,9 +649,22 @@
             html += '</tbody></table>';
         }
 
+        // ================================================================
+        //  UNIFIED REPORT: Add PART I header & PART II Therapy Section
+        //  Position: After results table, before footer
+        // ================================================================
+        
         if (isPrintMode) {
             html += `
                 </div>
+                <!-- PHẦN I: KHÁM & CHẨN ĐOÁN - Header already added above results table -->
+                
+                <!-- PHẦN II: HUẤN LUYỆN PHÂN THỊ (DICHOPTIC THERAPY) -->
+                <div class="therapy-report-section" style="margin-top: 30px; page-break-inside: avoid;">
+                    <h3 style="font-size: 18px; font-weight: bold; color: #1e293b; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">PHẦN II: HUẤN LUYỆN PHÂN THỊ (DICHOPTIC THERAPY)</h3>
+                    ${window.generateTherapyReportHTML ? window.generateTherapyReportHTML(exam.patientId || '') : '<p style="font-style: italic; color: #64748b;">Không có dữ liệu huấn luyện.</p>'}
+                </div>
+                
                 <div class="print-footer">
                     <p>--- HẾT ---</p>
                     <p><em>Báo cáo được tạo tự động bởi Hệ thống Khám Mắt</em></p>
@@ -657,7 +672,17 @@
             </div>
             `;
         } else {
-            html += '</div>';
+            html += `
+                </div>
+                <!-- PHẦN I: KHÁM & CHẨN ĐOÁN - Header already added above results table -->
+                
+                <!-- PHẦN II: HUẤN LUYỆN PHÂN THỊ (DICHOPTIC THERAPY) -->
+                <div class="therapy-report-section" style="margin-top: 30px;">
+                    <h4 style="font-size: 16px; font-weight: bold; color: #1e293b; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">PHẦN II: HUẤN LUYỆN PHÂN THỊ (DICHOPTIC THERAPY)</h4>
+                    ${window.generateTherapyReportHTML ? window.generateTherapyReportHTML(exam.patientId || '') : '<p style="font-style: italic; color: #64748b;">Không có dữ liệu huấn luyện.</p>'}
+                </div>
+            </div>
+            `;
         }
 
         return html;
@@ -1057,10 +1082,16 @@
             ? (new Date().getFullYear() - parseInt(patientYOB))
             : 'N/A';
 
+        // Generate a unique patientId for this exam session (used for therapy report lookup)
+        // Format: PATIENTNAME_YOB_TIMESTAMP for uniqueness
+        const safeName = (patientName || 'UNKNOWN').replace(/[^a-zA-Z0-9À-ỹ\s]/g, '').trim().replace(/\s+/g, '_');
+        const patientId = `${safeName}_${patientYOB || 'NOYOB'}_${Date.now()}`;
+
         window.__currentExam = {
             patientName: patientName,
             patientYOB: patientYOB || 'N/A',
             patientAge: age,
+            patientId: patientId,
             startTime: Date.now(),
             results: []
         };
@@ -2461,3 +2492,4 @@ document.addEventListener('click', function(e) {
     }
 
 })();
+

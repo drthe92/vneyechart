@@ -1,43 +1,46 @@
 /**
- * Module 2: Shape Alignment Game (Flat Fusion)
+ * Module 2: Shape Alignment Game (Flat Fusion + Crowding Effect)
  * 
- * Trò chơi huấn luyện dung hợp phẳng (Binocular Flat Fusion):
- * - Target Shape (Left Eye): Khung rỗng tĩnh, viền dày 5px, kích thước 100x100px
- * - Player Shape (Right Eye): Khối đặc động, kích thước 90x90px, di chuyển theo chuột
- * - Mục tiêu: Giữ Player trong Target liên tục 2 giây (120 frames) để khóa dung hợp
+ * Trò chơi huấn luyện dung hợp phẳng với Hiệu ứng đám đông (Crowding Effect):
+ * - Target Shape (Left Eye/Cyan): Khung rỗng tĩnh, viền dày, kích thước thu nhỏ dần theo level
+ * - Player Shape (Right Eye/Red): Khối đặc động, kích thước bằng target, di chuyển theo chuột
+ * - 4 Vạch nhiễu (Flanking Bars): Bao quanh target, khoảng cách giảm dần theo level
+ * - Mục tiêu: Giữ Player trong Target liên tục 2 giây (120 frames) để khóa khớp
+ * - 10 cấp độ: Kích thước giảm từ 120px xuống 30px, nhiễu ép sát vào tâm
  */
 
 class ShapeAlignmentGame extends BinocularGameEngine {
     /**
      * Khởi tạo trò chơi Shape Alignment
-     * Thiết lập Target Shape tĩnh và Player Shape động
+     * Thiết lập trạng thái game, vị trí ban đầu, và event SPA
      */
     constructor() {
         super(); // Khởi tạo cha: kiểm tra anaglyphColors, tạo canvas, bind event SPA
 
-        // --- Trạng thái dung hợp ---
-        this.score = 0;                    // Điểm số (số lần fusion lock thành công)
-        this.fusionFrameCount = 0;         // Biến đếm frame duy trì lock (< 10px khoảng cách)
-        this.FUSION_REQUIRED_FRAMES = 120; // 120 frames @ 60fps = 2 giây lock liên tục
+        // --- Tên game cho EMR identification ---
+        this.gameName = 'M2: Khớp khung (Flat Fusion)';
 
-        // --- Target Shape (Left Eye – Khung rỗng tĩnh) ---
-        this.targetSize = 100;             // Kích thước khung: 100x100px
-        this.targetBorderWidth = 5;        // Độ dày viền: 5px
-        this._randomizeTargetPosition();   // Đặt vị trí ngẫu nhiên ban đầu
+        // --- Trạng thái cấp độ & hold ---
+        this.level = 1;
+        this.maxLevel = 10;
+        this.baseSize = 120; // Kích thước ban đầu (px)
+        this.holdFrames = 0;
+        this.targetFrames = 120; // 2 giây @ 60fps
 
-        // --- Player Shape (Right Eye – Khối đặc động) ---
-        this.playerSize = 90;              // Kích thước khối: 90x90px (nhỏ hơn target để lọt vào)
-        this.playerX = this.canvas.width / 2 - this.playerSize / 2;
-        this.playerY = this.canvas.height / 2 - this.playerSize / 2;
+        // --- Vị trí ---
+        this.targetPos = { x: this.canvas.width / 2, y: this.canvas.height / 2 };
+        this.playerPos = { x: this.canvas.width / 2 + 100, y: this.canvas.height / 2 + 100 };
 
-        // --- Sự kiện chuột: Điều khiển Player Shape ---
-        this.handleMouseMove = this._handleMouseMove.bind(this);
-        this.canvas.addEventListener('mousemove', this.handleMouseMove);
+        // --- Con trỏ chuột ẩn ---
+        this.canvas.style.cursor = 'none';
+
+        // --- Sự kiện chuột: Điều khiển Player Position ---
+        this._handleMouseMove = this._handleMouseMove.bind(this);
+        this.canvas.addEventListener('mousemove', this._handleMouseMove);
     }
 
     /**
-     * Xử lý sự kiện di chuyển chuột → cập nhật tọa độ Player Shape
-     * Căn giữa Player theo con trỏ chuột, giới hạn trong biên canvas
+     * Xử lý sự kiện di chuyển chuột → cập nhật playerPos (tâm chuột)
      * @param {MouseEvent} e
      */
     _handleMouseMove(e) {
@@ -45,124 +48,202 @@ class ShapeAlignmentGame extends BinocularGameEngine {
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
-        // Đặt tâm Player trùng tâm chuột, tính lại góc trên trái
-        this.playerX = Math.max(0, Math.min(mouseX - this.playerSize / 2, this.canvas.width - this.playerSize));
-        this.playerY = Math.max(0, Math.min(mouseY - this.playerSize / 2, this.canvas.height - this.playerSize));
+        this.playerPos.x = mouseX;
+        this.playerPos.y = mouseY;
     }
 
     /**
-     * Random vị trí Target Shape trong canvas (giữ margin 150px từ mép)
+     * Tính kích thước hiện tại dựa trên level
+     * Giảm 10px mỗi level, tối thiểu 30px
+     * @returns {number} Kích thước hiện tại
+     */
+    getCurrentSize() {
+        return Math.max(30, this.baseSize - (this.level - 1) * 10);
+    }
+
+    /**
+     * Random vị trí target trong canvas (giữ margin an toàn 80px từ mép)
      */
     _randomizeTargetPosition() {
-        const margin = 150;
-        this.targetX = margin + Math.random() * (this.canvas.width - margin * 2 - this.targetSize);
-        this.targetY = margin + Math.random() * (this.canvas.height - margin * 2 - this.targetSize);
+        const margin = 80;
+        this.targetPos.x = margin + Math.random() * (this.canvas.width - margin * 2);
+        this.targetPos.y = margin + Math.random() * (this.canvas.height - margin * 2);
     }
 
     /**
-     * Tính khoảng cách Euclidean giữa tâm Target và tâm Player
+     * Tính khoảng cách Euclidean giữa playerPos và targetPos
      * @returns {number} Khoảng cách vector giữa hai tâm
      */
     _euclideanDistance() {
-        const targetCenterX = this.targetX + this.targetSize / 2;
-        const targetCenterY = this.targetY + this.targetSize / 2;
-        const playerCenterX = this.playerX + this.playerSize / 2;
-        const playerCenterY = this.playerY + this.playerSize / 2;
-
-        const dx = targetCenterX - playerCenterX;
-        const dy = targetCenterY - playerCenterY;
-
+        const dx = this.targetPos.x - this.playerPos.x;
+        const dy = this.targetPos.y - this.playerPos.y;
         return Math.sqrt(dx * dx + dy * dy);
     }
 
     /**
-     * Cập nhật logic dung hợp phẳng
-     * Kiểm tra khoảng cách liên tục < 10px để đếm 120 frames (2 giây)
+     * Cập nhật logic vật lý & cấp độ
+     * - Cập nhật playerPos theo chuột (đã làm trong _handleMouseMove)
+     * - Kiểm tra fusion lock (khoảng cách < size/4)
+     * - Xử lý level up khi đủ holdFrames
      */
     update() {
         const dist = this._euclideanDistance();
 
-        if (dist < 10) {
-            // Khoảng cách < 10px: tăng bộ đếm fusion
-            this.fusionFrameCount++;
-
-            // Đủ 120 frames (2 giây) → Fusion Lock thành công
-            if (this.fusionFrameCount >= this.FUSION_REQUIRED_FRAMES) {
-                this.score++;                          // Tăng điểm
-                this.fusionFrameCount = 0;             // Reset bộ đếm
-                this._randomizeTargetPosition();       // Đổi vị trí Target ngẫu nhiên
-            }
+        // Dung hợp (Fusion Lock): Sai số tâm tối đa 5 pixel
+        if (dist <= 5) {
+            this.holdFrames++;
         } else {
-            // Hỏng khoảng cách: reset bộ đếm fusion
-            this.fusionFrameCount = 0;
+            this.holdFrames = 0;
+        }
+
+        // Qua bàn (Level Up)
+        if (this.holdFrames >= this.targetFrames) {
+            if (this.level >= this.maxLevel) {
+                this._endGame();
+                return;
+            }
+            // Level lên: reset hold, random target mới
+            this.level++;
+            this.holdFrames = 0;
+            this._randomizeTargetPosition();
         }
     }
 
     /**
      * Render đồ họa trò chơi
-     * Dòng 1: super.render() – dọn dẹp frame, vẽ nền trắng + viền đen
-     * Dòng 2 & 3: Vẽ Target Shape (khung rỗng) và Player Shape (khối đặc)
-     * Dòng 4: Hiển thị điểm số + trạng thái fusion
+     * Áp dụng Crowding Effect: Target khung rỗng + 4 vạch nhiễu + Player khối đặc
      */
     render() {
-        // A. Môi trường quang học an toàn (nền trắng + viền đen)
+        // Bắt buộc gọi super.render() ở dòng đầu
         super.render();
-
         const ctx = this.ctx;
+        ctx.globalCompositeOperation = 'source-over';
 
-        // B. Vẽ Target Shape (Left Eye – Khung rỗng, viền dày 5px)
-        ctx.strokeStyle = this.colors.left;
-        ctx.lineWidth = this.targetBorderWidth;
-        ctx.strokeRect(this.targetX, this.targetY, this.targetSize, this.targetSize);
+        const progress = this.holdFrames / this.targetFrames;
 
-        // C. Vẽ Player Shape (Right Eye – Khối đặc)
-        ctx.fillStyle = this.colors.right;
-        ctx.fillRect(this.playerX, this.playerY, this.playerSize, this.playerSize);
+        // --- A. Tính toán kích thước & khoảng cách ---
+        const targetSize = Math.max(30, this.baseSize - (this.level - 1) * 10);
+        const playerSize = targetSize - 8; // Player nhỏ hơn 8px để lọt khít
+        const gap = Math.max(5, 40 - (this.level * 3)); // Khoảng cách từ mép Target đến thanh nhiễu
+        const barThickness = 4;
 
-        // D. Hiển thị điểm số + trạng thái fusion (màu đen – chung cho cả hai mắt)
+        // --- B. Vẽ Text HUD ---
         ctx.fillStyle = '#000000';
-        ctx.font = 'bold 22px Arial, sans-serif';
+        ctx.font = 'bold 18px Arial, sans-serif';
         ctx.textBaseline = 'top';
-        ctx.fillText(`Điểm: ${this.score}`, 15, 18);
+        ctx.fillText(`Cấp độ: ${this.level}/${this.maxLevel}`, 15, 15);
 
-        // Hiển thị thanh tiến trình fusion (nếu đang gần lock)
-        if (this.fusionFrameCount > 0) {
-            const progress = this.fusionFrameCount / this.FUSION_REQUIRED_FRAMES;
-            const barWidth = 150;
-            const barHeight = 12;
-            const barX = 15;
-            const barY = 48;
+        // Thanh tiến trình hold
+        const barWidth = 200;
+        const barHeight = 14;
+        const barX = 15;
+        const barY = 40;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+        ctx.fillRect(barX, barY, barWidth, barHeight);
+        ctx.fillStyle = '#00AA00';
+        ctx.fillRect(barX, barY, barWidth * progress, barHeight);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(barX, barY, barWidth, barHeight);
+        ctx.fillStyle = '#000000';
+        ctx.font = '12px Arial, sans-serif';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`${Math.floor(progress * 100)}%`, barX + barWidth / 2 - 10, barY + barHeight / 2);
 
-            // Nền thanh progress
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-            ctx.fillRect(barX, barY, barWidth, barHeight);
+        // Hướng dẫn ESC mờ ở góc phải
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.font = '14px Arial, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'top';
+        ctx.fillText('[ESC] Thoát', this.canvas.width - 15, 15);
+        ctx.textAlign = 'left'; // Reset
 
-            // Tiến trình điền đầy
-            ctx.fillStyle = '#00AA00';
-            ctx.fillRect(barX, barY, barWidth * progress, barHeight);
+        // --- C. Vẽ Mắt Nhược thị (Target & Flanking Bars) ---
+        ctx.strokeStyle = this.colors.left; // Cyan cho mắt nhược thị
+        ctx.fillStyle = this.colors.left;
+        ctx.lineWidth = 4;
 
-            // Viền thanh progress
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(barX, barY, barWidth, barHeight);
+        // Tọa độ tâm Target
+        const tx = this.targetPos.x;
+        const ty = this.targetPos.y;
 
-            // Text tiến trình
-            ctx.fillStyle = '#000000';
-            ctx.font = '14px Arial, sans-serif';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(`${Math.floor(progress * 100)}%`, barX + barWidth / 2 - 10, barY + barHeight / 2);
-        }
+        // Vẽ Target (Khung rỗng) với cạnh targetSize, tại tâm this.targetPos
+        ctx.strokeRect(tx - targetSize / 2, ty - targetSize / 2, targetSize, targetSize);
+
+        // Vẽ 4 Thanh nhiễu (Crowding Bars)
+        // Thanh TRÊN: tx - targetSize/2, ty - targetSize/2 - gap - barThickness, targetSize, barThickness
+        ctx.fillRect(tx - targetSize / 2, ty - targetSize / 2 - gap - barThickness, targetSize, barThickness);
+        // Thanh DƯỚI: tx - targetSize/2, ty + targetSize/2 + gap, targetSize, barThickness
+        ctx.fillRect(tx - targetSize / 2, ty + targetSize / 2 + gap, targetSize, barThickness);
+        // Thanh TRÁI: tx - targetSize/2 - gap - barThickness, ty - targetSize/2, barThickness, targetSize
+        ctx.fillRect(tx - targetSize / 2 - gap - barThickness, ty - targetSize / 2, barThickness, targetSize);
+        // Thanh PHẢI: tx + targetSize/2 + gap, ty - targetSize/2, barThickness, targetSize
+        ctx.fillRect(tx + targetSize / 2 + gap, ty - targetSize / 2, barThickness, targetSize);
+
+        // --- D. Vẽ Mắt Lành (Player) ---
+        ctx.fillStyle = this.colors.right; // Đỏ cho mắt lành
+        const px = this.playerPos.x - playerSize / 2;
+        const py = this.playerPos.y - playerSize / 2;
+        ctx.fillRect(px, py, playerSize, playerSize);
     }
 
     /**
-     * Ghi đè stop() để dọn dẹp event listener chuột trước khi gọi super.stop()
-     * Đảm bảo không rò rỉ bộ nhớ khi chuyển không gian làm việc
+     * Kết thúc game sau khi hoàn thành 10 cấp độ
+     * Hiển thị overlay báo cáo lâm sàng + nút chuyển sang Module 3
+     */
+    _endGame() {
+        // --- Tính toán kích thước Pixel cuối cùng ---
+        const finalSizePx = Math.max(30, this.baseSize - (this.level - 1) * 10);
+
+        // --- Quy đổi sang Góc thị giác (Visual Angle - Độ) ---
+        const visualAngleDeg = this.pixelsToVisualAngle(finalSizePx);
+
+        // --- Đóng gói sessionMetrics trước khi stop ---
+        this.sessionMetrics.level = this.level;
+        this.sessionMetrics.customData = { finalSizePx: finalSizePx, visualAngleDeg: visualAngleDeg };
+        this.finishSession();
+
+        this.canvas.style.cursor = 'default';
+        this.stop();
+        const overlayId = 'shape-alignment-end-overlay';
+
+        // Xóa overlay cũ nếu có
+        const oldOverlay = document.getElementById(overlayId);
+        if (oldOverlay) oldOverlay.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = overlayId;
+        overlay.style.cssText = 'position:fixed; inset:0; z-index:99999; background:rgba(15,23,42,0.95); display:flex; align-items:center; justify-content:center; flex-direction:column; color:white; text-align:center; padding:40px;';
+
+        overlay.innerHTML = `
+            <h1 style="font-size:32px; color:#34d399; margin-bottom:20px;">BÁO CÁO LÂM SÀNG: HOÀN THÀNH KHỚP KHUNG (CROWDING EFFECT)</h1>
+            <div style="max-width:600px; padding:20px; border:2px solid #34d399; border-radius:12px; background:rgba(52,211,153,0.1); margin-bottom:30px;">
+                <p style="font-size:18px; margin:10px 0;"><strong>Góc thị giác Foveal tối thiểu:</strong> <span style="color:#fbbf24; font-size:24px;">${visualAngleDeg.toFixed(2)}°</span></p>
+                <p style="font-size:16px; margin:10px 0; color:#94a3b8;">Bạn đã hoàn thành tất cả 10 cấp độ. Khả năng tập trung foveal và chống nhiễu đám đông đã được cải thiện đáng kể.</p>
+            </div>
+            <button id="btn-go-module3" style="padding:15px 40px; font-size:20px; background:#3b82f6; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">Chuyển sang Module 3: Vận nhãn</button>
+        `;
+
+        document.body.appendChild(overlay);
+
+        document.getElementById('btn-go-module3').addEventListener('click', () => {
+            overlay.remove();
+            document.dispatchEvent(new CustomEvent('requestLaunchModule3'));
+        });
+    }
+
+    /**
+     * Ghi đè stop() để dọn dẹp event listener và khôi phục con trỏ chuột
      */
     stop() {
-        // Dọn dẹp event listener chuột trước khi unmount canvas
+        // Khôi phục con trỏ chuột
+        this.canvas.style.cursor = 'default';
+
+        // Dọn dẹp event listener chuột
         if (this.canvas) {
-            this.canvas.removeEventListener('mousemove', this.handleMouseMove);
+            this.canvas.removeEventListener('mousemove', this._handleMouseMove);
         }
+
         super.stop(); // Gọi cha: cancelAnimationFrame, remove DOM, clear SPA listener
     }
 }

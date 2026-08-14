@@ -15,6 +15,26 @@ class BinocularGameEngine {
      * Kiểm tra anaglyph colors, tạo canvas, bắt đầu render loop
      */
     constructor() {
+        // --- Tên game cho EMR identification ---
+        this.gameName = 'Unknown Game';
+
+        // --- Chỉ số đo lường phiên trị liệu ---
+        this.sessionMetrics = { startTime: null, score: 0, level: 1, hits: 0, misses: 0, customData: {} };
+
+        // --- HỆ QUY CHIẾU LĂNG KÍNH Y KHOA (Prism Diopter - Δ) ---
+        // Đọc dữ liệu hiệu chuẩn từ localStorage (khớp với credit_card_calibration.js & calibration.js)
+        const calibration = this._loadCalibrationFromStorage();
+
+        // Bẫy lỗi: Bắt buộc phải có dữ liệu hiệu chuẩn màn hình và khoảng cách khám
+        if (!calibration.pixelsPerMm || !calibration.viewingDistanceCm) {
+            throw new Error("[LỖI Y KHOA NGHIÊM TRỌNG]: Vui lòng hiệu chuẩn phần cứng màn hình (Pixel/mm) và Khoảng cách khám trước khi khởi chạy phác đồ.");
+        }
+        // Gán đối tượng hiệu chuẩn toàn cục vào instance
+        this.calibration = calibration;
+
+        // Trạng thái Vergence Demand mặc định (không lăng kính, không lệch pixel)
+        this.vergenceDemand = { delta: 0, direction: 'BO', pixelOffset: 0 };
+
         // --- Rào cản y khoa: Bắt buộc hiệu chuẩn Anaglyph colors ---
         if (typeof window !== 'undefined' && window.__anaglyphColors) {
             this.colors = {
@@ -74,15 +94,138 @@ class BinocularGameEngine {
     }
 
     /**
+     * Đọc dữ liệu hiệu chuẩn từ localStorage
+     * @returns {{ pixelsPerMm: number, viewingDistanceCm: number }}
+     * @private
+     */
+    _loadCalibrationFromStorage() {
+        const result = { pixelsPerMm: 0, viewingDistanceCm: 0 };
+        const ccPxPerMm = localStorage.getItem('vision-therapy-cc-pxpermm');
+        if (ccPxPerMm && parseFloat(ccPxPerMm) > 0) result.pixelsPerMm = parseFloat(ccPxPerMm);
+        const distanceM = localStorage.getItem('vision-therapy-calibrate-distance-m');
+        if (distanceM && parseFloat(distanceM) > 0) result.viewingDistanceCm = parseFloat(distanceM) * 100;
+        return result;
+    }
+
+    /**
+     * [CÔNG THỨC Y VĂN] Chuyển đổi Prism Diopter (Δ) sang Pixel trên màn hình
+     *
+     * Công thức: 1Δ = 1cm lệch tuyến tính ở khoảng cách 1m (100cm).
+     *
+     * Suy ra tại khoảng cách viewingDistanceCm (cm):
+     *   LinearShift (cm) = prismDiopter * (viewingDistanceCm / 100)
+     *   LinearShift (mm) = prismDiopter * (viewingDistanceCm / 100) * 10
+     *   PixelOffset      = LinearShift (mm) * pixelsPerMm
+     *
+     * Tóm gọn:
+     *   pixels = prismDiopter * (viewingDistanceCm / 100) * 10 * pixelsPerMm
+     *
+     * @param {number} prismDiopter - Giá trị lăng kính cần chuyển (Delta - Δ)
+     * @returns {number} Số pixel tương ứng trên màn hình
+     */
+    // 1. Chuyển Lăng kính thành Pixel nội tại (Dùng để set logic)
+    diopterToPixels(prismDiopter) {
+        if (!this.calibration || !this.calibration.pixelsPerMm) return 0;
+        const scaleX = this.canvas ? (this.canvas.clientWidth / this.canvas.width) : 1;
+        const targetPhysicalPx = prismDiopter * (this.calibration.viewingDistanceCm / 100) * 10 * this.calibration.pixelsPerMm;
+        return targetPhysicalPx / scaleX;
+    }
+
+    /**
+     * [NGƯỢC] Chuyển đổi Pixel trên màn hình sang Prism Diopter (Δ)
+     *
+     * Công thức ngược lại từ diopterToPixels:
+     *   prismDiopter = pixels / ((viewingDistanceCm / 100) * 10 * pixelsPerMm)
+     *
+     * @param {number} pixels - Số pixel lệch trên màn hình
+     * @returns {number} Giá trị Prism Diopter (Δ) tương ứng
+     */
+    // 2. Chuyển Pixel nội tại thành Lăng kính thực tế (Dùng để báo cáo kết quả M3)
+    pixelsToDiopter(pixels) {
+        if (!this.calibration || !this.calibration.pixelsPerMm) return 0;
+        const scaleX = this.canvas ? (this.canvas.clientWidth / this.canvas.width) : 1;
+        const physicalPixels = pixels * scaleX;
+        return physicalPixels / ((this.calibration.viewingDistanceCm / 100) * 10 * this.calibration.pixelsPerMm);
+    }
+
+    /**
+     * [CÔNG THỨC QUANG HỌC] Chuyển đổi Pixel sang Góc thị giác (Visual Angle - Độ)
+     *
+     * Công thức:
+     *   physicalSizeMm = pixels / pixelsPerMm
+     *   viewingDistanceMm = viewingDistanceCm * 10
+     *   angleRadian = 2 * atan(physicalSizeMm / (2 * viewingDistanceMm))
+     *   angleDegree = angleRadian * (180 / π)
+     *
+     * @param {number} pixels - Kích thước trên màn hình (px)
+     * @returns {number} Góc thị giác tương ứng (Độ - °)
+     */
+    // 3. Chuyển Pixel nội tại thành Góc thị giác thực tế (Dùng để báo cáo kết quả M2)
+    pixelsToVisualAngle(pixels) {
+        if (!this.calibration || !this.calibration.pixelsPerMm || !this.calibration.viewingDistanceCm) return 0;
+        const scaleX = this.canvas ? (this.canvas.clientWidth / this.canvas.width) : 1;
+        const physicalSizeMm = (pixels * scaleX) / this.calibration.pixelsPerMm;
+        const viewingDistanceMm = this.calibration.viewingDistanceCm * 10;
+        const angleRadian = 2 * Math.atan(physicalSizeMm / (2 * viewingDistanceMm));
+        return angleRadian * (180 / Math.PI);
+    }
+
+    /**
+     * [CƠ CHẾ TÁCH HÌNH DIOPTIC - Dichoptic Separation]
+     * Thiết lập độ lệch hình giữa hai mắt dựa trên hệ quy chiếu Lăng kính Y khoa.
+     *
+     * Hướng phân kỳ/Hội tụ được xác định bởi tham số direction:
+     *
+     * BO (Base-Out / Hội tụ - Convergence):
+     *   - Mắt phải nhìn ra ngoài (trái), mắt trái nhìn ra ngoài (phải)
+     *   - Hình mắt phải dịch sang TRÁI (-pixelOffset)
+     *   - Hình mắt trái dịch sang PHẢI (+pixelOffset)
+     *
+     * BI (Base-In / Phân kỳ - Divergence):
+     *   - Ngược lại với BO
+     *   - Hình mắt phải dịch sang PHẢI (+pixelOffset)
+     *   - Hình mắt trái dịch sang TRÁI (-pixelOffset)
+     *
+     * @param {number} prismDiopters - Giá trị lăng kính (Delta - Δ) cần thiết lập
+     * @param {string} direction - Hướng lăng kính: 'BO' (Base-Out) hoặc 'BI' (Base-In). Mặc định: 'BO'
+     */
+    setSeparationDemand(prismDiopters, direction = 'BO') {
+        // Lưu giá trị lăng kính yêu cầu
+        this.vergenceDemand.delta = prismDiopters;
+        // Lưu hướng phân kỳ/hội tụ
+        this.vergenceDemand.direction = direction;
+        // Tính toán và lưu độ lệch pixel tương ứng dựa trên hiệu chuẩn màn hình
+        this.vergenceDemand.pixelOffset = this.diopterToPixels(prismDiopters);
+    }
+
+    /**
      * Bắt đầu render loop
      */
     start() {
+        this.sessionMetrics.startTime = Date.now();
         this._running = true;
         this._boundUpdate();
 
         // Lắng nghe SPA workspace change event
         this._boundSpaListener = this._handleSpaChange.bind(this);
         document.addEventListener('onWorkspaceChanged', this._boundSpaListener);
+    }
+
+    /**
+     * Phát ra CustomEvent để EMR system tự lưu trữ dữ liệu
+     * Không gọi this.stop() hoặc render UI tại đây
+     */
+    finishSession() {
+        const duration = Date.now() - (this.sessionMetrics.startTime || Date.now());
+        document.dispatchEvent(new CustomEvent('onTherapeuticSessionEnd', {
+            detail: {
+                gameName: this.gameName,
+                metrics: this.sessionMetrics,
+                durationMs: duration,
+                opticalSettings: this.colors,
+                timestamp: new Date().toISOString()
+            }
+        }));
     }
 
     /**

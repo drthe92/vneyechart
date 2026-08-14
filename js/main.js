@@ -725,6 +725,53 @@ function init() {
     }
   });
 
+  // ================================================================
+  //  Mini-EMR localStorage Integration — Therapeutic Session Logger
+  //  Đồng bộ patientId từ window.__currentExam.patientId (exam_session_manager.js)
+  // ================================================================
+  document.addEventListener('onTherapeuticSessionEnd', (e) => {
+    // TRUY XUẤT ID CHUẨN TỪ EXAM SESSION MANAGER
+    // patientId được tạo trong startExam() và lưu ở window.__currentExam.patientId
+    const examData = window.__currentExam;
+    
+    // RÀNG BUỘC AN TOÀN: Kiểm tra phiên khám hợp lệ
+    if (!examData || !examData.patientId) {
+      console.error('[EMR CORE] LỖI: Không tìm thấy patientId từ window.__currentExam.');
+      console.error('[EMR CORE] Bệnh nhân chưa bấm "Bắt đầu khám" trước khi thực hiện huấn luyện!');
+      alert('Vui lòng tạo phiên khám trước khi lưu kết quả huấn luyện!');
+      return; // CHẶN TIẾN TRÌNH LƯU — không lưu GUEST_SESSION
+    }
+
+    const currentId = examData.patientId;
+
+    const therapyRecord = {
+      id: 'THR-' + Date.now(),
+      timestamp: e.detail.timestamp,
+      gameName: e.detail.gameName,
+      durationSeconds: Math.round(e.detail.durationMs / 1000),
+      metrics: e.detail.metrics,
+      opticalSettings: e.detail.opticalSettings
+    };
+
+    let sessions = JSON.parse(localStorage.getItem('emr_patient_sessions') || '[]');
+    let activeSession = sessions.find(s => s.patientId === currentId);
+
+    if (!activeSession) {
+      activeSession = { patientId: currentId, createdAt: new Date().toISOString(), therapy_records: [] };
+      sessions.push(activeSession);
+    }
+
+    if (!activeSession.therapy_records) {
+      activeSession.therapy_records = [];
+    }
+
+    activeSession.therapy_records.push(therapyRecord);
+    localStorage.setItem('emr_patient_sessions', JSON.stringify(sessions));
+
+    console.log('[EMR CORE] Đã lưu kết quả huấn luyện vào hồ sơ bệnh nhân:', currentId);
+    console.log('[EMR CORE] Tên BN:', examData.patientName, '| SN:', examData.patientYOB);
+  });
+
   // Load default test
   const mod = getTestModule(state.currentTest);
   if (mod) {
@@ -739,4 +786,159 @@ if (document.readyState === 'loading') {
   init();
 }
 
-export { state, loadTest, nextStep, prevStep, back, registerTestModule, testModules };
+// ================================================================
+//  Unified Report: Therapy Data Parser & Report Generator
+// ================================================================
+
+/**
+ * Format clinical metrics string based on module type
+ * @param {Object} metrics - The metrics object from therapy record
+ * @returns {string} Formatted clinical result string
+ */
+function formatTherapyClinicalResult(metrics) {
+    const gameName = metrics?.gameName || '';
+    
+    // Module 1: Contrast threshold fusion (C-Ratio)
+    if (gameName === 'M1' || metrics?.moduleType === 1) {
+        const alpha = metrics.customData?.finalAlpha;
+        if (alpha !== undefined && alpha !== null) {
+            return `Ngưỡng tương phản dung hợp (C-Ratio): ${ (alpha * 100).toFixed(0) }%`;
+        }
+    }
+    
+    // Module 2: Foveal visual angle
+    if (gameName === 'M2' || metrics?.moduleType === 2) {
+        const angle = metrics.customData?.visualAngleDeg;
+        if (angle !== undefined && angle !== null) {
+            return `Góc thị giác Foveal tối thiểu: ${ angle.toFixed(2) }°`;
+        }
+    }
+    
+    // Module 3: Vergence measurements (BO/BI)
+    if (gameName === 'M3' || metrics?.moduleType === 3) {
+        const bo = metrics.customData?.avgBaseOut;
+        const bi = metrics.customData?.avgBaseIn;
+        if (bo !== undefined && bo !== null && bi !== undefined && bi !== null) {
+            return `Hội tụ (BO): ${ bo.toFixed(1) } Δ | Phân kỳ (BI): ${ bi.toFixed(1) } Δ`;
+        }
+    }
+    
+    // Fallback: generic score
+    const score = metrics?.score;
+    if (score !== undefined && score !== null) {
+        return `Hoàn thành bài tập: Score ${ score }`;
+    }
+    
+    return 'Hoàn thành bài tập';
+}
+
+/**
+ * Generate therapy report HTML for a given patient
+ * Reads therapy_records from localStorage emr_patient_sessions
+ * @param {string} patientId - The patient identifier
+ * @returns {string} HTML string for Part II of unified report
+ */
+function generateTherapyReportHTML(patientId) {
+    let sessions = [];
+    try {
+        sessions = JSON.parse(localStorage.getItem('emr_patient_sessions') || '[]');
+    } catch (e) {
+        console.warn('[TherapyReport] Failed to parse emr_patient_sessions:', e);
+        sessions = [];
+    }
+    
+    const activeSession = sessions.find(s => s.patientId === patientId);
+    const records = activeSession && Array.isArray(activeSession.therapy_records)
+        ? activeSession.therapy_records
+        : [];
+    
+    if (records.length === 0) {
+        return `<p style="font-style: italic; color: #64748b;">Không thực hiện huấn luyện thị giác trong phiên khám này.</p>`;
+    }
+    
+    // Build table rows
+    let rowsHTML = '';
+    records.forEach((record, index) => {
+        // Format timestamp
+        let timeStr = '-';
+        if (record.timestamp) {
+            try {
+                const ts = new Date(record.timestamp);
+                timeStr = ts.toLocaleTimeString('vi-VN', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch (e) {
+                timeStr = record.timestamp;
+            }
+        }
+        
+        // Game name
+        const gameName = record.gameName || '-';
+        
+        // Duration in seconds
+        const durationSec = record.durationSeconds != null ? record.durationSeconds : '-';
+        
+        // === LOGIC MỚI: Parse customData & đánh giá ĐẠT/CHƯA ĐẠT ===
+        let resultHTML = "";
+        let statusHTML = "";
+        const customData = record.metrics?.customData || {};
+        const durStr = record.durationSeconds != null ? record.durationSeconds + "s" : "N/A";
+        
+        if (record.gameName && record.gameName.includes('M1')) {
+            const cRatio = customData.finalAlpha !== undefined ? customData.finalAlpha : 1;
+            const isPassed = cRatio <= 0.5; // Đạt khi C-Ratio <= 0.5
+            statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>' : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
+            resultHTML = `C-Ratio: <b>${(cRatio * 100).toFixed(0)}%</b> | Thời gian: <b>${durStr}</b><br>Đánh giá: ${statusHTML}`;
+        }
+        else if (record.gameName && record.gameName.includes('M2')) {
+            const angle = customData.visualAngleDeg !== undefined ? customData.visualAngleDeg : 0;
+            const isPassed = angle > 0 && angle <= 2.0; // Đạt khi Góc Foveal <= 2 độ
+            statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>' : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
+            resultHTML = `Góc Foveal: <b>${angle.toFixed(2)}°</b> | Thời gian: <b>${durStr}</b><br>Đánh giá: ${statusHTML}`;
+        }
+        else if (record.gameName && record.gameName.includes('M3')) {
+            const bo = customData.avgBaseOut !== undefined ? customData.avgBaseOut : 0;
+            const bi = customData.avgBaseIn !== undefined ? customData.avgBaseIn : 0;
+            const isPassed = bo >= 15 && bi >= 8; // Đạt khi BO >= 15 và BI >= 8
+            statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>' : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
+            resultHTML = `BO: <b>${bo.toFixed(1)} Δ</b> | BI: <b>${bi.toFixed(1)} Δ</b><br>Đánh giá: ${statusHTML}`;
+        }
+        else {
+            const score = record.metrics?.score || 0;
+            resultHTML = `Score: <b>${score}</b>`;
+        }
+        
+        rowsHTML += `
+            <tr>
+                <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">${ index + 1 }</td>
+                <td style="border: 1px solid #cbd5e1; padding: 8px;">${ timeStr }</td>
+                <td style="border: 1px solid #cbd5e1; padding: 8px;">${ gameName }</td>
+                <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">${ durationSec }</td>
+                <td style="border: 1px solid #cbd5e1; padding: 8px;">${ resultHTML }</td>
+            </tr>`;
+    });
+    
+    return `
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; margin-top: 10px;">
+            <thead>
+                <tr style="background-color: #f1f5f9;">
+                    <th style="border: 1px solid #cbd5e1; padding: 8px; text-align: center; width: 50px;">STT</th>
+                    <th style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">Thời gian</th>
+                    <th style="border: 1px solid #cbd5e1; padding: 8px;">Phác đồ</th>
+                    <th style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">Thời lượng (giây)</th>
+                    <th style="border: 1px solid #cbd5e1; padding: 8px;">Kết quả lâm sàng</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${ rowsHTML }
+            </tbody>
+        </table>`;
+}
+
+export { state, loadTest, nextStep, prevStep, back, registerTestModule, testModules, generateTherapyReportHTML };
+
+// Expose globally for non-module scripts (exam_session_manager.js)
+if (typeof window !== 'undefined') {
+    window.generateTherapyReportHTML = generateTherapyReportHTML;
+}
