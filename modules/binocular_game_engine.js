@@ -171,6 +171,43 @@ class BinocularGameEngine {
     }
 
     /**
+     * [CÔNG THỨC QUANG HỌC] Chuyển đổi Pixel sang Giây cung (Arcsec)
+     *
+     * Công thức:
+     *   physicalSizeMm = pixels / pixelsPerMm
+     *   viewingDistanceMm = viewingDistanceCm * 10
+     *   angleArcsec = (physicalSizeMm / viewingDistanceMm) * (180 / π) * 3600
+     *
+     * @param {number} pixels - Kích thước trên màn hình (px)
+     * @returns {number} Góc thị giác tương ứng (Giây cung - arcsec)
+     */
+    pixelsToArcsec(pixels) {
+        if (!this.calibration || !this.calibration.pixelsPerMm || !this.calibration.viewingDistanceCm) return 0;
+        const scaleX = this.canvas ? (this.canvas.clientWidth / this.canvas.width) : 1;
+        const physicalSizeMm = (pixels * scaleX) / this.calibration.pixelsPerMm;
+        const viewingDistanceMm = this.calibration.viewingDistanceCm * 10;
+        return (physicalSizeMm / viewingDistanceMm) * (180 / Math.PI) * 3600;
+    }
+
+    /**
+     * [CÔNG THỨC QUANG HỌC] Chuyển đổi Giây cung (Arcsec) sang Pixel vật lý trên màn hình
+     *
+     * Công thức ngược lại từ pixelsToArcsec:
+     *   physicalSizeMm = (arcsec * viewingDistanceMm) / ((180 / π) * 3600)
+     *   pixels = physicalSizeMm * pixelsPerMm
+     *
+     * @param {number} arcsec - Giá trị giây cung (arcsec)
+     * @returns {number} Số pixel tương ứng trên màn hình
+     */
+    arcsecToPixels(arcsec) {
+        if (!this.calibration || !this.calibration.pixelsPerMm || !this.calibration.viewingDistanceCm) return 0;
+        const scaleX = this.canvas ? (this.canvas.clientWidth / this.canvas.width) : 1;
+        const viewingDistanceMm = this.calibration.viewingDistanceCm * 10;
+        const physicalSizeMm = (arcsec * viewingDistanceMm) / ((180 / Math.PI) * 3600);
+        return (physicalSizeMm * this.calibration.pixelsPerMm) / scaleX;
+    }
+
+    /**
      * [CƠ CHẾ TÁCH HÌNH DIOPTIC - Dichoptic Separation]
      * Thiết lập độ lệch hình giữa hai mắt dựa trên hệ quy chiếu Lăng kính Y khoa.
      *
