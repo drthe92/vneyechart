@@ -1267,10 +1267,17 @@
 
     /**
      * Save current exam to local EMR history
+     * Now includes therapy_records — saves if either clinical tests OR therapy data exist
      */
     function saveToHistory(exam) {
-        // Safety check: only save if we have valid exam data with results
-        if (!exam || !exam.results || exam.results.length === 0) return;
+        // Safety check: only save if we have valid exam data
+        const hasTests = exam && exam.results && exam.results.length > 0;
+        const hasTherapy = exam && exam.therapy_records && exam.therapy_records.length > 0;
+
+        if (!hasTests && !hasTherapy) {
+            console.warn('[ExamSessionManager] Chon luu vao lich su: Phiem khom trong (khong co lam sang hoac thuan luyen).');
+            return;
+        }
 
         try {
             let history = localStorage.getItem(EMR_HISTORY_KEY);
@@ -1294,7 +1301,13 @@
     // Reset session
     function resetSession() {
         // Save completed exam to history BEFORE clearing
-        if (window.__currentExam && window.__currentExam.results && window.__currentExam.results.length > 0) {
+        // Now includes therapy_records — saves if either clinical tests OR therapy data exist
+        const hasTests = window.__currentExam && window.__currentExam.results && window.__currentExam.results.length > 0;
+        const hasTherapy = window.__currentExam && window.__currentExam.therapy_records && window.__currentExam.therapy_records.length > 0;
+
+        if (!hasTests && !hasTherapy) {
+            console.warn('[ExamSessionManager] Chon reset: Phiem kham trong (khong co lam sang hoac thuan luyen).');
+        } else {
             saveToHistory(window.__currentExam);
         }
 
@@ -2490,6 +2503,64 @@ document.addEventListener('click', function(e) {
     } else {
         init();
     }
+
+    // ================================================================
+    //  Public API — Expose ExamSessionManager methods globally
+    // ================================================================
+    window.examSessionManager = {
+        /**
+         * Add a therapy record to the current exam session — Hard-Write mode
+         * Directly syncs this.currentExam into emr_patient_sessions localStorage
+         * @param {Object} record - The therapy record object to add
+         * @returns {boolean} True if successful, false otherwise
+         */
+        addTherapyRecord(record) {
+            if (!window.__currentExam || !window.__currentExam.patientId) {
+                console.error('[Manager] Khong co phien kham de luu ket qua Huấn luyen.');
+                return false;
+            }
+            
+            // 1. Cập nhật vào RAM hiện tại
+            if (!window.__currentExam.therapy_records) {
+                window.__currentExam.therapy_records = [];
+            }
+            window.__currentExam.therapy_records.push(record);
+            
+            // 2. ÉP GHI CỨNG VÀO LOCALSTORAGE (Hard-Write)
+            try {
+                // Lấy toàn bộ Database hiện có
+                let sessions = JSON.parse(localStorage.getItem('emr_patient_sessions')) || [];
+                
+                // Tìm vị trí của hồ sơ hiện tại
+                let index = sessions.findIndex(s => s.patientId === window.__currentExam.patientId);
+                
+                if (index !== -1) {
+                    // Nếu đã có, ghi đè toàn bộ object hiện tại (đã chứa therapy_records mới) lên
+                    sessions[index] = window.__currentExam;
+                } else {
+                    // Nếu chưa có (trường hợp chỉ tập mà không khám), push mới
+                    sessions.push(window.__currentExam);
+                }
+                
+                // Đóng gói và lưu lại
+                localStorage.setItem('emr_patient_sessions', JSON.stringify(sessions));
+                
+                console.log('[Manager] Da Hard-Write ket qua thuan luyen vao Database cho:', window.__currentExam.patientId);
+                return true;
+            } catch (err) {
+                console.error('[Manager] Loi khi ghi cung vao Database:', err);
+                return false;
+            }
+        },
+
+        /**
+         * Get the current exam data
+         * @returns {Object|null} Current exam object or null
+         */
+        getCurrentExam() {
+            return window.__currentExam;
+        }
+    };
 
 })();
 

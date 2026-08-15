@@ -727,23 +727,10 @@ function init() {
 
   // ================================================================
   //  Mini-EMR localStorage Integration — Therapeutic Session Logger
-  //  Đồng bộ patientId từ window.__currentExam.patientId (exam_session_manager.js)
+  //  Delegated to ExamSessionManager for unified storage management
   // ================================================================
   document.addEventListener('onTherapeuticSessionEnd', (e) => {
-    // TRUY XUẤT ID CHUẨN TỪ EXAM SESSION MANAGER
-    // patientId được tạo trong startExam() và lưu ở window.__currentExam.patientId
-    const examData = window.__currentExam;
-    
-    // RÀNG BUỘC AN TOÀN: Kiểm tra phiên khám hợp lệ
-    if (!examData || !examData.patientId) {
-      console.error('[EMR CORE] LỖI: Không tìm thấy patientId từ window.__currentExam.');
-      console.error('[EMR CORE] Bệnh nhân chưa bấm "Bắt đầu khám" trước khi thực hiện huấn luyện!');
-      alert('Vui lòng tạo phiên khám trước khi lưu kết quả huấn luyện!');
-      return; // CHẶN TIẾN TRÌNH LƯU — không lưu GUEST_SESSION
-    }
-
-    const currentId = examData.patientId;
-
+    // Build therapy record from event detail
     const therapyRecord = {
       id: 'THR-' + Date.now(),
       timestamp: e.detail.timestamp,
@@ -753,23 +740,18 @@ function init() {
       opticalSettings: e.detail.opticalSettings
     };
 
-    let sessions = JSON.parse(localStorage.getItem('emr_patient_sessions') || '[]');
-    let activeSession = sessions.find(s => s.patientId === currentId);
-
-    if (!activeSession) {
-      activeSession = { patientId: currentId, createdAt: new Date().toISOString(), therapy_records: [] };
-      sessions.push(activeSession);
+    // Delegate to ExamSessionManager for storage
+    if (window.examSessionManager && typeof window.examSessionManager.addTherapyRecord === 'function') {
+        const success = window.examSessionManager.addTherapyRecord(therapyRecord);
+        if (success) {
+            console.log('[EMR CORE] Da ban giao du lieu Game cho Manager xu ly.');
+        } else {
+            alert('Vui long tao phien kham truoc khi luu ket qua!');
+        }
+    } else {
+        console.error('[EMR CORE] Khong tim thay instance cua ExamSessionManager.');
+        alert('Loi he thong: Khong tim thay quan ly phiem kham. Vui long refresh trang.');
     }
-
-    if (!activeSession.therapy_records) {
-      activeSession.therapy_records = [];
-    }
-
-    activeSession.therapy_records.push(therapyRecord);
-    localStorage.setItem('emr_patient_sessions', JSON.stringify(sessions));
-
-    console.log('[EMR CORE] Đã lưu kết quả huấn luyện vào hồ sơ bệnh nhân:', currentId);
-    console.log('[EMR CORE] Tên BN:', examData.patientName, '| SN:', examData.patientYOB);
   });
 
   // Load default test
@@ -903,6 +885,39 @@ function generateTherapyReportHTML(patientId) {
             const isPassed = bo >= 15 && bi >= 8; // Đạt khi BO >= 15 và BI >= 8
             statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>' : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
             resultHTML = `BO: <b>${bo.toFixed(1)} Δ</b> | BI: <b>${bi.toFixed(1)} Δ</b><br>Đánh giá: ${statusHTML}`;
+        }
+        else if (record.gameName && record.gameName.includes('M4')) {
+            const latency = customData.avgLatencyMs !== undefined ? customData.avgLatencyMs : 0;
+            // Đọc thiết bị lưu từ phiên tập (fallback nhận diện hiện tại nếu dữ liệu cũ)
+            const device = customData.deviceType || (navigator.maxTouchPoints > 0 ? 'Cảm ứng' : 'Chuột');
+            
+            // Áp dụng định luật Fitts cho ngưỡng lâm sàng
+            const threshold = device === 'Cảm ứng' ? 500 : 900;
+            const isPassed = latency > 0 && latency <= threshold;
+            
+            statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>'
+                                 : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
+            
+            resultHTML = `Thời gian phản xạ: <b>${latency} ms</b> | Thiết bị: <b>${device}</b><br>Đánh giá: ${statusHTML}`;
+        }
+        else if (record.gameName && record.gameName.includes('M5')) {
+            // Module 5: Global Stereopsis (RDS Therapy) — Arcsec threshold
+            const finalArcsec = (customData && customData.finalArcsec) ? customData.finalArcsec : 0;
+            
+            // Đánh giá lâm sàng (<= 40 Arcsec là bình thường, > 40 là suy giảm)
+            let statusHTML = '';
+            if (finalArcsec > 0 && finalArcsec <= 40) {
+                statusHTML = '<span style="color:#16a34a; font-weight:bold;">ĐẠT (Thị giác nổi hoàn hảo)</span>';
+            } else if (finalArcsec > 40 && finalArcsec <= 200) {
+                statusHTML = '<span style="color:#eab308; font-weight:bold;">CHƯA ĐẠT (Suy giảm nhẹ)</span>';
+            } else {
+                statusHTML = '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT (Suy giảm nặng / Mất thị giác nổi)</span>';
+            }
+            
+            // Xử lý hiển thị an toàn nếu bệnh nhân không click trúng lần nào
+            const arcsecDisplay = finalArcsec > 0 ? `${finalArcsec} Arcsec` : 'Không xác định (Fail)';
+            
+            resultHTML = `Ngưỡng thị giác nổi (Stereoacuity): <b style="font-size:1.1em;">${arcsecDisplay}</b> | Thời gian tập: <b>${durStr}</b><br>Đánh giá: ${statusHTML}`;
         }
         else {
             const score = record.metrics?.score || 0;

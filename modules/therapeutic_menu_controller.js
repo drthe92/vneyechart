@@ -37,6 +37,22 @@ class TherapeuticMenuController {
                 purpose: 'Mở rộng biên độ vận nhãn.',
                 instruction: "YÊU CẦU LÂM SÀNG: Mắt Trái đeo kính Lục Lam (Cyan), Mắt Phải đeo kính Đỏ. Tập trung nhìn vào KHỐI CHỮ NHẬT ở giữa màn hình và cố gắng giữ nó thành một khối duy nhất. BẤM PHÍM SPACE ngay khi khối chữ nhật BỊ TÁCH ĐÔI thành 2 màu xanh/đỏ riêng biệt.",
                 target: 'Đo lường biên độ vận nhãn. Mục tiêu lâm sàng ở khoảng cách 50cm: Hội tụ (Base-Out) ≥ 15 Δ và Phân kỳ (Base-In) ≥ 8 Δ.'
+            },
+            {
+                id: 'saccadic',
+                name: 'M4: Vận nhãn nhanh (Saccadic)',
+                classRef: SaccadicTrackingGame,
+                purpose: 'Tăng cường khả năng đưa nhanh hình ảnh của một vật thể từ võng mạc ngoại vi vào đúng hố hoàng điểm (Foveola) để phân tích chi tiết.',
+                instruction: 'YÊU CẦU LÂM SÀNG: Mắt Trái đeo kính Lục Lam (Cyan), Mắt Phải đeo kính Đỏ. Click vào mục tiêu xuất hiện ngẫu nhiên trên màn hình càng nhanh càng tốt.',
+                target: 'Hoàn thành 20 mục tiêu. Yêu cầu lâm sàng: Độ trễ ≤ 500ms (Màn hình cảm ứng) hoặc ≤ 900ms (Sử dụng chuột).'
+            },
+            {
+                id: 'rds_therapy',
+                name: 'M5: Huấn luyện Thị giác nổi (RDS)',
+                classRef: RDSTherapyGame,
+                purpose: 'Phục hồi khả năng nhận thức chiều không gian 3D tinh tế (Global Stereopsis) bằng cách ép não bộ giải mã các điểm ảnh nhiễu.',
+                instruction: 'HƯỚNG DẪN BỆNH NHÂN: Đeo kính Trái Lục Lam (Cyan) - Phải Đỏ. Nhìn vào màn hình sẽ thấy các hạt nhiễu như TV mất sóng (đây là bình thường). Yêu cầu bệnh nhân tìm kiếm một KHỐI HÌNH VUÔNG ĐANG NỔI BỔNG lên khỏi mặt phẳng màn hình và dùng chuột CLICK thẳng vào nó. Nếu sai, khối hình sẽ to ra và nổi rõ hơn để bệnh nhân tập làm quen lại.',
+                target: 'Duy trì dung hợp liên tục trong 3 phút. Mục tiêu lâm sàng: Ngưỡng nhận thức độ sâu đạt ≤ 40 Giây cung (Arcsec).'
             }
         ];
 
