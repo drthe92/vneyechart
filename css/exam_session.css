@@ -1288,8 +1288,9 @@
     height: 40px;
     border-radius: 4px;
     cursor: pointer;
-    transition: transform 0.2s;
-    border: 1px solid #ccc;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: none !important;
+    outline: none !important;
 }
 
 .color-swatch:hover {
@@ -1298,6 +1299,5 @@
 
 .color-swatch.active {
     transform: scale(1.1);
-    border: 3px solid #000;
-    box-shadow: 0 0 8px rgba(0,0,0,0.3);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4);
 }
