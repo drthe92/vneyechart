@@ -808,25 +808,48 @@ button {
   font-weight: 600;
 }
 
-.calib-preset-row {
+.calib-preset-container {
   display: flex;
-  gap: 6px;
-  margin-top: 2px;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.calib-preset-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.calib-preset-group-title {
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.calib-preset-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
 }
 
 .calib-btn-preset {
-  flex: 1;
-  padding: 7px 8px;
+  padding: 10px 8px;
   border: 1px solid #d0d5dd;
   border-radius: var(--radius-sm);
   background: #f5f7fa;
   color: #555;
   font-family: inherit;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
   white-space: nowrap;
+  text-align: center;
 }
 
 .calib-btn-preset:hover {

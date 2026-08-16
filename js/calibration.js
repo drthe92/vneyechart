@@ -301,11 +301,27 @@ class DisplayCalibrator {
               <span class="calib-field-unit">mét</span>
             </div>
           </div>
-          <div class="calib-preset-row" style="margin-top: 16px;">
-            <button class="calib-btn-preset" data-distance="0.4" title="Thị lực nhìn gần (40 cm)">📖 40 cm</button>
-            <button class="calib-btn-preset" data-distance="3" title="3 mét">🌄 3 m</button>
-            <button class="calib-btn-preset" data-distance="4" title="4 mét">🌄 4 m</button>
-            <button class="calib-btn-preset" data-distance="5" title="5 mét">🌄 5 m</button>
+          <div class="calib-preset-container" style="margin-top: 16px;">
+            <!-- Nhóm Nhìn gần -->
+            <div class="calib-preset-group">
+              <div class="calib-preset-group-title">Nhìn gần</div>
+              <div class="calib-preset-row">
+                <button class="calib-btn-preset" data-distance="0.3" title="30 cm">30 cm</button>
+                <button class="calib-btn-preset" data-distance="0.4" title="40 cm">40 cm</button>
+                <button class="calib-btn-preset" data-distance="0.5" title="50 cm">50 cm</button>
+                <button class="calib-btn-preset" data-distance="0.6" title="60 cm">60 cm</button>
+              </div>
+            </div>
+            <!-- Nhóm Nhìn xa -->
+            <div class="calib-preset-group">
+              <div class="calib-preset-group-title">Nhìn xa</div>
+              <div class="calib-preset-row">
+                <button class="calib-btn-preset" data-distance="3" title="3 mét">3 m</button>
+                <button class="calib-btn-preset" data-distance="4" title="4 mét">4 m</button>
+                <button class="calib-btn-preset" data-distance="5" title="5 mét">5 m</button>
+                <button class="calib-btn-preset" data-distance="6" title="6 mét">6 m</button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="calib-modal-footer">
