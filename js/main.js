@@ -43,6 +43,9 @@ import dynamicFixationModule from '../modules/dynamic_fixation.js';
 import hidingHeidiModule from '../modules/hiding_heidi.js';
 import dynamicVergence from '../modules/dynamic_vergence.js';
 
+// ----- Maddox Grid (Heterophoria) -----
+import { MaddoxGridModule } from '../modules/maddox_grid_module.js';
+
 // ================================================================
 //  State Management
 // ================================================================
@@ -224,6 +227,45 @@ registerTestModule(hidingHeidiModule);     // id: 'hiding-heidi'
 
 // ----- Dynamic Vergence (Specialized Test) -----
 registerTestModule(dynamicVergence);      // id: 'dynamic-vergence'
+
+// ----- Maddox Grid (Heterophoria / AC-A) -----
+// 3-Priority Calibration Data Pipeline:
+//   Priority 1: Credit Card Calibration (localStorage 'vision-therapy-cc-pxpermm')
+//   Priority 2: DisplayCalibrator (window.__calibrator.pxPerMm)
+//   Priority 3: Hardcoded fallback (3.78 px/mm)
+const _getMaddoxCalibration = () => {
+    const savedPPM = localStorage.getItem('vision-therapy-cc-pxpermm');
+    return {
+        pixelsPerMm: savedPPM ? parseFloat(savedPPM) : (window.__calibrator?.pxPerMm || 3.78)
+    };
+};
+
+const maddoxGridModule = {
+    id: 'maddox-grid',
+    label: 'Maddox Grid (Heterophoria)',
+    steps: ['ready'],
+    _instance: null,
+
+    render() {
+        if (this._instance && this._instance.isRunning) return;
+        const cal = _getMaddoxCalibration();
+        this._instance = new MaddoxGridModule(cal);
+        this._instance.start();
+        console.log(`[Main] Đã cấp PPM cho Maddox Grid: ${cal.pixelsPerMm}`);
+    },
+
+    cleanup() {
+        if (this._instance && this._instance.isRunning) {
+            this._instance.stop();
+        }
+    },
+
+    randomize() {
+        // No-op for Maddox Grid — no shuffle needed
+    }
+};
+
+registerTestModule(maddoxGridModule);
 
 // ----- Fallback modules -----
 const DEFAULT_STEPS = ['▲', '▶', '●', '◆', '★', '⬟'];

@@ -1984,6 +1984,65 @@
     }
 
     /**
+     * Create Calibration Section (Red/Cyan color palettes for anaglyph filter calibration)
+     * Returns a DOM element to be appended into the clinic settings form.
+     */
+    function createCalibrationSection() {
+        const section = document.createElement('div');
+        section.className = 'calibration-section';
+        section.style.cssText = 'margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--gray-200);';
+
+        const calTitle = document.createElement('h4');
+        calTitle.style.cssText = 'margin: 0 0 5px 0; font-size: 14px; color: var(--gray-800); font-weight: 700;';
+        calTitle.textContent = 'Hiệu chuẩn màng lọc khử xuyên âm (Khuyên dùng)';
+        section.appendChild(calTitle);
+
+        const calDesc = document.createElement('p');
+        calDesc.style.cssText = 'font-size: 12px; color: var(--gray-500); margin: 0 0 15px 0;';
+        calDesc.textContent = 'Chọn ô màu biến mất hoàn toàn khi nhìn qua kính lọc tương ứng.';
+        section.appendChild(calDesc);
+
+        // Helper function to create palette rows
+        const createPalette = (type, titleStr, colorArray) => {
+            const wrapper = document.createElement('div');
+            const label = document.createElement('span');
+            label.style.cssText = 'font-size: 13px; color: var(--gray-600); font-weight: 600; min-width: 60px;';
+            label.textContent = titleStr;
+
+            const row = document.createElement('div');
+            row.className = `palette-row ${type}`;
+            row.style.cssText = 'display: flex; gap: 10px; margin-bottom: 15px; align-items: center;';
+
+            colorArray.forEach(color => {
+                const swatch = document.createElement('div');
+                swatch.className = 'color-swatch';
+                swatch.dataset.color = color;
+                swatch.dataset.type = type;
+                swatch.style.cssText = 'width: 40px; height: 40px; border-radius: 4px; cursor: pointer; transition: transform 0.2s, border 0.2s, box-shadow 0.2s; border: 1px solid #ccc; background-color: ' + color + ';';
+
+                swatch.addEventListener('click', () => {
+                    row.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+                    swatch.classList.add('active');
+                });
+                row.appendChild(swatch);
+            });
+
+            const rowWrapper = document.createElement('div');
+            rowWrapper.style.cssText = 'display: flex; align-items: center;';
+            rowWrapper.appendChild(label);
+            rowWrapper.appendChild(row);
+
+            wrapper.appendChild(rowWrapper);
+            section.appendChild(wrapper);
+        };
+
+        createPalette('red', 'Đỏ:', CALIBRATION_PALETTES.red);
+        createPalette('cyan', 'Lục Lam:', CALIBRATION_PALETTES.cyan);
+
+        return section;
+    }
+
+    /**
      * Create Clinic Settings Modal and Settings Button
      */
     function createClinicSettingsUI() {
