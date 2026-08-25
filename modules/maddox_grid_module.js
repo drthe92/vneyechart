@@ -646,12 +646,10 @@ class MaddoxGridModule {
     }
 }
 
-// ES Module named export
+// ES Module named export (for import { MaddoxGridModule } from '...')
 export { MaddoxGridModule };
 
 // Fallback for non-ESM environments
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { MaddoxGridModule };
-} else if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined') {
     window.MaddoxGridModule = MaddoxGridModule;
 }
