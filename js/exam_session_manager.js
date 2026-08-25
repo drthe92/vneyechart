@@ -139,7 +139,8 @@
         // Start Exam Button
         startExamBtn = document.createElement('button');
         startExamBtn.id = 'start-exam-btn';
-        startExamBtn.className = 'exam-btn start-exam-btn';
+        // nav-btn: đăng ký với thuật toán điều hướng bàn phím 2D trong main.js (updateMenuFocus)
+        startExamBtn.className = 'exam-btn start-exam-btn nav-btn';
         startExamBtn.innerHTML = 'Bắt đầu khám';
         examContainer.appendChild(startExamBtn);
 
@@ -156,7 +157,9 @@
 
         endExamBtn = document.createElement('button');
         endExamBtn.id = 'end-exam-btn';
-        endExamBtn.className = 'exam-btn end-exam-btn';
+        // nav-btn: nút này thay thế start-exam-btn khi phiên khám đang chạy,
+        // cũng cần tham gia điều hướng bàn phím 2D
+        endExamBtn.className = 'exam-btn end-exam-btn nav-btn';
         endExamBtn.innerHTML = 'Kết thúc khám';
         statusContainer.appendChild(endExamBtn);
 
@@ -1422,7 +1425,8 @@
 
         const historyBtn = document.createElement('button');
         historyBtn.id = 'history-viewer-btn';
-        historyBtn.className = 'exam-btn history-btn';
+        // nav-btn: đăng ký với thuật toán điều hướng bàn phím 2D trong main.js (updateMenuFocus)
+        historyBtn.className = 'exam-btn history-btn nav-btn';
         historyBtn.setAttribute('title', 'Kho bệnh án');
         historyBtn.innerHTML = '\uD83D\uDDC2\uFE0F';
 
@@ -1858,6 +1862,8 @@
         if (!modalElement) return;
 
         const stopGlobalHotkeys = (e) => {
+            // Allow Escape/Backspace to bubble up so main.js can close the modal
+            if (e.key === 'Escape' || e.key === 'Backspace') return;
             const tagName = e.target.tagName.toUpperCase();
             // If user is typing in Input, Textarea, Select, or Button
             if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || tagName === 'BUTTON') {
@@ -2055,7 +2061,8 @@
 
         const settingsBtn = document.createElement('button');
         settingsBtn.id = 'clinic-settings-btn';
-        settingsBtn.className = 'exam-btn settings-btn';
+        // nav-btn: đăng ký với thuật toán điều hướng bàn phím 2D trong main.js (updateMenuFocus)
+        settingsBtn.className = 'exam-btn settings-btn nav-btn';
         settingsBtn.setAttribute('title', 'Cài đặt phòng khám');
         settingsBtn.innerHTML = '⚙️';
 
@@ -2253,65 +2260,6 @@
         modalContent.appendChild(modalBody);
         modalBody.appendChild(form);
 
-        // --- BẮT ĐẦU UI HIỆU CHUẨN ---
-        try {
-            const calibrationSection = document.createElement('div');
-            calibrationSection.className = 'calibration-section';
-            
-            const calTitle = document.createElement('h4');
-            calTitle.style.cssText = 'margin: 0 0 5px 0; font-size: 14px; color: var(--gray-800); font-weight: 700;';
-            calTitle.textContent = 'Hiệu chuẩn màng lọc khử xuyên âm (Khuyên dùng)';
-            calibrationSection.appendChild(calTitle);
-
-            const calDesc = document.createElement('p');
-            calDesc.style.cssText = 'font-size: 12px; color: var(--gray-500); margin: 0 0 15px 0;';
-            calDesc.textContent = 'Chọn ô màu biến mất hoàn toàn khi nhìn qua kính lọc tương ứng.';
-            calibrationSection.appendChild(calDesc);
-
-            // Helper function to create palette rows
-            const createPalette = (type, titleStr, colorArray) => {
-                const wrapper = document.createElement('div');
-                const label = document.createElement('span');
-                label.style.cssText = 'font-size: 13px; color: var(--gray-600); font-weight: 600; min-width: 60px;';
-                label.textContent = titleStr;
-                
-                const row = document.createElement('div');
-                row.className = `palette-row ${type}`;
-                row.style.cssText = 'display: flex; gap: 10px; margin-bottom: 15px; align-items: center;';
-
-                colorArray.forEach(color => {
-                    const swatch = document.createElement('div');
-                    swatch.className = 'color-swatch';
-                    swatch.style.backgroundColor = color;
-                    swatch.dataset.color = color;
-                    swatch.dataset.type = type;
-                    swatch.style.cssText = 'width: 40px; height: 40px; border-radius: 4px; cursor: pointer; transition: transform 0.2s, border 0.2s, box-shadow 0.2s; border: 1px solid #ccc; background-color: ' + color + ';';
-
-                    swatch.addEventListener('click', () => {
-                        row.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
-                        swatch.classList.add('active');
-                    });
-                    row.appendChild(swatch);
-                });
-                
-                const rowWrapper = document.createElement('div');
-                rowWrapper.style.cssText = 'display: flex; align-items: center;';
-                rowWrapper.appendChild(label);
-                rowWrapper.appendChild(row);
-                
-                wrapper.appendChild(rowWrapper);
-                calibrationSection.appendChild(wrapper);
-            };
-
-            createPalette('red', 'Đỏ:', CALIBRATION_PALETTES.red);
-            createPalette('cyan', 'Lục Lam:', CALIBRATION_PALETTES.cyan);
-
-            modalBody.appendChild(calibrationSection);
-        } catch (error) {
-            console.error('[ExamSessionManager] Lỗi khi tạo UI Hiệu chuẩn màu:', error);
-        }
-        // --- KẾT THÚC UI HIỆU CHUẨN ---
-
         clinicSettingsModal.appendChild(modalContent);
 
         // Append modal to body
@@ -2326,7 +2274,87 @@ function openClinicSettingsModal() {
     
     // 1. Tìm modal trong DOM
     let modal = document.getElementById('clinic-settings-modal') || document.querySelector('.clinic-settings-modal');
-    
+
+    // --- Helper: Render / cập nhật 3 nút Chế độ hiển thị (Tương phản/Độ chói) ---
+    // Trạng thái active lấy từ window.__displayManager.currentPreset.
+    // Click → window.__displayManager.applyPreset(key) + cập nhật style nút đang chọn.
+    // Hỗ trợ CẢ HAI biến thể modal:
+    //   1. Modal DOM do createClinicSettingsUI() tạo sẵn (class 'exam-modal')
+    //   2. Modal HTML-string do chính hàm này khởi tạo (class 'custom-modal')
+    const renderDisplayPresetButtons = () => {
+        const dm = window.__displayManager;
+        if (!dm || typeof dm.applyPreset !== 'function') return;
+
+        let row = modal.querySelector('#display-preset-row');
+
+        // Nếu modal chưa có section này (vd: modal DOM tạo sẵn lúc init)
+        // → chèn Section mới vào trong <form>, ngay TRƯỚC khối .form-actions
+        // (nút Lưu/Hủy) để đảm bảo thứ tự: Inputs → Hiệu chuẩn → Chế độ hiển thị → Lưu/Hủy.
+        if (!row) {
+            const section = document.createElement('div');
+            section.className = 'display-preset-section';
+            section.style.cssText = 'margin-top: 15px; border-top: 1px solid #ddd; padding-top: 15px;';
+            section.innerHTML = `
+                <h3 style="margin-bottom: 5px; font-size: 15px;">Chế độ hiển thị (Tương phản/Độ chói)</h3>
+                <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Chọn chế độ hiển thị phù hợp. Thay đổi được áp dụng ngay lập tức cho toàn bộ ứng dụng.</p>`;
+            row = document.createElement('div');
+            row.id = 'display-preset-row';
+            row.style.cssText = 'display: flex; gap: 8px; flex-wrap: wrap;';
+            section.appendChild(row);
+
+            const form = modal.querySelector('#clinic-settings-form');
+            const formActions = form && form.querySelector('.form-actions');
+
+            if (form && formActions) {
+                // Biến thể modal DOM (createClinicSettingsUI): chèn trước nút Lưu/Hủy
+                form.insertBefore(section, formActions);
+            } else if (form) {
+                // Dự phòng: không tìm thấy .form-actions thì đặt cuối form
+                form.appendChild(section);
+            } else {
+                // Biến thể modal HTML-string (custom-modal): giữ hành vi cũ
+                const container =
+                    modal.querySelector('.exam-modal-body') ||
+                    modal.querySelector('.modal-content') ||
+                    modal;
+                container.appendChild(section);
+            }
+        }
+
+        const presets = typeof dm.getPresets === 'function' ? dm.getPresets() : {};
+        row.innerHTML = '';
+        Object.values(presets).forEach((preset) => {
+            const isActive = dm.currentPreset === preset.key;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.dataset.preset = preset.key;
+            btn.textContent = `${preset.label} (${preset.description})`;
+            const applyBtnStyle = (selected) => {
+                btn.style.padding = '8px 12px';
+                btn.style.borderRadius = '6px';
+                btn.style.cursor = 'pointer';
+                btn.style.fontSize = '13px';
+                btn.style.border = selected ? '2px solid #2563eb' : '1px solid #ccc';
+                btn.style.background = selected ? '#dbeafe' : '#fff';
+                btn.style.color = selected ? '#1e40af' : '#333';
+                btn.style.fontWeight = selected ? '700' : '400';
+            };
+            applyBtnStyle(isActive);
+            btn.addEventListener('click', () => {
+                dm.applyPreset(preset.key);
+                // Cập nhật lại trạng thái active của toàn bộ nút trong nhóm
+                row.querySelectorAll('button').forEach((b) => {
+                    const sel = b.dataset.preset === dm.currentPreset;
+                    b.style.border = sel ? '2px solid #2563eb' : '1px solid #ccc';
+                    b.style.background = sel ? '#dbeafe' : '#fff';
+                    b.style.color = sel ? '#1e40af' : '#333';
+                    b.style.fontWeight = sel ? '700' : '400';
+                });
+            });
+            row.appendChild(btn);
+        });
+    };
+
     // 2. NẾU CHƯA CÓ, TỰ ĐỘNG TẠO MỚI TOÀN BỘ DOM CHO MODAL CÀI ĐẶT
     if (!modal) {
         console.log('[System] Modal chưa tồn tại, đang tự động khởi tạo giao diện...');
@@ -2377,8 +2405,15 @@ function openClinicSettingsModal() {
                 <div class="palette-row cyan" style="display: flex; gap: 8px; margin-bottom: 15px;"></div>
             </div>
 
+            <!-- Section: Chế độ hiển thị (Tương phản/Độ chói) -->
+            <div class="display-preset-section" style="margin-top: 15px; border-top: 1px solid #ddd; padding-top: 15px;">
+                <h3 style="margin-bottom: 5px; font-size: 15px;">Chế độ hiển thị (Tương phản/Độ chói)</h3>
+                <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Chọn chế độ hiển thị phù hợp. Thay đổi được áp dụng ngay lập tức cho toàn bộ ứng dụng.</p>
+                <div id="display-preset-row" style="display: flex; gap: 8px; flex-wrap: wrap;"></div>
+            </div>
+
             <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-                <button type="button" id="close-settings-btn" style="padding: 8px 16px; background:#e5e7eb; border:none; border-radius:4px; cursor:pointer;">Hủy</button>
+                <button type="button" id="close-settings-btn" class="cancel-btn" style="padding: 8px 16px; background:#e5e7eb; border:none; border-radius:4px; cursor:pointer;">Hủy</button>
                 <button type="button" id="save-settings-btn" style="padding: 8px 16px; background:#2563eb; color:#fff; border:none; border-radius:4px; cursor:pointer;">Lưu cấu hình</button>
             </div>
         `;
@@ -2414,6 +2449,9 @@ function openClinicSettingsModal() {
             renderPalettes('red', CALIBRATION_PALETTES.red, 'palette-row.red');
             renderPalettes('cyan', CALIBRATION_PALETTES.cyan, 'palette-row.cyan');
         }
+
+        // Render 3 nút Chế độ hiển thị (Tương phản/Độ chói)
+        renderDisplayPresetButtons();
 
         // Gắn event Đóng / Lưu
         modal.querySelector('#close-settings-btn').addEventListener('click', () => { modal.style.display = 'none'; });
@@ -2456,6 +2494,9 @@ function openClinicSettingsModal() {
     // 3. Ép hiển thị
     modal.style.display = 'flex';
     console.log('[System] Modal set to display: flex successfully!');
+
+    // Làm mới trạng thái active của các nút Chế độ hiển thị theo preset hiện tại
+    renderDisplayPresetButtons();
 
     // 4. Điền dữ liệu cũ vào form
     const settings = typeof loadClinicSettings === 'function' ? loadClinicSettings() : JSON.parse(localStorage.getItem('vision_clinic_settings') || '{}');
