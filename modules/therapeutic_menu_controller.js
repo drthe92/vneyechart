@@ -1,10 +1,13 @@
 /**
  * Therapeutic Menu Controller (Lazy Binding Architecture)
- * 
- * Quản lý giao diện và vòng đời 3 Game module trong khu vực Huấn luyện Thị giác:
+ *
+ * Quản lý giao diện và vòng đời 6 Game module trong khu vực Huấn luyện Thị giác:
  * - M1: Hứng hạt (CatchGame)
  * - M2: Khớp khung (ShapeAlignmentGame)
  * - M3: Vận nhãn (VergenceTrackerGame)
+ * - M4: Vận nhãn nhanh (SaccadicTrackingGame)
+ * - M5: Huấn luyện Thị giác nổi (RDSTherapyGame)
+ * - M6: Huấn luyện Phân kỳ (DivergenceTherapyGame)
  */
 
 class TherapeuticMenuController {
@@ -53,6 +56,14 @@ class TherapeuticMenuController {
                 purpose: 'Phục hồi khả năng nhận thức chiều không gian 3D tinh tế (Global Stereopsis) bằng cách ép não bộ giải mã các điểm ảnh nhiễu.',
                 instruction: 'HƯỚNG DẪN BỆNH NHÂN: Đeo kính Trái Lục Lam (Cyan) - Phải Đỏ. Nhìn vào màn hình sẽ thấy các hạt nhiễu như TV mất sóng (đây là bình thường). Yêu cầu bệnh nhân tìm kiếm một KHỐI HÌNH VUÔNG ĐANG NỔI BỔNG lên khỏi mặt phẳng màn hình và dùng chuột CLICK thẳng vào nó. Nếu sai, khối hình sẽ to ra và nổi rõ hơn để bệnh nhân tập làm quen lại.',
                 target: 'Duy trì dung hợp liên tục trong 3 phút. Mục tiêu lâm sàng: Ngưỡng nhận thức độ sâu đạt ≤ 40 Giây cung (Arcsec).'
+            },
+            {
+                id: 'divergence',
+                name: 'M6: Huấn luyện Phân kỳ (Divergence)',
+                classRef: DivergenceTherapyGame,
+                purpose: 'Huấn luyện phân kỳ (Divergence Therapy) sử dụng chiến thuật "Quá tải tiến triển". Giữ hợp thị 10s để tăng độ khó, vỡ hợp thị thì nghỉ 3s.',
+                instruction: 'YÊU CẦU LÂM SÀNG: Đeo kính 🔴 Mắt Phải / 🔵 Mắt Trái. Giữ hợp thị (không thấy hình đôi) trong 10 giây để tăng mức độ. Bấm phím SPACE ngay khi vỡ hợp thị (thấy hình tách đôi). Nếu vỡ 3 lần ở cùng một mức, bài tập sẽ kết thúc.',
+                target: 'Giữ hợp thị liên tục đến mục tiêu lâm sàng (tăng dần từ 2Δ đến 8Δ). Sử dụng Vòng tròn thời gian (Circular Timer) ở trung tâm.'
             }
         ];
 
@@ -93,6 +104,17 @@ class TherapeuticMenuController {
             if (module3) {
                 console.log('[Therapeutic] Kích hoạt phác đồ tiếp theo: Module 3');
                 this.launchGame(module3);
+            }
+        }, { once: true });
+
+        // ============================================================
+        // Lắng nghe sự kiện requestLaunchModule6 từ RDSTherapyGame._endGame()
+        // ============================================================
+        document.addEventListener('requestLaunchModule6', () => {
+            const module6 = this.gameModules.find(m => m.id === 'divergence');
+            if (module6) {
+                console.log('[Therapeutic] Kích hoạt phác đồ tiếp theo: Module 6 (Phân kỳ)');
+                this.launchGame(module6);
             }
         }, { once: true });
     }
@@ -197,6 +219,55 @@ class TherapeuticMenuController {
                     </div>
                 </div>
             `;
+        } else if (module.id === 'divergence') {
+            clinicalContent = `
+                <div style="max-width: 700px; margin: 20px auto; text-align: left;">
+                    <div style="background: rgba(56, 189, 248, 0.1); border: 1px solid #38bdf8; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+                        <p style="color: #cbd5e1; margin: 0; font-size: 14px; line-height: 1.5;">
+                            <b style="color: #38bdf8;">🎯 MỤC ĐÍCH LÂM SÀNG:</b> Cải thiện biên độ hợp thị động phân kỳ (Dynamic Fusional Divergence Amplitude), thiết lập phản xạ tự động cho cơ trực ngoài, chỉ định cho lác trong ẩn (Esophoria) hoặc hội chứng dư thừa quy tụ.
+                        </p>
+                    </div>
+
+                    <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; padding: 12px; border-radius: 6px; text-align: center; margin-bottom: 20px;">
+                        <span style="color: #ef4444; font-weight: bold; font-size: 15px;">
+                            ⚠️ BẮT BUỘC: MẮT PHẢI ĐEO KÍNH ĐỎ (RED) - MẮT TRÁI ĐEO KÍNH XANH (CYAN)
+                        </span>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-around; margin-bottom: 20px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 8px; color: #94a3b8; font-size: 14px;">Mức Bắt đầu (Δ):</label>
+                            <select id="m6-start" style="padding: 8px 12px; border-radius: 6px; background: #0f172a; color: white; border: 1px solid #475569; font-size: 16px; min-width: 120px;">
+                                ${[2,4,6,8].map(v => `<option value="${v}" ${v==2?'selected':''}>${v} Δ</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 8px; color: #94a3b8; font-size: 14px;">Mục tiêu (Δ):</label>
+                            <select id="m6-target" style="padding: 8px 12px; border-radius: 6px; background: #0f172a; color: white; border: 1px solid #475569; font-size: 16px; min-width: 120px;">
+                                ${[4,6,8,10,12,15].map(v => `<option value="${v}" ${v==8?'selected':''}>${v} Δ</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="padding: 20px; border: 2px solid #3b82f6; border-radius: 8px; background: rgba(59, 130, 246, 0.1); margin-bottom: 20px;">
+                        <p style="font-size: 18px; color: #60a5fa; font-weight: bold; margin: 0 0 10px 0;">📋 CHIẾN THUẬT "QUÁ TẢI TIẾN TRIỂN":</p>
+                        <p style="font-size: 16px; color: white; margin: 0;">Giữ hợp thị (không thấy hình đôi) trong <strong>10 giây</strong> để tăng mức lăng kính (Δ). Vỡ hợp thị sẽ nghỉ <strong>3 giây</strong> rồi thử lại.</p>
+                    </div>
+
+                    <div style="padding: 20px; border: 2px solid #10b981; border-radius: 8px; background: rgba(16, 185, 129, 0.1); margin-bottom: 20px;">
+                        <p style="font-size: 18px; color: #34d399; font-weight: bold; margin: 0 0 10px 0;">🎯 MỤC TIÊU LÂM SÀNG:</p>
+                        <p style="font-size: 16px; color: white; margin: 0;">Tăng dần từ <strong>${document.getElementById('m6-start') ? document.getElementById('m6-start').value : 2}Δ</strong> đến <strong>${document.getElementById('m6-target') ? document.getElementById('m6-target').value : 8}Δ</strong>. Vòng tròn thời gian ở trung tâm hiển thị tiến trình giữ hợp thị.</p>
+                    </div>
+
+                    <div style="padding: 20px; border: 2px solid #f59e0b; border-radius: 8px; background: rgba(245, 158, 11, 0.1); margin-bottom: 20px;">
+                        <p style="font-size: 18px; color: #fbbf24; font-weight: bold; margin: 0 0 10px 0;">⌨️ THAO TÁC:</p>
+                        <ul style="font-size: 16px; color: white; margin: 0; padding-left: 20px;">
+                            <li>Bấm <kbd style="background: #334155; padding: 2px 8px; border-radius: 4px;">SPACE</kbd> ngay khi vỡ hợp thị (thấy hình tách đôi)</li>
+                            <li>Vỡ <strong>3 lần</strong> tại cùng một mức → Bài tập kết thúc</li>
+                        </ul>
+                    </div>
+                </div>
+            `;
         } else {
             clinicalContent = `
                 <div style="max-width: 600px; margin: 20px auto;">
@@ -255,7 +326,18 @@ class TherapeuticMenuController {
         try {
             this.currentGame = new module.classRef();
             
-            this.currentGame.start();
+            // Pass config for M6 divergence therapy
+            let config = {};
+            if (module.id === 'divergence') {
+                const startSelect = document.getElementById('m6-start');
+                const targetSelect = document.getElementById('m6-target');
+                config = {
+                    startDiopter: startSelect ? parseInt(startSelect.value) : 2,
+                    targetDiopter: targetSelect ? parseInt(targetSelect.value) : 8
+                };
+            }
+            
+            this.currentGame.start(config);
             console.log(`[Therapeutic] Started ${module.name} successfully`);
         } catch (error) {
             console.error("[LỖI ENGINE NGHIÊM TRỌNG]:", error);
