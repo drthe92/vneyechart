@@ -326,7 +326,15 @@ function setupSidebar() {
     el.addEventListener('click', (e) => {
       e.preventDefault();
       const testId = el.dataset.test;
-      if (!testId || testId === state.currentTest) return;
+      if (!testId) return;
+
+      // Clicking the currently active test: just close the menu to reveal
+      // the running test without resetting its progress.
+      if (testId === state.currentTest) {
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) sidebar.classList.add('sidebar-hidden');
+        return;
+      }
 
       const mod = getTestModule(testId);
       if (!mod) return;
@@ -416,7 +424,7 @@ function setupSidebar() {
     });
     const focused = items[menuFocusIndex];
     if (focused) {
-      focused.scrollIntoView({ block: 'nearest' });
+      focused.scrollIntoView({ behavior: 'smooth', block: 'center' });
       focused.focus();
     }
   }
@@ -426,25 +434,370 @@ function setupSidebar() {
     return sidebar && !sidebar.classList.contains('sidebar-hidden');
   }
 
-  // Keyboard: Tab / Home / ContextMenu to toggle menu (as before)
+  // ---- 2D Spatial Navigation helper ----
+  // Finds the element geometrically closest to items[currentIndex] in the given
+  // direction ('up' | 'down' | 'left' | 'right') using getBoundingClientRect().
+  // Returns the new index, or -1 if no candidate lies in that direction.
+  function findClosestElementInDirection(currentIndex, direction, items) {
+    if (currentIndex < 0 || currentIndex >= items.length) return -1;
+
+    const currentRect = items[currentIndex].getBoundingClientRect();
+    const currentCx = currentRect.left + currentRect.width / 2;
+    const currentCy = currentRect.top + currentRect.height / 2;
+
+    // Small tolerance (px) so elements aligned edge-to-edge still count
+    const EPSILON = 4;
+
+    let bestIndex = -1;
+    let bestDist = Infinity;
+
+    items.forEach((el, i) => {
+      if (i === currentIndex) return;
+
+      // Skip invisible/hidden elements (zero-size rects)
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) return;
+
+      // Directional filter: element must lie strictly in the pressed direction
+      let inDirection = false;
+      switch (direction) {
+        case 'up':
+          inDirection = rect.bottom <= currentRect.top + EPSILON;
+          break;
+        case 'down':
+          inDirection = rect.top >= currentRect.bottom - EPSILON;
+          break;
+        case 'left':
+          inDirection = rect.right <= currentRect.left + EPSILON;
+          break;
+        case 'right':
+          inDirection = rect.left >= currentRect.right - EPSILON;
+          break;
+      }
+      if (!inDirection) return;
+
+      // Geometric distance between element centers
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = cx - currentCx;
+      const dy = cy - currentCy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIndex = i;
+      }
+    });
+
+    return bestIndex;
+  }
+
+  // ================================================================
+  //  Hybrid D-Pad Navigation for Popups / Modals (Remote-friendly)
+  // ================================================================
+
+  // ---- Focus Restoration state ----
+  // Lưu phần tử (thường là nút trên menu chính) đang được focus NGAY TRƯỚC khi
+  // một Modal mở ra, để có thể trả lại focus + tái lập vòng outline xanh
+  // (.menu-focus) đúng vị trí điều hướng cũ khi Modal đóng.
+  let lastFocusedElementBeforeModal = null;
+
+  /**
+   * Trả focus về phần tử đã lưu trước khi Modal mở (Focus Restoration).
+   * - Gọi .focus() lên phần tử cũ để trình duyệt đặt lại vị trí focus.
+   * - Nếu phần tử thuộc menu chính, đồng bộ menuFocusIndex và gọi
+   *   updateMenuFocus() để class .menu-focus + outline xanh hiển thị lại mượt mà,
+   *   giúp điều hướng Trái/Phải tiếp tục không bị đứt đoạn.
+   * - Cuối cùng reset biến trạng thái về null.
+   */
+  function restoreFocusAfterModalClose() {
+    const el = lastFocusedElementBeforeModal;
+    lastFocusedElementBeforeModal = null;
+    if (!el || !el.isConnected || typeof el.focus !== 'function') return;
+    el.focus();
+    // Tái lập đúng trạng thái điều hướng menu (class .menu-focus + outline)
+    const items = getMenuItems();
+    const idx = items.indexOf(el);
+    if (idx !== -1 && idx !== menuFocusIndex) {
+      menuFocusIndex = idx;
+      updateMenuFocus();
+    } else if (idx !== -1) {
+      // Vẫn gọi để đảm bảo outline được vẽ lại nhất quán sau khi modal đóng
+      updateMenuFocus();
+    }
+  }
+
+  // Selectors that identify every popup/modal used across the project:
+  //  - .exam-modal            → exam session modals (start/end/manual/report/history/clinic settings)
+  //  - .settings-modal-overlay→ DisplayManager preset modal (js/settings.js)
+  //  - .calib-modal-overlay   → distance-selection dialog (js/calibration.js)
+  //  - .custom-modal / .modal → legacy fallbacks
+  // NOTE: .cc-modal-overlay is intentionally EXCLUDED — js/credit_card_calibration.js
+  // already implements its own dedicated arrow-key handling for its slider.
+  const MODAL_SELECTOR = [
+    '.exam-modal',
+    '.settings-modal-overlay',
+    '.calib-modal-overlay',
+    '.custom-modal',
+    '.modal'
+  ].join(', ');
+
+  /**
+   * Quét DOM tìm Modal đang hiển thị.
+   * Một Modal được coi là "active" nếu nó khớp MODAL_SELECTOR và đang hiển thị
+   * trên màn hình (display !== 'none' hoặc có class .active).
+   * @returns {HTMLElement|null}
+   */
+  function getActiveModal() {
+    const candidates = document.querySelectorAll(MODAL_SELECTOR);
+    for (const el of candidates) {
+      if (!el.isConnected) continue;
+      if (el.classList.contains('active')) return el;
+      const style = window.getComputedStyle(el);
+      if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+        return el;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Kiểm tra phần tử có phải ô nhập văn bản hay không.
+   * Với các ô này, ArrowLeft/ArrowRight phải được trả lại cho trình duyệt
+   * để di chuyển con trỏ text (caret).
+   */
+  function isTextInput(el) {
+    return !!el && el.tagName === 'INPUT' &&
+      ['text', 'number', 'password', 'search', 'tel', 'email', 'url'].includes(el.type);
+  }
+
+  /**
+   * Focus Trap: chỉ lấy các phần tử focusable BÊN TRONG modal đang mở,
+   * chặn hoàn toàn việc điều hướng lọt ra ngoài menu chính.
+   */
+  function getFocusableItems(modal) {
+    if (!modal) return [];
+    const selector =
+      'input:not([type="hidden"]):not([disabled]), ' +
+      'select:not([disabled]), textarea:not([disabled]), ' +
+      'button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    return Array.from(modal.querySelectorAll(selector)).filter((el) => {
+      // Loại bỏ phần tử không hiển thị (rect 0x0 hoặc display:none)
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) return false;
+      return true;
+    });
+  }
+
+  /** Focus vào một item trong modal + cuộn nhẹ để đảm bảo nhìn thấy. */
+  function focusModalItem(items, index) {
+    const el = items[index];
+    if (!el) return;
+    el.focus({ preventScroll: true });
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // Đặt caret về cuối chuỗi với ô nhập văn bản (trải nghiệm remote tốt hơn)
+    if (isTextInput(el) && typeof el.setSelectionRange === 'function') {
+      try {
+        const len = el.value.length;
+        el.setSelectionRange(len, len);
+      } catch (_) { /* input type number không hỗ trợ — bỏ qua */ }
+    }
+  }
+
+  /**
+   * Đóng modal hiện tại theo cách "tự nhiên" nhất:
+   * ưu tiên click nút đóng/hủy có sẵn (để chạy đúng logic dọn dẹp của từng modal),
+   * nếu không tìm thấy thì ẩn trực tiếp.
+   */
+  function closeActiveModal(modal) {
+    if (!modal) return;
+    const closeSelectors = [
+      '.exam-modal-close',
+      '.settings-modal-close',
+      '[data-dismiss="modal"]',
+      '.modal-close',
+      '.cancel-btn',
+      '.cc-modal-close',
+      // Định danh nút đóng phổ biến bổ sung
+      '.close',
+      '.close-btn',
+      '.btn-close',
+      '.btn-secondary',
+      '[aria-label="Close"]'
+    ];
+    for (const sel of closeSelectors) {
+      const btn = modal.querySelector(sel);
+      if (btn && btn.offsetParent !== null) {
+        btn.click();
+        // Modal đã được đóng thành công qua nút đóng/hủy của chính nó
+        // → trả focus về phần tử trên menu trước khi modal mở ra
+        restoreFocusAfterModalClose();
+        return;
+      }
+    }
+    // Fallback: ẩn TRIỆT ĐỂ modal...
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+    // ...và cả overlay cha (lớp phủ nền đen) nếu modal là con của overlay
+    const parent = modal.parentElement;
+    if (parent && parent !== document.body) {
+      const isOverlay =
+        /overlay/i.test(parent.className) ||
+        window.getComputedStyle(parent).position === 'fixed';
+      if (isOverlay) {
+        parent.classList.remove('active');
+        parent.style.display = 'none';
+      }
+    }
+    // Modal đã ẩn triệt để → trả focus về phần tử trên menu trước khi modal mở
+    restoreFocusAfterModalClose();
+  }
+
+  /**
+   * Xử lý phím khi một Modal đang mở (Hybrid algorithm):
+   *  - Escape / Backspace (nút Back trên remote) → đóng modal.
+   *  - Enter / OK → trả lại trình duyệt (click nút đang focus / submit form).
+   *  - Nếu đang focus <input type="text|number|password">:
+   *      + ArrowLeft / ArrowRight → bỏ qua (trình duyệt di chuyển caret).
+   *      + ArrowUp / ArrowDown    → nhảy tới item liền trước / liền sau (1D).
+   *  - Nếu đang focus button / checkbox / select...:
+   *      + Dùng findClosestElementInDirection (thuật toán 2D) theo cả 4 hướng.
+   */
+  function handleModalKeydown(e, modal) {
+    // ---- Escape / Back (remote) → đóng modal ----
+    if (e.key === 'Escape' || e.key === 'Backspace') {
+      e.preventDefault();
+      e.stopPropagation();
+      closeActiveModal(modal);
+      return;
+    }
+
+    // ---- Action keys: để hành vi native click nút / submit form ----
+    // LƯU Ý: KHÔNG dùng e.keyCode === 18 (Alt) để mô phỏng Enter/OK,
+    // tránh xung đột với tổ hợp hệ thống như Alt + Tab.
+    if (
+      e.key === 'Enter' || e.key === ' ' || e.key === 'OK' ||
+      e.key === 'Accept'
+    ) {
+      return;
+    }
+
+    const items = getFocusableItems(modal);
+    if (items.length === 0) return;
+
+    let direction = null;
+    if (e.key === 'ArrowUp') direction = 'up';
+    else if (e.key === 'ArrowDown') direction = 'down';
+    else if (e.key === 'ArrowLeft') direction = 'left';
+    else if (e.key === 'ArrowRight') direction = 'right';
+    if (!direction) return;
+
+    const active = document.activeElement;
+    const currentIndex = items.indexOf(active);
+
+    // Chưa focus vào đâu trong modal → bắt đầu từ phần tử đầu tiên
+    if (currentIndex === -1) {
+      e.preventDefault();
+      focusModalItem(items, 0);
+      return;
+    }
+
+    // ---- Nhánh 1: Text input → hybrid 1D (chỉ Up/Down), Left/Right cho caret ----
+    if (isTextInput(active)) {
+      if (direction === 'left' || direction === 'right') {
+        return; // Trả quyền cho trình duyệt di chuyển con trỏ text
+      }
+      e.preventDefault();
+      const next = direction === 'down' ? currentIndex + 1 : currentIndex - 1;
+      if (next >= 0 && next < items.length) {
+        focusModalItem(items, next);
+      }
+      return;
+    }
+
+    // ---- Nhánh 2: Button / checkbox / select... → thuật toán 2D ----
+    e.preventDefault();
+    const newIndex = findClosestElementInDirection(currentIndex, direction, items);
+    if (newIndex !== -1) {
+      focusModalItem(items, newIndex);
+    }
+  }
+
+  /**
+   * Auto-focus: ngay khi một Modal hiện lên (DOM thay đổi hoặc style/class đổi),
+   * tự động focus vào ô nhập liệu đầu tiên (ưu tiên) hoặc nút bấm đầu tiên.
+   * Người dùng không cần click chuột lần đầu khi dùng remote.
+   */
+  function initModalAutoFocus() {
+    let scheduled = false;
+    const focusIntoActiveModal = () => {
+      scheduled = false;
+      const modal = getActiveModal();
+      if (!modal) return;
+      // Đã có phần tử bên trong modal được focus → không can thiệp
+      if (modal.contains(document.activeElement)) return;
+      const items = getFocusableItems(modal);
+      if (items.length === 0) return;
+      // BẮT BUỘC lưu lại phần tử đang focus (nút trên menu chính) NGAY TRƯỚC
+      // khi chuyển focus vào các ô nhập liệu bên trong modal,
+      // phục vụ Focus Restoration khi modal đóng.
+      const currentActive = document.activeElement;
+      if (
+        currentActive &&
+        currentActive !== document.body &&
+        currentActive !== document.documentElement &&
+        !modal.contains(currentActive) &&
+        typeof currentActive.focus === 'function'
+      ) {
+        lastFocusedElementBeforeModal = currentActive;
+      }
+      const target = items.find(isTextInput) || items[0];
+      focusModalItem(items, items.indexOf(target));
+    };
+    const schedule = () => {
+      if (scheduled) return;
+      scheduled = true;
+      requestAnimationFrame(focusIntoActiveModal);
+    };
+    const observer = new MutationObserver(schedule);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style', 'class']
+    });
+  }
+
+  // Keyboard: Backquote (`) / Tilde (~) / Home / ContextMenu to toggle menu.
+  // Tab is left entirely to the browser's native focus navigation (tab order).
   // When menu is visible: Arrow keys navigate, Enter/OK selects
+  initModalAutoFocus();
+
   document.addEventListener('keydown', (e) => {
-    // Allow Tab and Enter to work normally when any exam modal is open
+    // ---- Hybrid D-Pad Navigation: khi một Modal đang mở, toàn bộ phím mũi tên
+    // bị "bẫy focus" bên trong Modal đó, không cho lọt ra ngoài menu chính.
+    // (Riêng phím backquote/tilde vẫn cho phép toggle menu.)
+    const isMenuToggleKey =
+      e.key === '`' || e.key === '~' || e.key === 'Home' || e.key === 'ContextMenu';
+    const activeModal = getActiveModal();
+    if (activeModal && !isMenuToggleKey) {
+      handleModalKeydown(e, activeModal);
+      return; // Chặn mọi xử lý điều hướng menu phía dưới
+    }
+
+    // Allow Enter and Space to work normally when any exam modal is open
     const startExamModal = document.getElementById('start-exam-modal');
     const manualEntryModal = document.getElementById('manual-entry-modal');
     const isInStartExamModal = startExamModal && startExamModal.style.display === 'flex';
     const isInManualModal = manualEntryModal && manualEntryModal.style.display === 'flex';
     const isInAnyExamModal = isInStartExamModal || isInManualModal;
 
-    if (e.key === 'Tab' && isInAnyExamModal) {
-      return; // Let browser handle Tab navigation in exam modals
-    }
-
     if ((e.key === 'Enter' || e.key === ' ') && isInAnyExamModal) {
       return; // Let browser handle Enter/Space for form submission in exam modals
     }
 
-    if (e.key === 'Tab' || e.key === 'Home' || e.key === 'ContextMenu') {
+    // Toggle sidebar with backquote/tilde key (both Shift states for stability)
+    if (e.key === '`' || e.key === '~' || e.key === 'Home' || e.key === 'ContextMenu') {
       e.preventDefault();
       toggleSidebar();
       if (isMenuVisible()) {
@@ -454,46 +807,62 @@ function setupSidebar() {
       return;
     }
 
-    // Arrow-key navigation only when menu is visible
+    // Keyboard navigation only when menu is visible
     if (isMenuVisible()) {
       const items = getMenuItems();
       if (items.length === 0) return;
 
-      if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'OK' || e.key === 'Accept' || e.key === 'Enter' || e.keyCode === 18) {
-        e.preventDefault();
-        if (e.key === 'OK' || e.key === 'Accept' || e.key === 'Enter' || e.keyCode === 18) {
-          // OK/Accept/Enter key selects the focused item
-          const focused = items[menuFocusIndex];
-          if (focused) {
-            focused.click();
-            // If it's a nav button, trigger its action
-            if (focused.dataset.nav === 'settings') {
-              // Trigger settings
-              const settingsBtn = document.getElementById('settings-btn');
-              if (settingsBtn) settingsBtn.click();
-            } else if (focused.dataset.nav === 'calibration') {
-              // Trigger calibration
-              const calibBtn = document.getElementById('cc-calib-btn');
-              if (calibBtn) calibBtn.click();
-            } else if (focused.dataset.nav === 'fullscreen') {
-              // Trigger fullscreen
-              const fsBtn = document.getElementById('fullscreen-btn');
-              if (fsBtn) fsBtn.click();
-            }
-          }
-        } else {
-          menuFocusIndex = (menuFocusIndex + 1) % items.length;
-          updateMenuFocus();
-        }
-      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        menuFocusIndex = (menuFocusIndex - 1 + items.length) % items.length;
-        updateMenuFocus();
-      } else if (e.key === 'Enter' || e.key === ' ') {
-        // Enter / Space to select the focused module
+      // ---- Action keys: OK / Accept / Enter / Space / keyCode 18 ----
+      // These only click the currently focused item; they never move focus.
+      const isActionKey =
+        e.key === 'OK' ||
+        e.key === 'Accept' ||
+        e.key === 'Enter' ||
+        e.key === ' ';
+
+      if (isActionKey) {
         e.preventDefault();
         const focused = items[menuFocusIndex];
-        if (focused) focused.click();
+        if (focused) {
+          focused.click();
+          // If it's a nav button, trigger its action
+          if (focused.dataset.nav === 'settings') {
+            // Trigger settings
+            const settingsBtn = document.getElementById('settings-btn');
+            if (settingsBtn) settingsBtn.click();
+          } else if (focused.dataset.nav === 'calibration') {
+            // Trigger calibration
+            const calibBtn = document.getElementById('cc-calib-btn');
+            if (calibBtn) calibBtn.click();
+          } else if (focused.dataset.nav === 'fullscreen') {
+            // Trigger fullscreen
+            const fsBtn = document.getElementById('fullscreen-btn');
+            if (fsBtn) fsBtn.click();
+          }
+        }
+        return;
+      }
+
+      // ---- Arrow keys: 2D spatial navigation ----
+      let direction = null;
+      if (e.key === 'ArrowUp') direction = 'up';
+      else if (e.key === 'ArrowDown') direction = 'down';
+      else if (e.key === 'ArrowLeft') direction = 'left';
+      else if (e.key === 'ArrowRight') direction = 'right';
+
+      if (direction) {
+        e.preventDefault();
+        // If nothing is focused yet, start at the first element
+        if (menuFocusIndex === -1) {
+          menuFocusIndex = 0;
+          updateMenuFocus();
+          return;
+        }
+        const newIndex = findClosestElementInDirection(menuFocusIndex, direction, items);
+        if (newIndex !== -1) {
+          menuFocusIndex = newIndex;
+          updateMenuFocus();
+        }
       }
     }
   });
@@ -583,8 +952,34 @@ function setupDisplay() {
     targetSelector: '#app',
     autoApply: true,
   });
-  displayManager.wireSettingsButton();
   window.__displayManager = displayManager;
+
+  // Nút Bánh răng trên Sidebar Header → mở thẳng màn hình "Hiệu chỉnh thước đo"
+  // (không còn Menu Popup "Cài đặt hiển thị" trung gian nào nữa).
+  function setupSettingsButton() {
+    const settingsBtn = document.getElementById('settings-btn');
+    if (settingsBtn) {
+      settingsBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (window.__calibrator && typeof window.__calibrator.showModal === 'function') {
+          window.__calibrator.showModal();
+        } else {
+          console.error('[Main] window.__calibrator is not initialized!');
+        }
+      });
+    } else {
+      console.error('[Main] Settings button (#settings-btn) not found in DOM!');
+    }
+  }
+
+  // Đợi DOM ready nếu cần
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupSettingsButton);
+  } else {
+    setupSettingsButton();
+  }
+
   return displayManager;
 }
 
@@ -596,16 +991,8 @@ let calibrator = null;
 
 function setupCalibrator() {
   calibrator = new DisplayCalibrator({ autoLoad: true });
-  displayManager.addFooterAction('🔧 Hiệu chỉnh màn hình', () => {
-    displayManager.hideModal();
-    setTimeout(() => calibrator.showModal(), 200);
-  });
   // Rào cản #1: Hiệu chuẩn vật lý bằng thẻ tín dụng (chính xác nhất)
   const ccCal = new CreditCardCalibrator({ calibrator });
-  displayManager.addFooterAction('💳 Hiệu chuẩn thẻ tín dụng (85.6mm)', () => {
-    // Mở trực tiếp — không qua settings, không setTimeout mong manh.
-    ccCal.showModal();
-  });
 
   // Nút riêng trên header sidebar — mở trực tiếp, không cần qua settings.
   // Đảm bảo DOM đã load xong

@@ -76,6 +76,10 @@ class MaddoxGridModule {
         
         // Kích hoạt render lần đầu
         setTimeout(() => { this.resize(); }, 100);
+
+        // Auto-focus ô IPD ngay khi module mở (dùng polling helper an toàn)
+        this._startPollingFocus('maddox-ipd', '[MaddoxGrid] Đã auto-focus vào ô IPD', '[MaddoxGrid] Lỗi: Không tìm thấy ô IPD');
+
         this._renderLoop();
     }
 
@@ -128,8 +132,9 @@ class MaddoxGridModule {
     _buildLayout() {
         // 1. Wrapper tràn viền đen tuyệt đối
         this.wrapper = document.createElement('div');
-        // z-index: 9999 — đảm bảo Maddox overlay nằm trên mọi content khác nhưng dưới system HUD/menu
-        this.wrapper.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000000; z-index: 9999; overflow: hidden;';
+        // z-index: 40 — đủ cao để che nội dung display-board, nhưng thấp hơn sidebar menu
+        // để menu có thể trượt lên đè trên nền đen của Maddox khi mở (~).
+        this.wrapper.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000000; z-index: 40; overflow: hidden;';
         
         // 2. Canvas trải rộng 100% không gian
         // z-index: 10 — thấp hơn wrapper, pointer-events: auto chỉ trên canvas để bắt click vẽ lưới
@@ -244,7 +249,7 @@ class MaddoxGridModule {
         // (Tab navigation, Enter submit, số nhập IPD/Hd/Hn).
         // KHÔNG chặn các phím hệ thống: ~, ESC, H, P, R, Tab (để UniversalInput xử lý).
         this.sidebar.addEventListener('keydown', (e) => {
-            const systemKeys = ['Escape', '~', '`', 'Tab', 'h', 'H', 'p', 'P', 'r', 'R'];
+            const systemKeys = ['Escape', '~', '`', 'Tab', 'Home', 'ContextMenu', 'h', 'H', 'p', 'P', 'r', 'R'];
             if (systemKeys.includes(e.key)) {
                 // Không gọi stopPropagation — để sự kiện lọt lên UniversalInput
                 return;

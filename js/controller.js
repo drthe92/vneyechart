@@ -219,8 +219,9 @@ class UniversalInput {
     if (e.repeat) return;
 
     // 3. Handle non-standard keys by keyCode (flying mouse OK button)
-    if (e.keyCode === 18 || e.keyCode === 123) {
-      const keyCodeStr = e.keyCode === 18 ? '18' : '123';
+    // LƯU Ý: ĐÃ LOẠI BỎ keyCode 18 (Alt) — phím Alt không được dùng để mô phỏng
+    // OK/Enter nữa, tránh xung đột với tổ hợp hệ thống như Alt + Tab.
+    if (e.keyCode === 123) {
       this._emit('NEXT', { source: 'keyboard', key: 'OK', keyCode: e.keyCode });
       e.preventDefault();
       return;

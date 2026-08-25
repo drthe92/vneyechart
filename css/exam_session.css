@@ -714,6 +714,23 @@
     outline-offset: 2px;
 }
 
+/* Keyboard 2D navigation (nav-btn).
+   Cac nut chuc nang tren header (start/end-exam, history, clinic-settings)
+   mang class .nav-btn de thuat toan dieu huong ban phim 2D trong main.js
+   (updateMenuFocus) nhan dien va gan vong focus:
+       outline: 3px solid var(--sidebar-accent); outline-offset: 2px;
+   Trinh duyet hien dai ve outline theo border-radius, nen vong focus om
+   tron bo goc var(--radius-md) cua .exam-btn. */
+.exam-btn.nav-btn {
+    outline: none;
+    outline-offset: 2px;
+}
+
+.exam-btn.nav-btn:focus-visible {
+    outline: 3px solid var(--sidebar-accent);
+    outline-offset: 2px;
+}
+
 /* ===== FLOATING ACTION BUTTON (FAB) ===== */
 .manual-save-fab {
     position: fixed;
