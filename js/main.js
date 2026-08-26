@@ -18,6 +18,7 @@ import snellenChart       from '../modules/snellen_chart.js';
 import leaModule          from '../modules/lea_symbols.js';
 import landoltCModule     from '../modules/landolt_c.js';
 import tumblingEModule    from '../modules/tumbling_e.js';
+import autoBcvaCrowdingModule from '../modules/auto_BCVA_tumbling_e_for_amblyopia.js';
 import numberChartModule  from '../modules/number_chart.js';
 import hotvModule         from '../modules/hotv.js';
 import aucklandLogmar     from '../modules/auckland_logmar.js';
@@ -190,6 +191,7 @@ registerTestModule(leaModule);             // id: 'far-vision-lea'
 // New standardised optotype modules
 registerTestModule(landoltCModule);        // id: 'far-vision-landolt'
 registerTestModule(tumblingEModule);       // id: 'far-vision-tumbling-e'
+registerTestModule(autoBcvaCrowdingModule); // id: 'far-vision-auto-bcva-crowding'
 registerTestModule(numberChartModule);      // id: 'far-vision-numbers'
 registerTestModule(aucklandLogmar);         // id: 'far-vision-auckland'
 

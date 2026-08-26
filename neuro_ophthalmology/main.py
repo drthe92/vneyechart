@@ -16,6 +16,7 @@ Usage:
 
 import sys
 import os
+import argparse
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -24,6 +25,7 @@ import pygame
 
 from neuro_ophthalmology.calibration import ScreenInfo
 from neuro_ophthalmology.ui import MainMenu
+from neuro_ophthalmology.okn_test import OKNTest, Direction
 
 
 # ================================================================
@@ -69,6 +71,23 @@ def init_pygame() -> pygame.Surface:
 
 def main():
     """Hàm chính của ứng dụng."""
+    parser = argparse.ArgumentParser(description="Neuro-Ophthalmology Test Suite")
+    parser.add_argument(
+        "--test-okn",
+        action="store_true",
+        help="Chạy thẳng bài test Optokinetic Nystagmus (bỏ qua menu)",
+    )
+    parser.add_argument("--cpd", type=float, default=2.0, help="Spatial frequency (cpd)")
+    parser.add_argument("--vel", type=float, default=20.0, help="Angular velocity (deg/s)")
+    parser.add_argument(
+        "--dir",
+        dest="direction",
+        choices=["ltr", "rtl", "up", "down"],
+        default="ltr",
+        help="Hướng chuyển động của sọc",
+    )
+    args = parser.parse_args()
+
     try:
         screen = init_pygame()
     except pygame.error as e:
@@ -78,9 +97,26 @@ def main():
     # Screen calibration
     screen_info = ScreenInfo()
 
-    # Menu loop
-    menu = MainMenu(screen, screen_info)
-    menu.run()
+    if args.test_okn:
+        # === Chạy trực tiếp bài test OKN ===
+        direction_map = {
+            "ltr": Direction.LEFT_TO_RIGHT,
+            "rtl": Direction.RIGHT_TO_LEFT,
+            "up": Direction.UP,
+            "down": Direction.DOWN,
+        }
+        okn = OKNTest(
+            screen,
+            screen_info,
+            cpd=args.cpd,
+            ang_vel=args.vel,
+            direction=direction_map[args.direction],
+        )
+        okn.run()
+    else:
+        # Menu loop
+        menu = MainMenu(screen, screen_info)
+        menu.run()
 
     # Cleanup
     pygame.quit()
