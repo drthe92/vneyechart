@@ -1861,9 +1861,27 @@
     function allowTypingInModal(modalElement) {
         if (!modalElement) return;
 
+        // Track IME composition state for inputs inside the modal
+        let isComposing = false;
+
         const stopGlobalHotkeys = (e) => {
-            // Allow Escape/Backspace to bubble up so main.js can close the modal
-            if (e.key === 'Escape' || e.key === 'Backspace') return;
+            // Allow Escape to bubble up so main.js can close the modal
+            if (e.key === 'Escape') return;
+
+            // Allow Backspace to bubble up ONLY when not inside an input/textarea
+            // This lets users delete text inside inputs without triggering global hotkeys
+            if (e.key === 'Backspace') {
+                const tagName = e.target.tagName.toUpperCase();
+                if (tagName === 'INPUT' || tagName === 'TEXTAREA') {
+                    // Stop propagation for Backspace inside input/textarea to prevent
+                    // global hotkeys from firing, but do NOT return (let it bubble for deletion)
+                    e.stopPropagation();
+                    return;
+                }
+                // Backspace outside input/textarea: allow normal bubbling
+                return;
+            }
+
             const tagName = e.target.tagName.toUpperCase();
             // If user is typing in Input, Textarea, Select, or Button
             if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || tagName === 'BUTTON') {
@@ -1872,9 +1890,24 @@
             }
         };
 
+        // Handle IME composition start/end to block global hotkeys during Vietnamese typing
+        const handleCompositionStart = (e) => {
+            isComposing = true;
+            e.stopPropagation();
+        };
+
+        const handleCompositionEnd = (e) => {
+            isComposing = false;
+            e.stopPropagation();
+        };
+
         modalElement.addEventListener('keydown', stopGlobalHotkeys, true);
         modalElement.addEventListener('keyup', stopGlobalHotkeys, true);
         modalElement.addEventListener('keypress', stopGlobalHotkeys, true);
+
+        // Listen for composition events on the modal and all its children
+        modalElement.addEventListener('compositionstart', handleCompositionStart, true);
+        modalElement.addEventListener('compositionend', handleCompositionEnd, true);
     }
 
     // ===== CLINIC SETTINGS MODULE =====

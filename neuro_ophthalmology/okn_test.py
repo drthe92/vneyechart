@@ -103,11 +103,14 @@ class OKNTest:
             self.stripe_width = 1
 
     def set_cpd(self, cpd: float):
-        self.cpd = max(0.5, min(40.0, cpd))
+        # Mở rộng dải kích thích lâm sàng: cho phép sọc rất lớn (0.1 cpd)
+        # hoặc rất nhuyễn (60 cpd)
+        self.cpd = max(0.1, min(60.0, cpd))
         self._recalc()
 
     def set_ang_vel(self, vel: float):
-        self.ang_vel = max(15.0, min(40.0, vel))
+        # Mở rộng dải vận tốc góc cho bài test đo ngưỡng giật nhãn cầu
+        self.ang_vel = max(2.0, min(120.0, vel))
         self._recalc()
 
     def set_direction(self, direction: Direction):
@@ -138,9 +141,9 @@ class OKNTest:
             num_stripes = total_width // self.stripe_width + 3
 
             for i in range(-1, num_stripes + 1):
-                x = int(round(i * self.stripe_width - self.offset)) % (2 * self.stripe_width)
-                if x > self.stripe_width:
-                    x -= 2 * self.stripe_width
+                # Công thức tọa độ chuẩn: x_i = i * w - Δ_offset
+                # Không dùng modulo => giữ nguyên toàn bộ trường nhìn (FOV)
+                x = int(round(i * self.stripe_width - self.offset))
 
                 # Xác định màu dựa trên index
                 color = WHITE if (i % 2 == 0) else BLACK
@@ -154,9 +157,9 @@ class OKNTest:
             num_stripes = total_height // self.stripe_width + 3
 
             for i in range(-1, num_stripes + 1):
-                y = int(round(i * self.stripe_width - self.offset)) % (2 * self.stripe_width)
-                if y > self.stripe_width:
-                    y -= 2 * self.stripe_width
+                # Công thức tọa độ chuẩn: y_i = i * w - Δ_offset
+                # Không dùng modulo => giữ nguyên toàn bộ trường nhìn (FOV)
+                y = int(round(i * self.stripe_width - self.offset))
 
                 color = WHITE if (i % 2 == 0) else BLACK
                 pygame.draw.rect(
@@ -206,10 +209,12 @@ class OKNTest:
 
         displacement = self.velocity_px_s * dt
 
+        # Vector vận tốc: với x_i = i * w - offset, để điểm ảnh chạy sang
+        # phải (x tăng) thì offset phải GIẢM, và ngược lại.
         if self.direction == Direction.LEFT_TO_RIGHT:
-            self.offset += displacement
-        elif self.direction == Direction.RIGHT_TO_LEFT:
             self.offset -= displacement
+        elif self.direction == Direction.RIGHT_TO_LEFT:
+            self.offset += displacement
         elif self.direction == Direction.UP:
             self.offset += displacement
         elif self.direction == Direction.DOWN:

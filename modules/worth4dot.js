@@ -109,46 +109,104 @@ const worth4dot = {
         position: absolute; 
         top: 0; 
         right: 0; 
-        width: 210px; 
-        height: 100%; 
+        width: 210px;
+        height: calc(100% - 90px);
+        border-bottom-left-radius: 12px;
         box-sizing: border-box; 
         color: #333; 
         font-family: sans-serif; 
         background: rgba(255,255,255,0.95); 
-        padding: 30px 20px; 
+        padding: 12px 10px;
         border-left: 1px solid #ddd; 
         box-shadow: -4px 0 15px rgba(0,0,0,0.05); 
         z-index: 10; 
         display: flex; 
         flex-direction: column; 
-        overflow-y: auto;
+        overflow: hidden;
       ">
         
-        <div style="border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 20px;">
-          <div style="font-size: 14px; font-weight: 600; color: #666; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Khoảng cách mô phỏng</div>
+        <div style="border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 10px;">
+          <div style="font-size: 12px; font-weight: 600; color: #666; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px;">Khoảng cách mô phỏng</div>
           <div style="display: flex; justify-content: space-between; align-items: baseline;">
-            <span style="font-size: 32px; font-weight: bold; color: #0056b3;">${spacing}</span>
+            <span style="font-size: 24px; font-weight: bold; color: #0056b3;">${spacing}</span>
             <span style="font-size: 14px; font-weight: bold; color: #999;">[${index + 1} / ${SPACING_STEPS.length}]</span>
           </div>
-          <div style="font-size: 14px; color: #555; margin-top: 4px;">Góc thị giác: <strong>${visualAngle}°</strong></div>
+          <div style="font-size: 12px; color: #555; margin-top: 2px;">Góc thị giác: <strong>${visualAngle}°</strong></div>
         </div>
 
-        <div style="font-size: 14px; color: #444; line-height: 1.6; margin-bottom: 20px; flex-grow: 1;">
-          <strong>Chỉ định:</strong> Trẻ đeo kính Đỏ/Xanh. Báo cáo <strong>số lượng</strong> và <strong>hình dạng</strong> các khối đen nhìn thấy.
+        <div style="font-size: 12.5px; color: #444; line-height: 1.4; margin-bottom: 8px; flex-grow: 1;">
+          <strong>Chỉ định:</strong> Mắt phải đeo kính Đỏ, mắt trái đeo kính Xanh. Báo cáo <strong>số lượng</strong> và <strong>hình dạng</strong> các khối đen nhìn thấy.
           
-          <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 15px; margin-top: 20px;">
-            <div style="font-size: 12px; font-weight: bold; color: #666; margin-bottom: 10px;">ĐIỀU KHIỂN BÀN PHÍM</div>
-            <div style="font-size: 13px; color: #444; display: flex; flex-direction: column; gap: 10px;">
-              <div><kbd style="background: #fff; border: 1px solid #ccc; padding: 3px 8px; border-radius: 4px; font-family: monospace;">Space</kbd> : Đảo kênh Đỏ/Chung</div>
-              <div><kbd style="background: #fff; border: 1px solid #ccc; padding: 3px 8px; border-radius: 4px; font-family: monospace;">F</kbd> : Chế độ Cover-Uncover</div>
+          <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 8px; margin-top: 8px;">
+            <div style="font-size: 11px; font-weight: bold; color: #666; margin-bottom: 4px;">ĐIỀU KHIỂN BÀN PHÍM</div>
+            <div style="font-size: 11px; color: #444; display: flex; flex-direction: column; gap: 4px;">
+              <div><kbd style="background: #fff; border: 1px solid #ccc; padding: 1px 5px; border-radius: 4px; font-family: monospace;">Space</kbd> : Đảo kênh Đỏ/Chung</div>
+              <div><kbd style="background: #fff; border: 1px solid #ccc; padding: 1px 5px; border-radius: 4px; font-family: monospace;">F</kbd> : Chế độ Cover-Uncover</div>
             </div>
           </div>
         </div>
 
+        <div style="margin-bottom: 8px;">
+          <div style="font-size: 11px; font-weight: bold; color: #666; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">GHI NHẬN KẾT QUẢ</div>
+          <button class="w4d-res-btn" data-res="Hợp thị (4 hình)" style="
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 5px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            border: 1px solid #ccc;
+            background: #fff;
+            color: #28a745;
+            border-radius: 4px;
+            text-align: left;
+          ">Hợp thị (4 hình)</button>
+          <button class="w4d-res-btn" data-res="Ức chế Mắt Phải (3 hình xanh)" style="
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 5px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            border: 1px solid #ccc;
+            background: #fff;
+            border-radius: 4px;
+            text-align: left;
+          ">Ức chế Mắt Phải (3 hình xanh)</button>
+          <button class="w4d-res-btn" data-res="Ức chế Mắt Trái (2 hình đỏ)" style="
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 5px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            border: 1px solid #ccc;
+            background: #fff;
+            border-radius: 4px;
+            text-align: left;
+          ">Ức chế Mắt Trái (2 hình đỏ)</button>
+          <button class="w4d-res-btn" data-res="Song thị (5 hình)" style="
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 5px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            border: 1px solid #ccc;
+            background: #fff;
+            border-radius: 4px;
+            text-align: left;
+          ">Song thị (5 hình)</button>
+        </div>
+
         <button id="worth4dot-flicker-btn" style="
           width: 100%;
-          padding: 14px;
-          font-size: 14px;
+          padding: 10px;
+          font-size: 12px;
           font-weight: bold;
           cursor: pointer;
           background: ${this._flickerTimer ? '#28a745' : '#6c757d'};
@@ -174,6 +232,30 @@ const worth4dot = {
           this.toggleFlicker();
         });
       }
+
+      // Ghi nhận kết quả lâm sàng -> phát sự kiện visionTestCompleted cho EMR
+      const resBtns = board.querySelectorAll('.w4d-res-btn');
+      resBtns.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const payload = {
+            test_type: 'Worth 4 Dot',
+            clinical_metrics: {
+              'Kết quả': btn.dataset.res,
+              'Khoảng cách': spacing,
+              'Góc thị giác': visualAngle + '°',
+              'Đảo kênh': this._isInverted ? 'Có' : 'Không'
+            }
+          };
+          document.dispatchEvent(new CustomEvent('visionTestCompleted', { detail: payload, bubbles: true }));
+
+          // Visual feedback: nền xanh lá nhạt trong 300ms
+          const originalBg = btn.style.background;
+          btn.style.background = '#d4edda';
+          setTimeout(() => {
+            btn.style.background = originalBg;
+          }, 300);
+        });
+      });
     }
   },
 
