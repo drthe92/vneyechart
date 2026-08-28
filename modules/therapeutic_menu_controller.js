@@ -611,7 +611,7 @@ class TherapeuticMenuController {
             console.log(`[Therapeutic] Started ${module.name} successfully`, config);
         } catch (error) {
             console.error("[LỖI ENGINE NGHIÊM TRỌNG]:", error);
-            alert("Không thể khởi động bài tập. Vui lòng xem Console.");
+            alert((error && error.message) ? error.message : "Không thể khởi động bài tập. Vui lòng xem Console.");
         }
     }
 }
