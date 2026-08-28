@@ -6,6 +6,7 @@ import RDSTherapyGame from './rds_therapy_game.js';
 import DivergenceTherapyGame from './divergence_therapy_game.js';
 import CamVisualStimulatorGame from './cam_visual_stimulator_game.js';
 import AntiCrowdingGame from './anti_crowding_game.js';
+import RedConeStimulatorGame from './red_cone_stimulator_game.js';
 
 /**
  * Therapeutic Menu Controller (Lazy Binding Architecture)
@@ -19,6 +20,7 @@ import AntiCrowdingGame from './anti_crowding_game.js';
  * - M6: Huấn luyện Phân kỳ (DivergenceTherapyGame)
  * - M7: Kích thích Lưới quay CAM (CamVisualStimulatorGame)
  * - M8: Khử hiện tượng chen chúc (AntiCrowdingGame)
+ * - M9: Kích thích tế bào nón hoàng điểm (RedConeStimulatorGame)
  */
 
 class TherapeuticMenuController {
@@ -269,6 +271,36 @@ class TherapeuticMenuController {
                     }
                 ],
                 mandatoryWarning: '⚠️ BẮT BUỘC: CHỈ MỞ MẮT NHƯỢC THỊ (BỊT MẮT LÀNH). Tuyệt đối không sử dụng kính Đỏ-Lục Lam (Anaglyph).'
+            },
+            {
+                id: 'red-cone',
+                name: 'M9: Kích thích tế bào nón hoàng điểm (RED-Cone)',
+                classRef: RedConeStimulatorGame,
+                stage: 'Giai đoạn 1: Đánh thức Hoàng điểm (Monocular Pleoptics)',
+                parentTranslation: 'Kích thích vùng hoàng điểm bằng ánh sáng đỏ, ép mắt yếu phải làm việc trong bóng tối.',
+                medicalPurpose: 'Sử dụng phương pháp Brinker-Katz. Vô hiệu hóa tế bào que chu biên bằng ánh sáng đỏ thuần, ép kích hoạt tế bào nón hoàng điểm.',
+                indication: 'Nhược thị sâu (Thị lực < 2/10), định thị ngoại tâm dai dẳng.',
+                contraindication: 'KHÔNG DÙNG cho bệnh nhân động kinh ánh sáng.',
+                gameplay: 'Tắt đèn phòng. Bịt mắt sáng. Tìm và chỉ hướng chữ E màu đỏ trên nền đen.',
+                goal: 'Đạt độ chính xác > 85%, thời gian phản xạ < 1.5s.',
+                settings: [
+                    {
+                        id: 'red-cone-target-size', key: 'targetSize', label: 'Kích thước mục tiêu', numeric: false,
+                        options: [
+                            { value: 'Lớn', label: 'Lớn', selected: false },
+                            { value: 'Vừa', label: 'Vừa', selected: true },
+                            { value: 'Nhỏ', label: 'Nhỏ', selected: false }
+                        ]
+                    },
+                    {
+                        id: 'red-cone-display-time', key: 'displayTime', label: 'Thời gian hiển thị', numeric: false,
+                        options: [
+                            { value: 'unlimited', label: 'Không giới hạn', selected: true },
+                            { value: '3000', label: '3 giây', selected: false }
+                        ]
+                    }
+                ],
+                mandatoryWarning: '⚠️ BẮT BUỘC: CHỈ MỞ MẮT NHƯỢC THỊ. Hãy TẮT ĐÈN phòng tập.'
             }
         ];
 
