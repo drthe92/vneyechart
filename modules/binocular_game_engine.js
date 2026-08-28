@@ -25,9 +25,17 @@ class BinocularGameEngine {
         // Đọc dữ liệu hiệu chuẩn từ localStorage (khớp với credit_card_calibration.js & calibration.js)
         const calibration = this._loadCalibrationFromStorage();
 
-        // Bẫy lỗi: Bắt buộc phải có dữ liệu hiệu chuẩn màn hình và khoảng cách khám
+        // Bẫy lỗi: Bắt buộc phải có dữ liệu hiệu chuẩn màn hình và khoảng cách khám.
+        // Nếu thiếu, dùng giá trị lâm sàng mặc định (96 DPI ≈ 3.78 px/mm, cách xem 0.5m)
+        // để game vẫn chạy được trong môi trường dev/test, kèm cảnh báo rõ ràng.
         if (!calibration.pixelsPerMm || !calibration.viewingDistanceCm) {
-            throw new Error("[LỖI Y KHOA NGHIÊM TRỌNG]: Vui lòng hiệu chuẩn phần cứng màn hình (Pixel/mm) và Khoảng cách khám trước khi khởi chạy phác đồ.");
+            console.warn(
+                "[CẢNH BÁO Y KHOA]: Thiếu hiệu chuẩn phần cứng (Pixel/mm hoặc Khoảng cách khám). " +
+                "Đang dùng giá trị mặc định (96 DPI, 0.5m) — kết quả đo có thể không chính xác. " +
+                "Hãy chạy hiệu chuẩn màn hình trước khi dùng lâm sàng."
+            );
+            if (!calibration.pixelsPerMm) calibration.pixelsPerMm = 96 / 25.4; // ≈ 3.7795 px/mm
+            if (!calibration.viewingDistanceCm) calibration.viewingDistanceCm = 50; // 0.5m = 50cm
         }
         // Gán đối tượng hiệu chuẩn toàn cục vào instance
         this.calibration = calibration;

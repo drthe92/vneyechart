@@ -160,12 +160,12 @@ class UniversalInput {
     doc.addEventListener('mousedown', this._boundMouseDown);
     win.addEventListener('contextmenu', this._boundContextMenu);
 
-    // Wheel (bỏ passive để có thể gọi e.preventDefault() chặn scroll trang)
-    doc.addEventListener('wheel', this._boundWheel);
+    // Wheel (passive:false để có thể gọi e.preventDefault() chặn scroll trang)
+    doc.addEventListener('wheel', this._boundWheel, { passive: false });
 
-    // Touch (bỏ passive để có thể gọi e.preventDefault() chặn swipe Back/Forward)
-    doc.addEventListener('touchstart', this._boundTouchStart);
-    doc.addEventListener('touchmove',  this._boundTouchMove);
+    // Touch (passive:false để có thể gọi e.preventDefault() chặn swipe Back/Forward)
+    doc.addEventListener('touchstart', this._boundTouchStart, { passive: false });
+    doc.addEventListener('touchmove',  this._boundTouchMove,  { passive: false });
     doc.addEventListener('touchend',   this._boundTouchEnd);
   }
 
