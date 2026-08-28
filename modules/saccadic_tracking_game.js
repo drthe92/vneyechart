@@ -12,6 +12,8 @@
  * - Hiển thị overlay kết quả: Xanh nếu avgLatency <= 400ms, Đỏ nếu > 400ms
  */
 
+import BinocularGameEngine from './binocular_game_engine.js';
+
 class SaccadicTrackingGame extends BinocularGameEngine {
     /**
      * Khởi tạo game Saccadic Tracking
@@ -281,3 +283,5 @@ class SaccadicTrackingGame extends BinocularGameEngine {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { SaccadicTrackingGame };
 }
+
+export default SaccadicTrackingGame;

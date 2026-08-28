@@ -10,6 +10,8 @@
  * - Áp dụng thủ thuật Central Check (Chữ E trắng) để chống ức chế luân phiên
  */
 
+import BinocularGameEngine from './binocular_game_engine.js';
+
 class VergenceTrackerGame extends BinocularGameEngine {
     /**
      * Khởi tạo trò chơi Vergence Tracker
@@ -283,3 +285,5 @@ class VergenceTrackerGame extends BinocularGameEngine {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { VergenceTrackerGame };
 }
+
+export default VergenceTrackerGame;

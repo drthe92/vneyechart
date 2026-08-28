@@ -9,6 +9,8 @@
  * - Lưu avgTherapyArcsec (trung bình 5 lần khó nhất) vào customData
  */
 
+import BinocularGameEngine from './binocular_game_engine.js';
+
 class RDSTherapyGame extends BinocularGameEngine {
     /**
      * Khởi tạo Game Logic RDS Therapy
@@ -572,3 +574,5 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.RDSTherapyGame = RDSTherapyGame;
 }
+
+export default RDSTherapyGame;

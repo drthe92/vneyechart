@@ -362,3 +362,5 @@ class BinocularGameEngine {
 if (typeof window !== 'undefined') {
     window.BinocularGameEngine = BinocularGameEngine;
 }
+
+export default BinocularGameEngine;

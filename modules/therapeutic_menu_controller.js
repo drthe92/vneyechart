@@ -1,13 +1,24 @@
+import CatchGame from './anti_suppression_catch.js';
+import ShapeAlignmentGame from './shape_alignment.js';
+import VergenceTrackerGame from './vergence_tracker_game.js';
+import SaccadicTrackingGame from './saccadic_tracking_game.js';
+import RDSTherapyGame from './rds_therapy_game.js';
+import DivergenceTherapyGame from './divergence_therapy_game.js';
+import CamVisualStimulatorGame from './cam_visual_stimulator_game.js';
+import AntiCrowdingGame from './anti_crowding_game.js';
+
 /**
  * Therapeutic Menu Controller (Lazy Binding Architecture)
  *
- * Quản lý giao diện và vòng đời 6 Game module trong khu vực Huấn luyện Thị giác:
+ * Quản lý giao diện và vòng đời 8 Game module trong khu vực Huấn luyện Thị giác:
  * - M1: Hứng hạt (CatchGame)
  * - M2: Khớp khung (ShapeAlignmentGame)
  * - M3: Vận nhãn (VergenceTrackerGame)
  * - M4: Vận nhãn nhanh (SaccadicTrackingGame)
  * - M5: Huấn luyện Thị giác nổi (RDSTherapyGame)
  * - M6: Huấn luyện Phân kỳ (DivergenceTherapyGame)
+ * - M7: Kích thích Lưới quay CAM (CamVisualStimulatorGame)
+ * - M8: Khử hiện tượng chen chúc (AntiCrowdingGame)
  */
 
 class TherapeuticMenuController {
@@ -21,49 +32,243 @@ class TherapeuticMenuController {
                 id: 'catch',
                 name: 'M1: Hứng hạt',
                 classRef: CatchGame,
-                purpose: 'Cải thiện độ nhạy tương phản của mắt nhược thị bằng cách giảm dần tín hiệu ở mắt lành, ép não bộ xóa bỏ ám điểm ức chế.',
-                instruction: 'Dùng chuột di chuyển thanh ngang để hứng các hạt màu rơi xuống.',
-                target: 'Đạt 80 điểm để hoàn thành bài tập.'
+                stage: 'Giai đoạn 2: Phá vỡ Ức chế (Đeo kính Đỏ - Xanh)',
+                parentTranslation: 'Dạy não bộ không được "bỏ rơi" mắt yếu. Game sẽ làm mờ hình ở mắt khỏe và làm rõ hình ở mắt yếu để bắt 2 mắt phải làm việc đều nhau.',
+                medicalPurpose: 'Phá vỡ ức chế, khôi phục hợp thị thô.',
+                indication: 'Trẻ đã nhìn khá hơn (> 2/10) nhưng khi mở cả 2 mắt vẫn hay nheo một mắt.',
+                contraindication: 'Đeo ngược kính (Bắt buộc: Phải Đỏ - Trái Xanh).',
+                gameplay: 'Di chuyển thanh ngang để hứng hạt rơi. Hứng trúng +1, trượt -1.',
+                goal: 'Đạt 30 điểm. Khi đó độ tương phản của 2 mắt đạt mức cân bằng (50%).',
+                settings: [
+                    {
+                        id: 'catch-fall-speed', key: 'fallSpeed', label: 'Tốc độ rơi', numeric: false,
+                        options: [
+                            { value: 'slow', label: 'Chậm', selected: true },
+                            { value: 'medium', label: 'Vừa', selected: false },
+                            { value: 'fast', label: 'Nhanh', selected: false }
+                        ]
+                    },
+                    {
+                        id: 'catch-bar-size', key: 'barSize', label: 'Kích thước thanh hứng', numeric: false,
+                        options: [
+                            { value: 'large', label: 'To', selected: true },
+                            { value: 'medium', label: 'Vừa', selected: false },
+                            { value: 'small', label: 'Nhỏ', selected: false }
+                        ]
+                    }
+                ],
+                mandatoryWarning: '⚠️ CẢNH BÁO: Đeo kính Đỏ-Lục Lam (Mắt phải ĐỎ / Mắt trái XANH) trước khi chơi.'
             },
             {
                 id: 'align',
                 name: 'M2: Khớp khung',
                 classRef: ShapeAlignmentGame,
-                purpose: 'Rèn luyện Foveal Focus và Hiệu ứng đám đông (Crowding Effect).',
-                instruction: 'YÊU CẦU LÂM SÀNG: Mắt nhược thị đeo kính Lục Lam (Cyan), mắt lành đeo kính Đỏ. Dùng chuột kéo khối đặc lọt khít vào khung rỗng và giữ yên.',
-                target: 'Hoàn thành 10 cấp độ. Kích thước hình sẽ thu nhỏ dần và nhiễu (Crowding) sẽ tăng lên. Giữ khớp liên tục 2 giây để qua bàn.'
+                stage: 'Giai đoạn 2: Phá vỡ Ức chế (Đeo kính Đỏ - Xanh)',
+                parentTranslation: 'Rèn luyện sự tỉ mỉ. Ép mắt yếu phải khóa chặt mục tiêu trong khi mắt khỏe chỉ nhìn thấy khung nền.',
+                medicalPurpose: 'Định thị trung tâm trong điều kiện 2 mắt.',
+                indication: 'Thị lực >= 2/10, hết định thị lệch tâm.',
+                contraindication: 'Không có.',
+                gameplay: 'Dùng chuột kéo khối màu đặc thả lọt khít vào khung rỗng và giữ yên 2 giây.',
+                goal: 'Hoàn thành 10 cấp độ mà không bị trượt tay.',
+                settings: [
+                    {
+                        id: 'align-levels', key: 'levels', label: 'Số lượng cấp độ', numeric: true,
+                        options: [
+                            { value: '5', label: '5 bàn', selected: true },
+                            { value: '10', label: '10 bàn', selected: false },
+                            { value: '15', label: '15 bàn', selected: false }
+                        ]
+                    }
+                ],
+                mandatoryWarning: '⚠️ CẢNH BÁO: Đeo kính Đỏ-Lục Lam (Mắt phải ĐỎ / Mắt trái XANH) trước khi chơi.'
             },
             {
                 id: 'vergence',
                 name: 'M3: Vận nhãn',
                 classRef: VergenceTrackerGame,
-                purpose: 'Mở rộng biên độ vận nhãn.',
-                instruction: "YÊU CẦU LÂM SÀNG: Mắt Trái đeo kính Lục Lam (Cyan), Mắt Phải đeo kính Đỏ. Tập trung nhìn vào KHỐI CHỮ NHẬT ở giữa màn hình và cố gắng giữ nó thành một khối duy nhất. BẤM PHÍM SPACE ngay khi khối chữ nhật BỊ TÁCH ĐÔI thành 2 màu xanh/đỏ riêng biệt.",
-                target: 'Đo lường biên độ vận nhãn. Mục tiêu lâm sàng ở khoảng cách 50cm: Hội tụ (Base-Out) ≥ 15 Δ và Phân kỳ (Base-In) ≥ 8 Δ.'
+                stage: 'Giai đoạn 3: Tập gym cơ mắt (Vận nhãn cơ học)',
+                parentTranslation: 'Giống như tập tạ, bài tập này giúp hai mắt có lực để kéo chụm vào nhau khi đọc sách, nhìn gần, chống mỏi mắt.',
+                medicalPurpose: 'Tăng biên độ hội tụ (Base Out).',
+                indication: 'Lác ngoài (Exotropia) ẩn, mỏi mắt khi học bài, lờ đờ.',
+                contraindication: 'Đang bị liệt cơ vận nhãn.',
+                gameplay: 'Nhìn tập trung để 2 khối màu chập thành 1. Khi 2 khối bị tách làm đôi (vỡ hình), bấm ngay phím SPACE.',
+                goal: 'Chịu đựng được mức hội tụ 15 Đi-ốp (Δ).',
+                settings: [
+                    {
+                        id: 'vergence-start', key: 'startDiopter', label: 'Mức lăng kính xuất phát (Δ)', numeric: true,
+                        options: [
+                            { value: '2', label: '2 Δ', selected: true },
+                            { value: '4', label: '4 Δ', selected: false },
+                            { value: '6', label: '6 Δ', selected: false },
+                            { value: '8', label: '8 Δ', selected: false }
+                        ]
+                    },
+                    {
+                        id: 'vergence-target', key: 'targetDiopter', label: 'Mức lăng kính mục tiêu (Δ)', numeric: true,
+                        options: [
+                            { value: '8', label: '8 Δ', selected: true },
+                            { value: '10', label: '10 Δ', selected: false },
+                            { value: '12', label: '12 Δ', selected: false },
+                            { value: '15', label: '15 Δ', selected: false }
+                        ]
+                    }
+                ],
+                mandatoryWarning: '⚠️ CẢNH BÁO: Đeo kính Đỏ-Lục Lam (Mắt phải ĐỎ / Mắt trái XANH) trước khi chơi.'
             },
             {
                 id: 'saccadic',
                 name: 'M4: Vận nhãn nhanh (Saccadic)',
                 classRef: SaccadicTrackingGame,
-                purpose: 'Tăng cường khả năng đưa nhanh hình ảnh của một vật thể từ võng mạc ngoại vi vào đúng hố hoàng điểm (Foveola) để phân tích chi tiết.',
-                instruction: 'YÊU CẦU LÂM SÀNG: Mắt Trái đeo kính Lục Lam (Cyan), Mắt Phải đeo kính Đỏ. Click vào mục tiêu xuất hiện ngẫu nhiên trên màn hình càng nhanh càng tốt.',
-                target: 'Hoàn thành 20 mục tiêu. Yêu cầu lâm sàng: Độ trễ ≤ 500ms (Màn hình cảm ứng) hoặc ≤ 900ms (Sử dụng chuột).'
+                stage: 'Giai đoạn 4: Thị giác 3D (Tinh chỉnh tối đa)',
+                parentTranslation: 'Tăng tốc độ truyền tín hiệu từ mắt lên não. Trẻ sẽ phản xạ nhanh hơn trong học tập và chơi thể thao.',
+                medicalPurpose: 'Tăng tốc độ đưa ảnh từ võng mạc ngoại vi vào hố hoàng điểm (Saccadic).',
+                indication: 'Thị lực hai mắt đều, cần giảm độ trễ phản xạ.',
+                contraindication: 'Không có.',
+                gameplay: 'Mục tiêu xuất hiện ngẫu nhiên, click chuột vào mục tiêu càng nhanh càng tốt.',
+                goal: 'Chạm mốc phản xạ dưới 500ms (Nửa giây) cho 20 mục tiêu.',
+                settings: [
+                    {
+                        id: 'saccadic-size', key: 'targetSize', label: 'Kích thước mục tiêu', numeric: false,
+                        options: [
+                            { value: 'large', label: 'Lớn', selected: true },
+                            { value: 'medium', label: 'Vừa', selected: false },
+                            { value: 'small', label: 'Nhỏ', selected: false }
+                        ]
+                    },
+                    {
+                        id: 'saccadic-count', key: 'count', label: 'Số lượng mục tiêu', numeric: true,
+                        options: [
+                            { value: '20', label: '20', selected: true },
+                            { value: '40', label: '40', selected: false },
+                            { value: '60', label: '60', selected: false }
+                        ]
+                    }
+                ],
+                mandatoryWarning: '⚠️ CẢNH BÁO: Đeo kính Đỏ-Lục Lam (Mắt phải ĐỎ / Mắt trái XANH) trước khi chơi.'
             },
             {
                 id: 'rds_therapy',
                 name: 'M5: Huấn luyện Thị giác nổi (RDS)',
                 classRef: RDSTherapyGame,
-                purpose: 'Phục hồi khả năng nhận thức chiều không gian 3D tinh tế (Global Stereopsis) bằng cách ép não bộ giải mã các điểm ảnh nhiễu.',
-                instruction: 'HƯỚNG DẪN BỆNH NHÂN: Đeo kính Trái Lục Lam (Cyan) - Phải Đỏ. Nhìn vào màn hình sẽ thấy các hạt nhiễu như TV mất sóng (đây là bình thường). Yêu cầu bệnh nhân tìm kiếm một KHỐI HÌNH VUÔNG ĐANG NỔI BỔNG lên khỏi mặt phẳng màn hình và dùng chuột CLICK thẳng vào nó. Nếu sai, khối hình sẽ to ra và nổi rõ hơn để bệnh nhân tập làm quen lại.',
-                target: 'Duy trì dung hợp liên tục trong 3 phút. Mục tiêu lâm sàng: Ngưỡng nhận thức độ sâu đạt ≤ 40 Giây cung (Arcsec).'
+                stage: 'Giai đoạn 4: Thị giác 3D (Tinh chỉnh tối đa)',
+                parentTranslation: 'Đánh thức khả năng nhìn không gian 3 chiều. Qua lớp kính Đỏ-Xanh, não bộ sẽ ghép các đốm nhiễu thành một hình khối nổi bồng bềnh lên khỏi màn hình.',
+                medicalPurpose: 'Tinh chỉnh thị giác nổi toàn cục (Global Stereopsis).',
+                indication: 'Giai đoạn cuối cùng. Yêu cầu hai mắt đã khá đều nhau.',
+                contraindication: 'Không dùng nếu chưa có hợp thị.',
+                gameplay: 'Tìm khối vuông đang "nổi" lên khỏi nền nhiễu và click vào nó.',
+                goal: 'Đạt ngưỡng thị giác nổi 40 Giây cung (Arcsec). Trẻ thực sự khỏi nhược thị hoàn toàn.',
+                settings: [
+                    {
+                        id: 'rds-time', key: 'searchTimeMs', label: 'Thời gian tìm kiếm tối đa', numeric: true,
+                        options: [
+                            { value: '300000', label: '300 giây', selected: true }
+                        ]
+                    }
+                ],
+                mandatoryWarning: '⚠️ CẢNH BÁO: Đeo kính Đỏ-Lục Lam (Mắt phải ĐỎ / Mắt trái XANH) trước khi chơi.'
             },
             {
                 id: 'divergence',
                 name: 'M6: Huấn luyện Phân kỳ (Divergence)',
                 classRef: DivergenceTherapyGame,
-                purpose: 'Huấn luyện phân kỳ (Divergence Therapy) sử dụng chiến thuật "Quá tải tiến triển". Giữ hợp thị 10s để tăng độ khó, vỡ hợp thị thì nghỉ 3s.',
-                instruction: 'YÊU CẦU LÂM SÀNG: Đeo kính 🔴 Mắt Phải / 🔵 Mắt Trái. Giữ hợp thị (không thấy hình đôi) trong 10 giây để tăng mức độ. Bấm phím SPACE ngay khi vỡ hợp thị (thấy hình tách đôi). Nếu vỡ 3 lần ở cùng một mức, bài tập sẽ kết thúc.',
-                target: 'Giữ hợp thị liên tục đến mục tiêu lâm sàng (tăng dần từ 2Δ đến 8Δ). Sử dụng Vòng tròn thời gian (Circular Timer) ở trung tâm.'
+                stage: 'Giai đoạn 3: Tập gym cơ mắt (Vận nhãn cơ học)',
+                parentTranslation: 'Giúp hai mắt biết cách nhả cơ, giãn lỏng ra khi nhìn xa. Chữa tật hay bị lác chéo vào trong (lé kim).',
+                medicalPurpose: 'Tăng biên độ phân kỳ (Base In).',
+                indication: 'Lác trong ẩn.',
+                contraindication: 'Đang bị liệt cơ vận nhãn.',
+                gameplay: 'Tập trung giữ 2 khối màu chập 1 khi chúng tách xa nhau.',
+                goal: 'Chịu đựng được mức phân kỳ 8 Đi-ốp (Δ) trong 5 chu kỳ.',
+                settings: [
+                    {
+                        id: 'divergence-start', key: 'startDiopter', label: 'Mức lăng kính xuất phát (Δ)', numeric: true,
+                        options: [
+                            { value: '2', label: '2 Δ', selected: true },
+                            { value: '4', label: '4 Δ', selected: false },
+                            { value: '6', label: '6 Δ', selected: false },
+                            { value: '8', label: '8 Δ', selected: false }
+                        ]
+                    },
+                    {
+                        id: 'divergence-target', key: 'targetDiopter', label: 'Mức lăng kính mục tiêu (Δ)', numeric: true,
+                        options: [
+                            { value: '8', label: '8 Δ', selected: true },
+                            { value: '10', label: '10 Δ', selected: false },
+                            { value: '12', label: '12 Δ', selected: false },
+                            { value: '15', label: '15 Δ', selected: false }
+                        ]
+                    }
+                ],
+                mandatoryWarning: '⚠️ CẢNH BÁO: Đeo kính Đỏ-Lục Lam (Mắt phải ĐỎ / Mắt trái XANH) trước khi chơi.'
+            },
+            {
+                id: 'cam-stim',
+                name: 'M7: Kích thích Lưới quay CAM',
+                classRef: CamVisualStimulatorGame,
+                stage: 'Giai đoạn 1: Đánh thức Hoàng điểm (Bịt mắt lành)',
+                parentTranslation: 'Đánh thức vùng trung tâm của mắt nhược thị, giúp mắt học cách tập trung vào một điểm duy nhất thay vì nhìn lệch.',
+                medicalPurpose: 'Kích hoạt cưỡng bức tế bào vỏ não thị giác (V1) nhạy cảm hướng. Ép dồn chú ý tâm điểm để phá vỡ hiện tượng định thị ngoại tâm.',
+                indication: 'Mắt nhược thị rất nặng (Thị lực < 2/10). Trẻ hay nhìn nghiêng đầu, liếc mắt.',
+                contraindication: 'TUYỆT ĐỐI KHÔNG dùng nếu trẻ có tiền sử động kinh, co giật khi nhìn ánh sáng nhấp nháy.',
+                gameplay: 'Bịt mắt sáng, chỉ dùng mắt mờ nhìn thẳng vào chấm tròn giữa vòng xoáy. Khi chấm tròn đổi màu, bấm SPACE ngay lập tức.',
+                goal: 'Đạt độ chính xác > 85%. Chơi 1-2 lần/ngày.',
+                settings: [
+                    {
+                        id: 'cam-stim-stripe', key: 'stripeWidth', label: 'Kích thước sọc (SF)', numeric: true,
+                        options: [
+                            { value: '80', label: 'Sọc to (Low SF)', selected: false },
+                            { value: '40', label: 'Sọc vừa (Medium SF)', selected: true },
+                            { value: '20', label: 'Sọc nhỏ (High SF)', selected: false }
+                        ]
+                    },
+                    {
+                        id: 'cam-stim-speed', key: 'rotationSpeed', label: 'Tốc độ xoay', numeric: true,
+                        options: [
+                            { value: '0.5', label: 'Chậm', selected: false },
+                            { value: '1', label: 'Bình thường', selected: true },
+                            { value: '2', label: 'Nhanh', selected: false }
+                        ]
+                    },
+                    {
+                        id: 'cam-stim-duration', key: 'durationMs', label: 'Thời gian', numeric: true,
+                        options: [
+                            { value: '120000', label: '120 giây', selected: false },
+                            { value: '180000', label: '180 giây', selected: false },
+                            { value: '300000', label: '300 giây (mặc định)', selected: true },
+                            { value: '600000', label: '600 giây', selected: false }
+                        ]
+                    }
+                ],
+                mandatoryWarning: '⚠️ BẮT BUỘC: CHỈ MỞ MẮT NHƯỢC THỊ (BỊT MẮT LÀNH). Tuyệt đối không sử dụng kính Đỏ-Lục Lam (Anaglyph).'
+            },
+            {
+                id: 'anti-crowding',
+                name: 'M8: Khử hiện tượng chen chúc (Anti-Crowding)',
+                classRef: AntiCrowdingGame,
+                stage: 'Giai đoạn 1: Đánh thức Hoàng điểm (Bịt mắt lành)',
+                parentTranslation: 'Giúp mắt trẻ hết bị "loạn", không còn hiện tượng các chữ cái dính chùm vào nhau khi đọc sách.',
+                medicalPurpose: 'Phá vỡ hiệu ứng tương tác viền (Contour Interaction / Crowding Effect). Huấn luyện vỏ não khả năng bóc tách tín hiệu.',
+                indication: 'Mắt nhược thị nhìn từng chữ thì rõ, nhưng nhìn cả hàng chữ thì mờ.',
+                contraindication: 'Trẻ chưa biết phân biệt các hướng Lên/Xuống/Trái/Phải.',
+                gameplay: 'Bịt mắt sáng. Chỉ tập trung vào chữ E ở chính giữa (bỏ qua 4 chữ E xung quanh). Bấm phím mũi tên theo hướng hở của chữ E giữa. Trả lời đúng, các chữ xung quanh sẽ ép sát vào để thử thách thêm.',
+                goal: 'Chịu đựng được khoảng cách ép sát ở mức 1.2x.',
+                settings: [
+                    {
+                        id: 'anti-crowding-target-size', key: 'targetSize', label: 'Kích thước vật tiêu', numeric: false,
+                        options: [
+                            { value: 'Lớn', label: 'Lớn', selected: false },
+                            { value: 'Vừa', label: 'Vừa', selected: true },
+                            { value: 'Nhỏ', label: 'Nhỏ', selected: false }
+                        ]
+                    },
+                    {
+                        id: 'anti-crowding-display-time', key: 'displayTime', label: 'Thời gian hiển thị', numeric: false,
+                        options: [
+                            { value: 'unlimited', label: 'Không giới hạn', selected: true },
+                            { value: '2000', label: '2 giây', selected: false }
+                        ]
+                    }
+                ],
+                mandatoryWarning: '⚠️ BẮT BUỘC: CHỈ MỞ MẮT NHƯỢC THỊ (BỊT MẮT LÀNH). Tuyệt đối không sử dụng kính Đỏ-Lục Lam (Anaglyph).'
             }
         ];
 
@@ -190,127 +395,202 @@ class TherapeuticMenuController {
     }
 
     /**
+     * Sinh chuỗi HTML Form cài đặt ĐỘNG cho từng module game.
+     * @param {Object} module - Game module (chứa mảng `settings`)
+     * @returns {string} HTML của các thẻ <label> + <select>
+     */
+    renderSettingsForm(module) {
+        if (!module.settings || module.settings.length === 0) {
+            return '<p style="font-size:13px;color:#94a3b8;margin:0;">Không có cài đặt bổ sung.<br>Nhấn <b>BẮT ĐẦU TẬP</b> để vào bài tập.</p>';
+        }
+
+        let html = '';
+        for (const setting of module.settings) {
+            const optionsHtml = setting.options.map(o =>
+                `<option value="${o.value}"${o.selected ? ' selected' : ''}>${o.label}</option>`
+            ).join('');
+
+            html += `
+                <div style="margin-bottom:12px;">
+                    <label style="display:block;font-size:13px;color:#cbd5e1;margin-bottom:6px;" for="${setting.id}">${setting.label}:</label>
+                    <select id="${setting.id}" style="width:100%;padding:8px;border-radius:6px;background:#0f172a;color:white;border:1px solid #475569;font-size:15px;">
+                        ${optionsHtml}
+                    </select>
+                </div>
+            `;
+        }
+        return html;
+    }
+
+    /**
      * Render the Lobby/Instruction screen for a game
      * @param {Object} module - Game module with metadata
      */
     _renderLobby(module) {
-        // Nếu là module M1 (CatchGame), hiển thị nội dung lâm sàng đặc thù
-        let clinicalContent = '';
-        if (module.id === 'catch') {
-            clinicalContent = `
-                <div style="max-width: 700px; margin: 20px auto; text-align: left;">
-                    <div style="padding: 20px; border: 2px solid #3b82f6; border-radius: 8px; background: rgba(59, 130, 246, 0.1); margin-bottom: 20px;">
-                        <p style="font-size: 18px; color: #60a5fa; font-weight: bold; margin: 0 0 10px 0;">📋 QUY ĐỊNH LÂM SÀNG:</p>
-                        <p style="font-size: 16px; color: white; margin: 0;">YÊU CẦU LÂM SÀNG: Xác định mắt nhược thị. Nếu vật thể rơi màu <span style="color: #ef4444; font-weight: bold;">ĐỎ</span>, hãy đeo kính <span style="color: #06b6d4; font-weight: bold;">LỤC LAM (Cyan)</span> cho mắt nhược thị. Mắt lành đeo kính <span style="color: #ef4444; font-weight: bold;">ĐỎ</span>.</p>
-                    </div>
-
-                    <div style="padding: 20px; border: 2px solid #10b981; border-radius: 8px; background: rgba(16, 185, 129, 0.1); margin-bottom: 20px;">
-                        <p style="font-size: 18px; color: #34d399; font-weight: bold; margin: 0 0 10px 0;">🎯 MỤC TIÊU ĐIỀU TRỊ:</p>
-                        <p style="font-size: 16px; color: white; margin: 0;">Mục đích: Cải thiện độ nhạy tương phản của mắt nhược thị bằng cách giảm dần tín hiệu ở mắt lành, ép não bộ xóa bỏ ám điểm ức chế.</p>
-                    </div>
-
-                    <div style="padding: 20px; border: 2px solid #f59e0b; border-radius: 8px; background: rgba(245, 158, 11, 0.1); margin-bottom: 20px;">
-                        <p style="font-size: 18px; color: #fbbf24; font-weight: bold; margin: 0 0 10px 0;">📜 LUẬT CHƠI:</p>
-                        <ul style="font-size: 16px; color: white; margin: 0; padding-left: 20px;">
-                            <li>Hứng trúng: <strong style="color: #10b981;">+1 điểm</strong></li>
-                            <li>Hứng trượt: <strong style="color: #ef4444;">-1 điểm</strong></li>
-                            <li>Bài tập kết thúc khi đạt <strong style="color: #fbbf24;">30 điểm</strong></li>
-                        </ul>
-                    </div>
-                </div>
-            `;
-        } else if (module.id === 'divergence') {
-            clinicalContent = `
-                <div style="max-width: 700px; margin: 20px auto; text-align: left;">
-                    <div style="background: rgba(56, 189, 248, 0.1); border: 1px solid #38bdf8; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
-                        <p style="color: #cbd5e1; margin: 0; font-size: 14px; line-height: 1.5;">
-                            <b style="color: #38bdf8;">🎯 MỤC ĐÍCH LÂM SÀNG:</b> Cải thiện biên độ hợp thị động phân kỳ (Dynamic Fusional Divergence Amplitude), thiết lập phản xạ tự động cho cơ trực ngoài, chỉ định cho lác trong ẩn (Esophoria) hoặc hội chứng dư thừa quy tụ.
-                        </p>
-                    </div>
-
-                    <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; padding: 12px; border-radius: 6px; text-align: center; margin-bottom: 20px;">
-                        <span style="color: #ef4444; font-weight: bold; font-size: 15px;">
-                            ⚠️ BẮT BUỘC: MẮT PHẢI ĐEO KÍNH ĐỎ (RED) - MẮT TRÁI ĐEO KÍNH XANH (CYAN)
-                        </span>
-                    </div>
-
-                    <div style="display: flex; justify-content: space-around; margin-bottom: 20px;">
-                        <div>
-                            <label style="display: block; margin-bottom: 8px; color: #94a3b8; font-size: 14px;">Mức Bắt đầu (Δ):</label>
-                            <select id="m6-start" style="padding: 8px 12px; border-radius: 6px; background: #0f172a; color: white; border: 1px solid #475569; font-size: 16px; min-width: 120px;">
-                                ${[2,4,6,8].map(v => `<option value="${v}" ${v==2?'selected':''}>${v} Δ</option>`).join('')}
-                            </select>
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 8px; color: #94a3b8; font-size: 14px;">Mục tiêu (Δ):</label>
-                            <select id="m6-target" style="padding: 8px 12px; border-radius: 6px; background: #0f172a; color: white; border: 1px solid #475569; font-size: 16px; min-width: 120px;">
-                                ${[4,6,8,10,12,15].map(v => `<option value="${v}" ${v==8?'selected':''}>${v} Δ</option>`).join('')}
-                            </select>
-                        </div>
-                    </div>
-
-                    <div style="padding: 20px; border: 2px solid #3b82f6; border-radius: 8px; background: rgba(59, 130, 246, 0.1); margin-bottom: 20px;">
-                        <p style="font-size: 18px; color: #60a5fa; font-weight: bold; margin: 0 0 10px 0;">📋 CHIẾN THUẬT "QUÁ TẢI TIẾN TRIỂN":</p>
-                        <p style="font-size: 16px; color: white; margin: 0;">Giữ hợp thị (không thấy hình đôi) trong <strong>10 giây</strong> để tăng mức lăng kính (Δ). Vỡ hợp thị sẽ nghỉ <strong>3 giây</strong> rồi thử lại.</p>
-                    </div>
-
-                    <div style="padding: 20px; border: 2px solid #10b981; border-radius: 8px; background: rgba(16, 185, 129, 0.1); margin-bottom: 20px;">
-                        <p style="font-size: 18px; color: #34d399; font-weight: bold; margin: 0 0 10px 0;">🎯 MỤC TIÊU LÂM SÀNG:</p>
-                        <p style="font-size: 16px; color: white; margin: 0;">Tăng dần từ <strong>${document.getElementById('m6-start') ? document.getElementById('m6-start').value : 2}Δ</strong> đến <strong>${document.getElementById('m6-target') ? document.getElementById('m6-target').value : 8}Δ</strong>. Vòng tròn thời gian ở trung tâm hiển thị tiến trình giữ hợp thị.</p>
-                    </div>
-
-                    <div style="padding: 20px; border: 2px solid #f59e0b; border-radius: 8px; background: rgba(245, 158, 11, 0.1); margin-bottom: 20px;">
-                        <p style="font-size: 18px; color: #fbbf24; font-weight: bold; margin: 0 0 10px 0;">⌨️ THAO TÁC:</p>
-                        <ul style="font-size: 16px; color: white; margin: 0; padding-left: 20px;">
-                            <li>Bấm <kbd style="background: #334155; padding: 2px 8px; border-radius: 4px;">SPACE</kbd> ngay khi vỡ hợp thị (thấy hình tách đôi)</li>
-                            <li>Vỡ <strong>3 lần</strong> tại cùng một mức → Bài tập kết thúc</li>
-                        </ul>
-                    </div>
-                </div>
-            `;
-        } else {
-            clinicalContent = `
-                <div style="max-width: 600px; margin: 20px auto;">
-                    <p style="font-size: 18px; color: #94a3b8; margin-bottom: 15px;"><strong>Mục đích:</strong> ${module.purpose}</p>
-                    <p style="font-size: 18px; margin-bottom: 15px;"><strong>Hướng dẫn:</strong> ${module.instruction}</p>
-                    <p style="font-size: 18px; color: #fbbf24; margin-bottom: 15px;"><strong>Mục tiêu:</strong> ${module.target}</p>
-                </div>
-            `;
-        }
+        // ============================================================
+        // NỘI SUY DỮ LIỆU CHUẨN HÓA VÀO SPLIT-PANE RENDER
+        // ============================================================
+        const game = {
+            title: module.name,
+            stage: module.stage || '',
+            parentTranslation: module.parentTranslation || '',
+            medicalPurpose: module.medicalPurpose || '',
+            indication: module.indication || '',
+            contraindication: module.contraindication || '',
+            gameplay: module.gameplay || '',
+            goal: module.goal || '',
+            mandatory_warning_html: module.mandatoryWarning || '⚠️ CẢNH BÁO: Tuân thủ quy định an toàn trước khi chơi.'
+        };
 
         const distM = parseFloat(localStorage.getItem('vision-therapy-calibrate-distance-m')) || 0.5;
         const distCm = Math.round(distM * 100);
-        
+
         const lobbyHtml = `
-            <div style="position: fixed; inset: 0; z-index: 9998; background: #0f172a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; overflow-y: auto;">
-                <h1 style="font-size: 36px; margin-bottom: 10px;">${module.name}</h1>
-                
-                <div style="padding: 10px; background: #fee2e2; border-left: 4px solid #ef4444; color: #991b1b; font-weight: bold; margin-bottom: 15px; max-width: 600px;">⚠️ YÊU CẦU BẮT BUỘC: Bệnh nhân ngồi cách màn hình chính xác ${distCm} cm.</div>
-                
-                ${clinicalContent}
-                
-                <div style="margin-top: 20px; padding: 15px; border: 2px solid #ef4444; border-radius: 8px; background: rgba(239, 68, 68, 0.1);">
-                    <p style="font-size: 20px; color: #ef4444; font-weight: bold; margin: 0;">⚠ CẢNH BÁO: Đeo kính Đỏ-Lục Lam trước khi chơi</p>
+            <div style="position: fixed; inset: 0; z-index: 9998; background: rgba(15, 23, 42, 0.97); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; font-family: sans-serif;">
+
+                <!-- NÚT TẮT (ĐÓNG) LOBBY: cố định góc màn hình, ngoài Split-Pane -->
+                <button id="btn-close-lobby" title="Nhấn ESC để thoát" style="position: fixed; top: 24px; right: 24px; width: 44px; height: 44px; font-size: 20px; background: rgba(255,255,255,0.1); border: none; color: #cbd5e1; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s; z-index: 9999;">
+                    ✖
+                </button>
+
+                <!-- BANNER KHOẢNG CÁCH BẮT BUỘC -->
+                <div style="width: 100%; max-width: 1200px; margin-bottom: 14px; padding: 10px 14px; background: #fee2e2; border-left: 4px solid #ef4444; color: #991b1b; font-weight: bold; font-size: 14px; border-radius: 6px;">
+                    ⚠️ YÊU CẦU BẮT BUỘC: Bệnh nhân ngồi cách màn hình chính xác ${distCm} cm.
                 </div>
-                
-                <button id="btn-start-fullscreen" style="padding: 15px 30px; font-size: 20px; margin-top: 30px; cursor: pointer; background: #3b82f6; color: white; border: none; border-radius: 8px; font-weight: bold;">BẮT ĐẦU (FULLSCREEN)</button>
+
+                <!-- SPLIT-PANE CONTAINER -->
+                <div style="position: relative; display: flex; gap: 24px; width: 90%; max-width: 1200px; min-height: 70vh; background: #0f172a; padding: 32px; border-radius: 12px; border: 1px solid #1e293b; color: #cbd5e1; text-align: left;">
+
+                    <!-- CỘT TRÁI (60%): THÔNG TIN LÂM SÀNG (SCROLLABLE) -->
+                    <div style="flex: 6; overflow-y: auto; padding-right: 15px; border-right: 1px solid #1e293b;">
+                        <h2 style="color: #38bdf8; margin-top: 0; font-size: 22px; border-bottom: 1px solid #1e293b; padding-bottom: 10px;">${game.title}</h2>
+
+                        <p style="font-size: 12px; color: #a78bfa; margin: 0 0 16px 0; font-weight: bold;">${game.stage}</p>
+
+                        <div style="margin-bottom: 16px; background: rgba(167, 139, 250, 0.08); padding: 12px; border-radius: 6px; border: 1px solid #6d28d9;">
+                            <h4 style="color: #c4b5fd; margin-top: 0; margin-bottom: 6px;">👪 DÀNH CHO PHỤ HUYNH:</h4>
+                            <p style="font-size: 13px; line-height: 1.5; margin: 0;">${game.parentTranslation}</p>
+                        </div>
+
+                        <div style="margin-bottom: 16px;">
+                            <h4 style="color: #10b981; margin-bottom: 4px;">🎯 MỤC ĐÍCH Y KHOA:</h4>
+                            <p style="font-size: 13px; line-height: 1.5; margin: 0;">${game.medicalPurpose}</p>
+                        </div>
+
+                        <div style="margin-bottom: 16px;">
+                            <h4 style="color: #3b82f6; margin-bottom: 4px;">👥 CHỈ ĐỊNH:</h4>
+                            <p style="font-size: 13px; line-height: 1.5; margin: 0;">${game.indication}</p>
+                        </div>
+
+                        <div style="margin-bottom: 16px;">
+                            <h4 style="color: #ef4444; margin-bottom: 4px;">🚫 CHỐNG CHỈ ĐỊNH:</h4>
+                            <p style="font-size: 13px; line-height: 1.5; margin: 0; color: #fca5a5;">${game.contraindication}</p>
+                        </div>
+
+                        <div style="margin-bottom: 16px;">
+                            <h4 style="color: #f59e0b; margin-bottom: 4px;">🎮 CÁCH CHƠI:</h4>
+                            <p style="font-size: 13px; line-height: 1.5; margin: 0;">${game.gameplay}</p>
+                        </div>
+
+                        <div style="margin-bottom: 16px; background: rgba(56, 189, 248, 0.05); padding: 12px; border-radius: 6px; border: 1px solid #0369a1;">
+                            <h4 style="color: #e2e8f0; margin-top: 0; margin-bottom: 6px;">🏆 MỤC TIÊU:</h4>
+                            <p style="font-size: 13px; line-height: 1.5; margin: 0;">${game.goal}</p>
+                        </div>
+                    </div>
+
+                    <!-- CỘT PHẢI (40%): ĐIỀU KHIỂN & HÀNH ĐỘNG (STICKY) -->
+                    <div style="flex: 4; display: flex; flex-direction: column; gap: 16px; padding-left: 10px;">
+
+                        <!-- FORM CÀI ĐẶT ĐỘNG (theo từng game) -->
+                        <div style="background: #1e293b; padding: 16px; border-radius: 8px;">
+                            <h4 style="color: #38bdf8; margin: 0 0 10px 0; font-size: 14px;">⚙️ CÀI ĐẶT BÀI TẬP:</h4>
+                            ${this.renderSettingsForm(module)}
+                        </div>
+
+                        <!-- CẢNH BÁO Y KHOA ĐỘNG -->
+                        <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; padding: 12px; border-radius: 6px; text-align: center; margin-top: auto;">
+                            <span style="color: #ef4444; font-weight: bold; font-size: 13px;">
+                                ${game.mandatory_warning_html}
+                            </span>
+                        </div>
+
+                        <!-- ACTION BUTTONS -->
+                        <button id="btn-start-fullscreen" style="width: 100%; background: #3b82f6; color: white; padding: 14px; border: none; border-radius: 6px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s;">
+                            BẮT ĐẦU TẬP
+                        </button>
+                    </div>
+                </div>
             </div>
         `;
 
         this.workspaceContainer.innerHTML = lobbyHtml;
 
-        // Attach fullscreen + game start handler
+        // B.1 Handler đóng Lobby (hủy chọn game, quay về menu danh sách)
+        this._handleLobbyKeydown = (e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                this._closeLobby();
+            }
+        };
+
+        const closeLobbyHandler = () => this._closeLobby();
+
+        // Attach close button handler
+        const closeBtn = document.getElementById('btn-close-lobby');
+        if (closeBtn) {
+            closeBtn.onclick = closeLobbyHandler;
+        }
+
+        // Attach fullscreen + game start handler (đọc cấu hình động từ form)
         const startBtn = document.getElementById('btn-start-fullscreen');
         if (startBtn) {
-            startBtn.onclick = () => this._startFullscreenGame(module);
+            startBtn.onclick = () => {
+                // B.2 Đọc giá trị từ các <select> được sinh động
+                const config = {};
+                if (module.settings) {
+                    for (const setting of module.settings) {
+                        const el = document.getElementById(setting.id);
+                        if (el) {
+                            config[setting.key] = setting.numeric ? Number(el.value) : el.value;
+                        }
+                    }
+                }
+                this._startFullscreenGame(module, config);
+            };
         }
+
+        // Bắt sự kiện ESC toàn cục khi Lobby đang mở
+        document.addEventListener('keydown', this._handleLobbyKeydown);
+    }
+
+    /**
+     * Đóng Lobby: xóa nội dung HTML vùng chứa và gỡ bỏ sự kiện ESC
+     * để tránh vô tình kích hoạt khi đang chơi game (Memory Leak / false trigger).
+     */
+    _closeLobby() {
+        // Gỡ bỏ sự kiện keydown ESC ngay khi đóng Lobby
+        if (this._handleLobbyKeydown) {
+            document.removeEventListener('keydown', this._handleLobbyKeydown);
+            this._handleLobbyKeydown = null;
+        }
+
+        // Xóa nội dung Lobby, trả về trạng thái menu danh sách game
+        this.workspaceContainer.innerHTML = '';
+        this.stopCurrentGame();
     }
 
     /**
      * Enter fullscreen mode, apply CSS overrides, and start the game
      * @param {Object} module - Game module with classRef
+     * @param {Object} config - Cấu hình đã được đọc từ form cài đặt động
      */
-    _startFullscreenGame(module) {
+    _startFullscreenGame(module, config = {}) {
+        // Gỡ bỏ sự kiện keydown ESC khi bước vào game (tránh false trigger)
+        if (this._handleLobbyKeydown) {
+            document.removeEventListener('keydown', this._handleLobbyKeydown);
+            this._handleLobbyKeydown = null;
+        }
+
         // Request fullscreen on workspace container
         this.workspaceContainer.requestFullscreen().catch(err => {
             console.warn("[Therapeutic] Fullscreen request failed:", err);
@@ -324,21 +604,11 @@ class TherapeuticMenuController {
 
         // Initialize and start game
         try {
-            this.currentGame = new module.classRef();
-            
-            // Pass config for M6 divergence therapy
-            let config = {};
-            if (module.id === 'divergence') {
-                const startSelect = document.getElementById('m6-start');
-                const targetSelect = document.getElementById('m6-target');
-                config = {
-                    startDiopter: startSelect ? parseInt(startSelect.value) : 2,
-                    targetDiopter: targetSelect ? parseInt(targetSelect.value) : 8
-                };
-            }
-            
+            const GameClass = (typeof module.classRef === 'string') ? window[module.classRef] : module.classRef;
+            this.currentGame = new GameClass();
+
             this.currentGame.start(config);
-            console.log(`[Therapeutic] Started ${module.name} successfully`);
+            console.log(`[Therapeutic] Started ${module.name} successfully`, config);
         } catch (error) {
             console.error("[LỖI ENGINE NGHIÊM TRỌNG]:", error);
             alert("Không thể khởi động bài tập. Vui lòng xem Console.");
