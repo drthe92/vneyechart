@@ -1235,7 +1235,25 @@ function formatTherapyClinicalResult(metrics) {
             return `Hội tụ (BO): ${ bo.toFixed(1) } Δ | Phân kỳ (BI): ${ bi.toFixed(1) } Δ`;
         }
     }
-    
+
+    // Module 7: CAM Visual Stimulator (Monocular) — accuracy & reaction time
+    else if (gameName.includes('M7')) {
+        const acc = metrics.customData?.accuracyRate;
+        const rt = metrics.customData?.avgReactionTimeMs;
+        if (acc !== undefined && acc !== null && rt !== undefined && rt !== null) {
+            return `Tỷ lệ chính xác: ${ acc.toFixed(0) }% | Phản xạ: ${ rt.toFixed(0) } ms`;
+        }
+    }
+
+    // Module 8: Anti-Crowding Tracker (Monocular) — accuracy & narrowest spacing
+    else if (gameName.includes('M8')) {
+        const acc = metrics.customData?.accuracy;
+        const minSpacing = metrics.customData?.minimumSpacingReached;
+        if (acc !== undefined && acc !== null) {
+            return `Chính xác: ${ acc.toFixed(0) }% | Khoảng cách hẹp nhất: ${ minSpacing !== undefined ? minSpacing : 'N/A' }`;
+        }
+    }
+
     // Fallback: generic score
     const score = metrics?.score;
     if (score !== undefined && score !== null) {
@@ -1349,6 +1367,23 @@ function generateTherapyReportHTML(patientId) {
             const arcsecDisplay = finalArcsec > 0 ? `${finalArcsec} Arcsec` : 'Không xác định (Fail)';
             
             resultHTML = `Ngưỡng thị giác nổi (Stereoacuity): <b style="font-size:1.1em;">${arcsecDisplay}</b> | Thời gian tập: <b>${durStr}</b><br>Đánh giá: ${statusHTML}`;
+        }
+        else if (record.gameName && record.gameName.includes('M7')) {
+            const acc = customData.accuracyRate !== undefined ? customData.accuracyRate : 0;
+            const rt = customData.avgReactionTimeMs !== undefined ? customData.avgReactionTimeMs : 0;
+            // Đạt: Tỷ lệ chính xác >= 80% và Thời gian phản xạ <= 800ms
+            const isPassed = acc >= 80 && rt <= 800;
+            statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>' : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
+            resultHTML = `Tỷ lệ chính xác: <b>${acc.toFixed(0)}%</b> | Phản xạ: <b>${rt.toFixed(0)} ms</b><br>Đánh giá: ${statusHTML}`;
+        }
+        else if (record.gameName && record.gameName.includes('M8')) {
+            const acc = customData.accuracy !== undefined ? customData.accuracy : 0;
+            const minSpacing = customData.minimumSpacingReached !== undefined ? customData.minimumSpacingReached : 'N/A';
+            const finalSpacing = customData.finalSpacing !== undefined ? customData.finalSpacing : 'N/A';
+            // Đạt: Tỷ lệ chính xác >= 75% (Ngưỡng lâm sàng khử chen chúc)
+            const isPassed = acc >= 75;
+            statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>' : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
+            resultHTML = `Chính xác: <b>${acc.toFixed(0)}%</b> | Khoảng cách hẹp nhất: <b>${minSpacing}</b> | Khoảng cách cuối: <b>${finalSpacing}</b><br>Đánh giá: ${statusHTML}`;
         }
         else {
             const score = record.metrics?.score || 0;

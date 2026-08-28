@@ -315,21 +315,11 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script src="js/exam_session_manager.js"></script>
 
-  <!-- ===== Vision Training Games: Lazy Loading Order (Dependency Hierarchy) ===== -->
-  <!-- Priority 1 (Core): Base Engine — must load first -->
-  <script src="modules/binocular_game_engine.js"></script>
+   <!-- ===== Vision Training Games: ES Module graph ===== -->
+   <!-- The controller is an ES module; it imports the 8 game classes, which in
+        turn import the BinocularGameEngine base class. All loaded via the graph. -->
+   <script type="module" src="modules/therapeutic_menu_controller.js"></script>
 
-  <!-- Priority 2 (Modules): Game classes — inherit from BinocularGameEngine -->
-  <script src="modules/anti_suppression_catch.js"></script>
-  <script src="modules/shape_alignment.js"></script>
-  <script src="modules/vergence_tracker_game.js"></script>
-  <script src="modules/saccadic_tracking_game.js"></script>
-  <script src="modules/rds_therapy_game.js"></script>
-  <script src="modules/divergence_therapy_game.js"></script>
-
-  <!-- Priority 3 (Controller): Menu controller — depends on all game classes -->
-  <script src="modules/therapeutic_menu_controller.js"></script>
-
-  <script type="module" src="js/main.js"></script>
+   <script type="module" src="js/main.js"></script>
 </body>
 </html>

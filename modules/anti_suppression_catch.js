@@ -17,6 +17,8 @@
  * - Quản lý bộ nhớ: start/stop lifecycle
  */
 
+import BinocularGameEngine from './binocular_game_engine.js';
+
 class CatchGame extends BinocularGameEngine {
     /**
      * Khởi tạo trò chơi Catch với cơ chế Cầu thang Thích ứng
@@ -346,4 +348,6 @@ class CatchGame extends BinocularGameEngine {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { CatchGame };
 }
+
+export default CatchGame;
 

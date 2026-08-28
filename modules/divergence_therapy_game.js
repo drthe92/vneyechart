@@ -1,3 +1,5 @@
+import BinocularGameEngine from './binocular_game_engine.js';
+
 class DivergenceTherapyGame extends BinocularGameEngine {
     constructor() {
         super();
@@ -186,3 +188,5 @@ class DivergenceTherapyGame extends BinocularGameEngine {
 }
 
 if (typeof module !== 'undefined' && module.exports) module.exports = { DivergenceTherapyGame };
+
+export default DivergenceTherapyGame;

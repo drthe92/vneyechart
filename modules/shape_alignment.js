@@ -9,6 +9,8 @@
  * - 10 cấp độ: Kích thước giảm từ 120px xuống 30px, nhiễu ép sát vào tâm
  */
 
+import BinocularGameEngine from './binocular_game_engine.js';
+
 class ShapeAlignmentGame extends BinocularGameEngine {
     /**
      * Khởi tạo trò chơi Shape Alignment
@@ -252,3 +254,5 @@ class ShapeAlignmentGame extends BinocularGameEngine {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { ShapeAlignmentGame };
 }
+
+export default ShapeAlignmentGame;
