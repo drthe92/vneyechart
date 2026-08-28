@@ -1254,6 +1254,15 @@ function formatTherapyClinicalResult(metrics) {
         }
     }
 
+    // Module 9: RED-Cone Stimulator (Monocular) — accuracy & avg reaction time
+    else if (gameName.includes('M9')) {
+        const acc = metrics.customData?.accuracy;
+        const rt = metrics.customData?.avgReactionTimeMs;
+        if (acc !== undefined && acc !== null && rt !== undefined && rt !== null) {
+            return `Chính xác: ${ acc.toFixed(0) }% | Phản xạ trung bình: ${ rt.toFixed(0) } ms`;
+        }
+    }
+
     // Fallback: generic score
     const score = metrics?.score;
     if (score !== undefined && score !== null) {
@@ -1384,6 +1393,14 @@ function generateTherapyReportHTML(patientId) {
             const isPassed = acc >= 75;
             statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>' : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
             resultHTML = `Chính xác: <b>${acc.toFixed(0)}%</b> | Khoảng cách hẹp nhất: <b>${minSpacing}</b> | Khoảng cách cuối: <b>${finalSpacing}</b><br>Đánh giá: ${statusHTML}`;
+        }
+        else if (record.gameName && record.gameName.includes('M9')) {
+            const acc = customData.accuracy !== undefined ? customData.accuracy : 0;
+            const rt = customData.avgReactionTimeMs !== undefined ? customData.avgReactionTimeMs : 0;
+            // Đạt: Độ chính xác >= 85% (ngưỡng lâm sàng Brinker-Katz)
+            const isPassed = acc >= 85;
+            statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>' : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
+            resultHTML = `Chính xác: <b>${acc.toFixed(0)}%</b> | Phản xạ trung bình: <b>${rt.toFixed(0)} ms</b><br>Đánh giá: ${statusHTML}`;
         }
         else {
             const score = record.metrics?.score || 0;
