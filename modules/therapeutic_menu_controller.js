@@ -9,6 +9,7 @@ import AntiCrowdingGame from './anti_crowding_game.js';
 import RedConeStimulatorGame from './red_cone_stimulator_game.js';
 import OKNStimulationGame from './okn_stimulation_game.js';
 import GaborPerceptualLearningGame from './gabor_perceptual_learning_game.js';
+import DichopticPursuitGame from './dichoptic_pursuit_game.js';
 
 /**
  * Therapeutic Menu Controller (Lazy Binding Architecture)
@@ -25,6 +26,7 @@ import GaborPerceptualLearningGame from './gabor_perceptual_learning_game.js';
  * - M9: Kích thích tế bào nón hoàng điểm (RedConeStimulatorGame)
  * - M10: Kích thích phản xạ OKN (OKNStimulationGame)
  * - M11: Học tri giác Gabor (GaborPerceptualLearningGame)
+ * - M12: Bám đuôi phân thị (DichopticPursuitGame)
  */
 
 class TherapeuticMenuController {
@@ -365,6 +367,52 @@ class TherapeuticMenuController {
                     }
                 ],
                 mandatoryWarning: '⚠️ BẮT BUỘC: CHỈ MỞ MẮT NHƯỢC THỊ (BỊT MẮT LÀNH).'
+            },
+            {
+                id: 'dichoptic-pursuit',
+                name: 'M12: Bám đuôi phân thị (Smooth Pursuit)',
+                classRef: DichopticPursuitGame,
+                stage: 'Giai đoạn 3: Huấn luyện Vận nhãn & Hợp thị (Binocular Oculomotor)',
+                parentTranslation: 'Rèn cho hai mắt biết "bám đuôi" một vật mượt mà không nhảy hình. Qua kính Đỏ-Lục Lam, não buộc phải dung hợp hai ảnh thành một đường ray sáng để Tàu luôn đi đúng vệt.',
+                medicalPurpose: 'Rèn luyện cử động nhãn cầu theo vết (Smooth Pursuit) kết hợp triệt tiêu ức chế vỏ não qua môi trường phân thị.',
+                indication: 'Hợp thị đã ổn định, cần tăng chất lượng vận nhãn theo vết (theo dõi vật động).',
+                contraindication: 'Động kinh ánh sáng (do đường ray nhấp nháy qua kính).',
+                gameplay: 'Di chuyển chuột / vuốt để lái Tàu Lục Lam bám sát đường ray Đỏ trôi dọc màn hình. Giữ Tàu trong băng đường ray càng lâu càng tốt.',
+                goal: 'Đạt độ chính xác bám đuôi ≥ 70% trong toàn bộ thời lượng.',
+                settings: [
+                    {
+                        id: 'pursuit-speed', key: 'speed', label: 'Tốc độ trôi', numeric: false,
+                        options: [
+                            { value: 'slow', label: 'Chậm', selected: true },
+                            { value: 'medium', label: 'Vừa', selected: false },
+                            { value: 'fast', label: 'Nhanh', selected: false }
+                        ]
+                    },
+                    {
+                        id: 'pursuit-width', key: 'pathWidth', label: 'Độ rộng đường', numeric: false,
+                        options: [
+                            { value: 'wide', label: 'Rộng', selected: true },
+                            { value: 'medium', label: 'Vừa', selected: false },
+                            { value: 'narrow', label: 'Hẹp', selected: false }
+                        ]
+                    },
+                    {
+                        id: 'pursuit-amp', key: 'amplitude', label: 'Biên độ uốn lượn', numeric: false,
+                        options: [
+                            { value: 'low', label: 'Thấp', selected: true },
+                            { value: 'medium', label: 'Vừa', selected: false },
+                            { value: 'high', label: 'Cao', selected: false }
+                        ]
+                    },
+                    {
+                        id: 'pursuit-duration', key: 'duration', label: 'Thời lượng', numeric: true,
+                        options: [
+                            { value: '180000', label: '180 giây', selected: true },
+                            { value: '300000', label: '300 giây', selected: false }
+                        ]
+                    }
+                ],
+                mandatoryWarning: '⚠️ BẮT BUỘC: ĐEO KÍNH ĐỎ (MẮT PHẢI) - LỤC LAM (MẮT TRÁI) TRONG SUỐT QUÁ TRÌNH TẬP.'
             }
         ];
 
@@ -519,6 +567,30 @@ class TherapeuticMenuController {
     }
 
     /**
+     * Ánh xạ ID module -> đường dẫn tài liệu y khoa tương ứng trong /docs.
+     * Mapping linh hoạt: mỗi module tự động trỏ tới file HTML cùng tên.
+     * @param {string} moduleId - ID của module (vd: 'gabor-pl')
+     * @returns {string} href tuyệt đối tới trang tài liệu (vd: '/docs/m11_gabor.html')
+     */
+    _docHrefFor(moduleId) {
+        const docMap = {
+            'catch':             '/docs/m01_catch.html',
+            'align':             '/docs/m02_align.html',
+            'vergence':          '/docs/m03_vergence.html',
+            'saccadic':          '/docs/m04_saccadic.html',
+            'rds_therapy':       '/docs/m05_rds.html',
+            'divergence':        '/docs/m06_divergence.html',
+            'cam-stim':          '/docs/m07_cam.html',
+            'anti-crowding':     '/docs/m08_anticrowding.html',
+            'red-cone':          '/docs/m09_redcone.html',
+            'okn-stim':          '/docs/m10_okn.html',
+            'gabor-pl':          '/docs/m11_gabor.html',
+            'dichoptic-pursuit': '/docs/m12_pursuit.html'
+        };
+        return docMap[moduleId] || '/docs/index.html';
+    }
+
+    /**
      * Render the Lobby/Instruction screen for a game
      * @param {Object} module - Game module with metadata
      */
@@ -541,6 +613,9 @@ class TherapeuticMenuController {
         const distM = parseFloat(localStorage.getItem('vision-therapy-calibrate-distance-m')) || 0.5;
         const distCm = Math.round(distM * 100);
 
+        // Liên kết tài liệu y khoa: mapping linh hoạt href theo ID module
+        const docHref = this._docHrefFor(module.id);
+
         const lobbyHtml = `
             <div style="position: fixed; inset: 0; z-index: 9998; background: rgba(15, 23, 42, 0.97); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; font-family: sans-serif;">
 
@@ -559,7 +634,7 @@ class TherapeuticMenuController {
 
                     <!-- CỘT TRÁI (60%): THÔNG TIN LÂM SÀNG (SCROLLABLE) -->
                     <div style="flex: 6; overflow-y: auto; padding-right: 15px; border-right: 1px solid #1e293b;">
-                        <h2 style="color: #38bdf8; margin-top: 0; font-size: 22px; border-bottom: 1px solid #1e293b; padding-bottom: 10px;">${game.title}</h2>
+                        <h2 style="color: #38bdf8; margin-top: 0; font-size: 22px; border-bottom: 1px solid #1e293b; padding-bottom: 10px;">${game.title}<a href="${docHref}" target="_blank" title="Xem tài liệu y khoa (mở trang mới)" style="text-decoration:none; margin-left:10px;">ℹ️</a></h2>
 
                         <p style="font-size: 12px; color: #a78bfa; margin: 0 0 16px 0; font-weight: bold;">${game.stage}</p>
 
