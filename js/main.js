@@ -1213,9 +1213,9 @@ function formatTherapyClinicalResult(metrics) {
 
     // Ưu tiên xử lý M11 (chặn rơi vào khối C-Ratio mặc định của M1)
     if (gameName && gameName.includes('M11')) {
-        let cValue = metrics?.customData?.finalContrastThreshold || metrics?.customData?.finalContrast || 0;
+        let logCS = metrics?.customData?.finalLogCS || 0;
         let revs = metrics?.customData?.reversals || 0;
-        return `Ngưỡng tương phản (C): ${(cValue * 100).toFixed(1)}% | Đảo chiều: ${revs}`;
+        return `LogCS: ${logCS.toFixed(2)} | Đảo chiều: ${revs}`;
     }
 
     // Module 1: Contrast threshold fusion (C-Ratio)
@@ -1444,16 +1444,16 @@ function generateTherapyReportHTML(patientId) {
             resultHTML = `Chính xác: <b>${acc.toFixed(0)}%</b> (${hit}/${spawned}) | Phản xạ trung bình: <b>${rt.toFixed(0)} ms</b> | Hướng: <b>${dir}</b> | Tốc độ: <b>${spd} px/s</b><br>Đánh giá: ${statusHTML}`;
         }
         else if (record.gameName && record.gameName.includes('M11')) {
-            const fc = customData.finalContrast !== undefined ? customData.finalContrast : 1;
+            const logCS = customData.finalLogCS !== undefined ? customData.finalLogCS : 0;
             const rev = customData.reversals !== undefined ? customData.reversals : 0;
             const acc = customData.accuracy !== undefined ? customData.accuracy : 0;
             const total = customData.totalTrials !== undefined ? customData.totalTrials : 0;
             const hit = customData.correctAnswers !== undefined ? customData.correctAnswers : 0;
             const rt = customData.avgReactionTimeMs !== undefined ? customData.avgReactionTimeMs : 0;
-            // Đạt: ngưỡng tương phản thấp (<= 10%) và đã hội tụ (>= 4 đảo chiều)
-            const isPassed = fc <= 0.1 && rev >= 4;
+            // Đạt (chuẩn LogCS): LogCS >= 1.0 (tương phản <= 10%) và đã hội tụ (>= 4 đảo chiều)
+            const isPassed = logCS >= 1.0 && rev >= 4;
             statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>' : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
-            resultHTML = `Ngưỡng tương phản: <b>${(fc * 100).toFixed(1)}%</b> | Đảo chiều: <b>${rev}</b> | Chính xác: <b>${acc.toFixed(0)}%</b> (${hit}/${total}) | Phản xạ: <b>${rt.toFixed(0)} ms</b><br>Đánh giá: ${statusHTML}`;
+            resultHTML = `LogCS: <b>${logCS.toFixed(2)}</b> | Đảo chiều: <b>${rev}</b> | Chính xác: <b>${acc.toFixed(0)}%</b> (${hit}/${total}) | Phản xạ: <b>${rt.toFixed(0)} ms</b><br>Đánh giá: ${statusHTML}`;
         }
         else {
             const score = record.metrics?.score || 0;
