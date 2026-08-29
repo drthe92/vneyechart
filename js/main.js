@@ -1275,11 +1275,13 @@ function formatTherapyClinicalResult(metrics) {
     }
 
     // Module 11: Gabor Perceptual Learning (Monocular) — contrast threshold & reversals
+    // TUYỆT ĐỐI KHÔNG kế thừa logic C-Ratio của Module 1; trích xuất độc lập từ customData.
     else if (gameName.includes('M11')) {
         const fc = metrics.customData?.finalContrast;
         const rev = metrics.customData?.reversals;
         if (fc !== undefined && fc !== null) {
-            return `Ngưỡng tương phản (C): ${ (fc * 100).toFixed(1) }% | Số đảo chiều: ${ rev !== undefined ? rev : 'N/A' }`;
+            const revStr = (rev !== undefined && rev !== null) ? rev : 'N/A';
+            return `Ngưỡng tương phản (C): ${ Number(fc).toFixed(3) } | Đảo chiều: ${ revStr }`;
         }
     }
 
