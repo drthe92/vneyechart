@@ -39,8 +39,9 @@ class TherapeuticMenuController {
             {
                 id: 'catch',
                 name: 'M1: Hứng hạt',
+                icon: '🍎',
                 classRef: CatchGame,
-                stage: 'Giai đoạn 2: Phá vỡ Ức chế (Đeo kính Đỏ - Xanh)',
+                stage: 'Giai đoạn 2 · Phá vỡ ức chế hợp thị cảm giác (Phân thị Anaglyph)',
                 parentTranslation: 'Dạy não bộ không được "bỏ rơi" mắt yếu. Game sẽ làm mờ hình ở mắt khỏe và làm rõ hình ở mắt yếu để bắt 2 mắt phải làm việc đều nhau.',
                 medicalPurpose: 'Phá vỡ ức chế, khôi phục hợp thị thô.',
                 indication: 'Trẻ đã nhìn khá hơn (> 2/10) nhưng khi mở cả 2 mắt vẫn hay nheo một mắt.',
@@ -70,8 +71,9 @@ class TherapeuticMenuController {
             {
                 id: 'align',
                 name: 'M2: Khớp khung',
+                icon: '🧩',
                 classRef: ShapeAlignmentGame,
-                stage: 'Giai đoạn 2: Phá vỡ Ức chế (Đeo kính Đỏ - Xanh)',
+                stage: 'Giai đoạn 2 · Phá vỡ ức chế hợp thị cảm giác (Phân thị Anaglyph)',
                 parentTranslation: 'Rèn luyện sự tỉ mỉ. Ép mắt yếu phải khóa chặt mục tiêu trong khi mắt khỏe chỉ nhìn thấy khung nền.',
                 medicalPurpose: 'Định thị trung tâm trong điều kiện 2 mắt.',
                 indication: 'Thị lực >= 2/10, hết định thị lệch tâm.',
@@ -93,8 +95,9 @@ class TherapeuticMenuController {
             {
                 id: 'vergence',
                 name: 'M3: Vận nhãn',
+                icon: '🔀',
                 classRef: VergenceTrackerGame,
-                stage: 'Giai đoạn 3: Tập gym cơ mắt (Vận nhãn cơ học)',
+                stage: 'Giai đoạn 3 · Hợp thị Vận động & Theo vết (Motor Oculomotor)',
                 parentTranslation: 'Giống như tập tạ, bài tập này giúp hai mắt có lực để kéo chụm vào nhau khi đọc sách, nhìn gần, chống mỏi mắt.',
                 medicalPurpose: 'Tăng biên độ hội tụ (Base Out).',
                 indication: 'Lác ngoài (Exotropia) ẩn, mỏi mắt khi học bài, lờ đờ.',
@@ -126,8 +129,9 @@ class TherapeuticMenuController {
             {
                 id: 'saccadic',
                 name: 'M4: Vận nhãn nhanh (Saccadic)',
+                icon: '⚡',
                 classRef: SaccadicTrackingGame,
-                stage: 'Giai đoạn 4: Thị giác 3D (Tinh chỉnh tối đa)',
+                stage: 'Giai đoạn 4 · Thị giác 3D & Phản xạ Cấp cao',
                 parentTranslation: 'Tăng tốc độ truyền tín hiệu từ mắt lên não. Trẻ sẽ phản xạ nhanh hơn trong học tập và chơi thể thao.',
                 medicalPurpose: 'Tăng tốc độ đưa ảnh từ võng mạc ngoại vi vào hố hoàng điểm (Saccadic).',
                 indication: 'Thị lực hai mắt đều, cần giảm độ trễ phản xạ.',
@@ -157,8 +161,9 @@ class TherapeuticMenuController {
             {
                 id: 'rds_therapy',
                 name: 'M5: Huấn luyện Thị giác nổi (RDS)',
+                icon: '🧊',
                 classRef: RDSTherapyGame,
-                stage: 'Giai đoạn 4: Thị giác 3D (Tinh chỉnh tối đa)',
+                stage: 'Giai đoạn 4 · Thị giác 3D & Phản xạ Cấp cao',
                 parentTranslation: 'Đánh thức khả năng nhìn không gian 3 chiều. Qua lớp kính Đỏ-Xanh, não bộ sẽ ghép các đốm nhiễu thành một hình khối nổi bồng bềnh lên khỏi màn hình.',
                 medicalPurpose: 'Tinh chỉnh thị giác nổi toàn cục (Global Stereopsis).',
                 indication: 'Giai đoạn cuối cùng. Yêu cầu hai mắt đã khá đều nhau.',
@@ -178,8 +183,9 @@ class TherapeuticMenuController {
             {
                 id: 'divergence',
                 name: 'M6: Huấn luyện Phân kỳ (Divergence)',
+                icon: '↔️',
                 classRef: DivergenceTherapyGame,
-                stage: 'Giai đoạn 3: Tập gym cơ mắt (Vận nhãn cơ học)',
+                stage: 'Module Chuyên biệt (Tùy chọn)',
                 parentTranslation: 'Giúp hai mắt biết cách nhả cơ, giãn lỏng ra khi nhìn xa. Chữa tật hay bị lác chéo vào trong (lé kim).',
                 medicalPurpose: 'Tăng biên độ phân kỳ (Base In).',
                 indication: 'Lác trong ẩn.',
@@ -211,8 +217,9 @@ class TherapeuticMenuController {
             {
                 id: 'cam-stim',
                 name: 'M7: Kích thích Lưới quay CAM',
+                icon: '🌀',
                 classRef: CamVisualStimulatorGame,
-                stage: 'Giai đoạn 1: Đánh thức Hoàng điểm (Bịt mắt lành)',
+                stage: 'Giai đoạn 1 · Đánh thức Hoàng điểm (Đơn thị)',
                 parentTranslation: 'Đánh thức vùng trung tâm của mắt nhược thị, giúp mắt học cách tập trung vào một điểm duy nhất thay vì nhìn lệch.',
                 medicalPurpose: 'Kích hoạt cưỡng bức tế bào vỏ não thị giác (V1) nhạy cảm hướng. Ép dồn chú ý tâm điểm để phá vỡ hiện tượng định thị ngoại tâm.',
                 indication: 'Mắt nhược thị rất nặng (Thị lực < 2/10). Trẻ hay nhìn nghiêng đầu, liếc mắt.',
@@ -251,8 +258,9 @@ class TherapeuticMenuController {
             {
                 id: 'anti-crowding',
                 name: 'M8: Khử hiện tượng chen chúc (Anti-Crowding)',
+                icon: '🔠',
                 classRef: AntiCrowdingGame,
-                stage: 'Giai đoạn 1: Đánh thức Hoàng điểm (Bịt mắt lành)',
+                stage: 'Giai đoạn 1 · Đánh thức Hoàng điểm (Đơn thị)',
                 parentTranslation: 'Giúp mắt trẻ hết bị "loạn", không còn hiện tượng các chữ cái dính chùm vào nhau khi đọc sách.',
                 medicalPurpose: 'Phá vỡ hiệu ứng tương tác viền (Contour Interaction / Crowding Effect). Huấn luyện vỏ não khả năng bóc tách tín hiệu.',
                 indication: 'Mắt nhược thị nhìn từng chữ thì rõ, nhưng nhìn cả hàng chữ thì mờ.',
@@ -281,8 +289,9 @@ class TherapeuticMenuController {
             {
                 id: 'red-cone',
                 name: 'M9: Kích thích tế bào nón hoàng điểm (RED-Cone)',
+                icon: '🔴',
                 classRef: RedConeStimulatorGame,
-                stage: 'Giai đoạn 1: Đánh thức Hoàng điểm (Monocular Pleoptics)',
+                stage: 'Giai đoạn 1 · Đánh thức Hoàng điểm (Đơn thị)',
                 parentTranslation: 'Kích thích vùng hoàng điểm bằng ánh sáng đỏ, ép mắt yếu phải làm việc trong bóng tối.',
                 medicalPurpose: 'Sử dụng phương pháp Brinker-Katz. Vô hiệu hóa tế bào que chu biên bằng ánh sáng đỏ thuần, ép kích hoạt tế bào nón hoàng điểm.',
                 indication: 'Nhược thị sâu (Thị lực < 2/10), định thị ngoại tâm dai dẳng.',
@@ -311,8 +320,9 @@ class TherapeuticMenuController {
             {
                 id: 'okn-stim',
                 name: 'M10: Kích thích phản xạ OKN (Optokinetic)',
+                icon: '🚆',
                 classRef: OKNStimulationGame,
-                stage: 'Giai đoạn 1: Đánh thức Hoàng điểm (Bịt mắt lành)',
+                stage: 'Giai đoạn 1 · Đánh thức Hoàng điểm (Đơn thị)',
                 parentTranslation: 'Khi mắt nhược thị nhìn theo các sọc đen trắng chuyển động, não sẽ bật phản xạ rung giật nhãn cầu (OKN), giúp kéo điểm nhìn về đúng trung tâm võng mạc.',
                 medicalPurpose: 'Kích thích phản xạ rung giật nhãn cầu (Optokinetic Nystagmus) để phá vỡ định thị ngoại tâm, rèn lại định thị trung tâm.',
                 indication: 'Định thị ngoại tâm dai dẳng, nhược thị sâu cần tái lập hoàng điểm.',
@@ -349,8 +359,9 @@ class TherapeuticMenuController {
             {
                 id: 'gabor-pl',
                 name: 'M11: Học tri giác Gabor (Perceptual Learning)',
+                icon: '🦓',
                 classRef: GaborPerceptualLearningGame,
-                stage: 'Giai đoạn 2: Tăng cường độ nhạy tương phản (Đơn nhãn)',
+                stage: 'Giai đoạn 1 · Đánh thức Hoàng điểm (Đơn thị)',
                 parentTranslation: 'Giống như tập tạ cho não, bài tập này dùng các vằn sáng tối (Gabor) để ép tế bào V1 của mắt yếu nhạy hơn với độ tương phản, giúp trẻ nhìn rõ vật mờ.',
                 medicalPurpose: 'Kích thích trực tiếp tế bào V1 bằng mảng Gabor, tăng cường độ nhạy tương phản (Neuroplasticity) qua thuật toán Cầu thang 3-Down/1-Up.',
                 indication: 'Nhược thị đã ổn định định thị, giảm độ nhạy tương phản (Contrast Sensitivity).',
@@ -371,8 +382,9 @@ class TherapeuticMenuController {
             {
                 id: 'dichoptic-pursuit',
                 name: 'M12: Bám đuôi phân thị (Smooth Pursuit)',
+                icon: '🎢',
                 classRef: DichopticPursuitGame,
-                stage: 'Giai đoạn 3: Huấn luyện Vận nhãn & Hợp thị (Binocular Oculomotor)',
+                stage: 'Giai đoạn 3 · Hợp thị Vận động & Theo vết (Motor Oculomotor)',
                 parentTranslation: 'Rèn cho hai mắt biết "bám đuôi" một vật mượt mà không nhảy hình. Qua kính Đỏ-Lục Lam, não buộc phải dung hợp hai ảnh thành một đường ray sáng để Tàu luôn đi đúng vệt.',
                 medicalPurpose: 'Rèn luyện cử động nhãn cầu theo vết (Smooth Pursuit) kết hợp triệt tiêu ức chế vỏ não qua môi trường phân thị.',
                 indication: 'Hợp thị đã ổn định, cần tăng chất lượng vận nhãn theo vết (theo dõi vật động).',
@@ -480,40 +492,143 @@ class TherapeuticMenuController {
     }
 
     renderSidebar() {
-        this.menuContainer.innerHTML = '';
+        const container = this.menuContainer;
+
+        // 1. Dọn dẹp container cha (Xóa hết tàn dư cũ)
+        container.innerHTML = '';
+        container.style.display = 'flex';
+        container.style.flexDirection = 'column';
+        container.style.alignItems = 'stretch';
+        container.style.justifyContent = 'flex-start'; // Quan trọng: tránh flexbox căn giữa cắt mất Giai đoạn 1
+        container.style.gap = '30px';
+        container.style.width = '100%';
+        container.style.padding = '20px';
+        container.style.overflowY = 'auto'; // Cho phép cuộn khi nội dung vượt khung
+        container.style.maxHeight = 'calc(100vh - 120px)';
+
+        // 2. Định nghĩa mảng chuỗi chuẩn tuyệt đối (Source of Truth)
+        const stagesOrder = [
+            "Giai đoạn 1 · Đánh thức Hoàng điểm (Đơn thị)",
+            "Giai đoạn 2 · Phá vỡ ức chế hợp thị cảm giác (Phân thị Anaglyph)",
+            "Giai đoạn 3 · Hợp thị Vận động & Theo vết (Motor Oculomotor)",
+            "Giai đoạn 4 · Thị giác 3D & Phản xạ Cấp cao",
+            "Module Chuyên biệt (Tùy chọn)"
+        ];
+
+        // 3. Ép lại `stage` cho TỪNG module dựa vào số hiệu (Mx:) trong name
+        // (chống sai lệch chuỗi / tàn dư cũ trong dữ liệu)
+        const idMap = {
+            "7": 0, "8": 0, "9": 0, "10": 0, "11": 0,  // Giai đoạn 1
+            "1": 1, "2": 1,                              // Giai đoạn 2
+            "3": 2, "12": 2,                            // Giai đoạn 3
+            "4": 3, "5": 3,                             // Giai đoạn 4
+            "6": 4                                      // Chuyên biệt
+        };
+
+        this.gameModules.forEach(mod => {
+            // Trích xuất Mx / Mxx từ name (ví dụ: "M7: ..." -> "7", "M12: ..." -> "12")
+            const match = (mod.name || "").match(/M(\d{1,2})/i);
+            if (match) {
+                const stageIndex = idMap[match[1]];
+                if (stageIndex !== undefined) {
+                    mod.stage = stagesOrder[stageIndex];
+                }
+            }
+        });
+
+        // 4. Thuật toán phân nhóm
+        const groupedModules = {};
+        this.gameModules.forEach(mod => {
+            if (!groupedModules[mod.stage]) groupedModules[mod.stage] = [];
+            groupedModules[mod.stage].push(mod);
+        });
 
         const isCalibrated = window.__anaglyphColors && window.__anaglyphColors.red;
 
-        for (const module of this.gameModules) {
-            const btn = document.createElement('button');
-            btn.textContent = module.name;
+        // 5. Render tuần tự và đóng gói
+        stagesOrder.forEach(stageName => {
+            const modulesInStage = groupedModules[stageName];
+            if (!modulesInStage || modulesInStage.length === 0) return;
 
-            btn.style.width = '100%';
-            btn.style.marginBottom = '10px';
-            btn.style.padding = '15px';
-            btn.style.border = 'none';
-            btn.style.borderRadius = '8px';
-            btn.style.textAlign = 'center';
-            btn.style.fontSize = '14px';
-            btn.style.fontWeight = '500';
-            btn.style.cursor = 'pointer';
+            // A. Tạo Tiêu đề
+            const title = document.createElement('h3');
+            title.innerText = stageName;
+            title.style.width = '100%';
+            title.style.color = '#4da6ff';
+            title.style.borderBottom = '1px solid #333';
+            title.style.paddingBottom = '8px';
+            title.style.marginBottom = '16px';
+            title.style.marginTop = '0';
+            title.style.textAlign = 'left';
+            title.style.fontSize = '1.2rem';
+            container.appendChild(title);
 
-            if (!isCalibrated) {
-                btn.disabled = true;
-                btn.style.opacity = '0.5';
-                btn.style.cursor = 'not-allowed';
-                btn.title = 'Chống chỉ định: Cần hiệu chuẩn kính';
-                btn.style.backgroundColor = '#e0e0e0';
-                btn.style.color = '#999';
-            } else {
-                btn.onclick = () => this.launchGame(module);
-                btn.onmouseover = () => btn.style.backgroundColor = '#e8f4fc';
-                btn.onmouseout = () => btn.style.backgroundColor = '#f5f5f5';
-                btn.style.backgroundColor = '#f5f5f5';
-            }
+            // B. Tạo Container chứa các thẻ Game của Giai đoạn này
+            const gamesContainer = document.createElement('div');
+            gamesContainer.style.display = 'flex';
+            gamesContainer.style.flexDirection = 'row';
+            gamesContainer.style.flexWrap = 'wrap';
+            gamesContainer.style.gap = '16px';
+            gamesContainer.style.justifyContent = 'flex-start';
+            gamesContainer.style.marginBottom = '20px';
 
-            this.menuContainer.appendChild(btn);
-        }
+            // C. Render các nút bài tập bỏ vào gamesContainer
+            modulesInStage.forEach(mod => {
+                const btn = document.createElement('button');
+                btn.style.flex = '1 1 150px';
+                btn.style.maxWidth = '220px';
+                btn.style.height = 'auto';
+                btn.style.minHeight = '92px';
+                btn.style.padding = '14px';
+                btn.style.display = 'flex';
+                btn.style.flexDirection = 'column';
+                btn.style.alignItems = 'center';
+                btn.style.justifyContent = 'center';
+                btn.style.backgroundColor = '#f8f9fa';
+                btn.style.borderRadius = '12px';
+                btn.style.cursor = 'pointer';
+                btn.style.transition = 'all 0.2s ease';
+                btn.style.border = '2px solid transparent';
+                btn.style.color = '#1a1a1a';
+                btn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+
+                const iconSpan = document.createElement('span');
+                iconSpan.textContent = mod.icon || '▶';
+                iconSpan.style.fontSize = '1.9rem';
+                iconSpan.style.marginBottom = '8px';
+
+                const nameStrong = document.createElement('strong');
+                nameStrong.textContent = mod.name;
+                nameStrong.style.fontSize = '0.95rem';
+                nameStrong.style.textAlign = 'center';
+                nameStrong.style.lineHeight = '1.35';
+
+                btn.appendChild(iconSpan);
+                btn.appendChild(nameStrong);
+
+                if (!isCalibrated) {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.5';
+                    btn.style.cursor = 'not-allowed';
+                    btn.title = 'Chống chỉ định: Cần hiệu chuẩn kính';
+                } else {
+                    btn.onclick = () => this.launchGame(mod);
+                    btn.onmouseover = () => {
+                        btn.style.borderColor = '#007bff';
+                        btn.style.transform = 'translateY(-3px)';
+                    };
+                    btn.onmouseout = () => {
+                        btn.style.borderColor = 'transparent';
+                        btn.style.transform = 'none';
+                    };
+                }
+
+                gamesContainer.appendChild(btn);
+            });
+
+            // D. Đưa toàn bộ nhóm vào container chính
+            container.appendChild(gamesContainer);
+        });
     }
 
     stopCurrentGame() {

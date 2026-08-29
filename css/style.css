@@ -191,13 +191,6 @@ button {
   max-height: calc(100vh - 120px);
 }
 
-/* Therapeutic menu has different layout (centered content) */
-#menu-therapeutic {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 /* All menu items in a 4-column grid */
 .menu-items {
   display: grid;
