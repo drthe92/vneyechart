@@ -1263,6 +1263,17 @@ function formatTherapyClinicalResult(metrics) {
         }
     }
 
+    // Module 10: OKN Tracker (Monocular) — accuracy & avg reaction time
+    else if (gameName.includes('M10')) {
+        const acc = metrics.customData?.accuracy;
+        const rt = metrics.customData?.avgReactionTimeMs;
+        const dir = metrics.customData?.direction;
+        const spd = metrics.customData?.stripeSpeed;
+        if (acc !== undefined && acc !== null && rt !== undefined && rt !== null) {
+            return `Chính xác: ${ acc.toFixed(0) }% | Phản xạ trung bình: ${ rt.toFixed(0) } ms${ dir ? ` | Hướng: ${ dir }` : '' }${ spd ? ` | Tốc độ: ${ spd } px/s` : '' }`;
+        }
+    }
+
     // Fallback: generic score
     const score = metrics?.score;
     if (score !== undefined && score !== null) {
@@ -1401,6 +1412,18 @@ function generateTherapyReportHTML(patientId) {
             const isPassed = acc >= 85;
             statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>' : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
             resultHTML = `Chính xác: <b>${acc.toFixed(0)}%</b> | Phản xạ trung bình: <b>${rt.toFixed(0)} ms</b><br>Đánh giá: ${statusHTML}`;
+        }
+        else if (record.gameName && record.gameName.includes('M10')) {
+            const acc = customData.accuracy !== undefined ? customData.accuracy : 0;
+            const rt = customData.avgReactionTimeMs !== undefined ? customData.avgReactionTimeMs : 0;
+            const dir = customData.direction || 'N/A';
+            const spd = customData.stripeSpeed !== undefined ? customData.stripeSpeed : 0;
+            const spawned = customData.targetsSpawned !== undefined ? customData.targetsSpawned : 0;
+            const hit = customData.targetsHit !== undefined ? customData.targetsHit : 0;
+            // Đạt: Độ chính xác >= 80% (ngưỡng lâm sàng OKN)
+            const isPassed = acc >= 80;
+            statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>' : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
+            resultHTML = `Chính xác: <b>${acc.toFixed(0)}%</b> (${hit}/${spawned}) | Phản xạ trung bình: <b>${rt.toFixed(0)} ms</b> | Hướng: <b>${dir}</b> | Tốc độ: <b>${spd} px/s</b><br>Đánh giá: ${statusHTML}`;
         }
         else {
             const score = record.metrics?.score || 0;

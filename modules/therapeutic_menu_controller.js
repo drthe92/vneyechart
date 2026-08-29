@@ -7,11 +7,12 @@ import DivergenceTherapyGame from './divergence_therapy_game.js';
 import CamVisualStimulatorGame from './cam_visual_stimulator_game.js';
 import AntiCrowdingGame from './anti_crowding_game.js';
 import RedConeStimulatorGame from './red_cone_stimulator_game.js';
+import OKNStimulationGame from './okn_stimulation_game.js';
 
 /**
  * Therapeutic Menu Controller (Lazy Binding Architecture)
  *
- * Quản lý giao diện và vòng đời 8 Game module trong khu vực Huấn luyện Thị giác:
+ * Quản lý giao diện và vòng đời 10 Game module trong khu vực Huấn luyện Thị giác:
  * - M1: Hứng hạt (CatchGame)
  * - M2: Khớp khung (ShapeAlignmentGame)
  * - M3: Vận nhãn (VergenceTrackerGame)
@@ -21,6 +22,7 @@ import RedConeStimulatorGame from './red_cone_stimulator_game.js';
  * - M7: Kích thích Lưới quay CAM (CamVisualStimulatorGame)
  * - M8: Khử hiện tượng chen chúc (AntiCrowdingGame)
  * - M9: Kích thích tế bào nón hoàng điểm (RedConeStimulatorGame)
+ * - M10: Kích thích phản xạ OKN (OKNStimulationGame)
  */
 
 class TherapeuticMenuController {
@@ -301,6 +303,44 @@ class TherapeuticMenuController {
                     }
                 ],
                 mandatoryWarning: '⚠️ BẮT BUỘC: CHỈ MỞ MẮT NHƯỢC THỊ. Hãy TẮT ĐÈN phòng tập.'
+            },
+            {
+                id: 'okn-stim',
+                name: 'M10: Kích thích phản xạ OKN (Optokinetic)',
+                classRef: OKNStimulationGame,
+                stage: 'Giai đoạn 1: Đánh thức Hoàng điểm (Bịt mắt lành)',
+                parentTranslation: 'Khi mắt nhược thị nhìn theo các sọc đen trắng chuyển động, não sẽ bật phản xạ rung giật nhãn cầu (OKN), giúp kéo điểm nhìn về đúng trung tâm võng mạc.',
+                medicalPurpose: 'Kích thích phản xạ rung giật nhãn cầu (Optokinetic Nystagmus) để phá vỡ định thị ngoại tâm, rèn lại định thị trung tâm.',
+                indication: 'Định thị ngoại tâm dai dẳng, nhược thị sâu cần tái lập hoàng điểm.',
+                contraindication: 'TUYỆT ĐỐI KHÔNG dùng cho bệnh nhân động kinh ánh sáng (sọc chuyển động có thể kích phát cơn).',
+                gameplay: 'Bịt mắt sáng. Nhìn theo sọc chuyển động, dùng chuột/ngón tay chạm vào đốm đỏ sáng xuất hiện ngẫu nhiên. Chạm trúng -> tiếng "Ting".',
+                goal: 'Đạt độ chính xác > 80%, thời gian phản xạ < 1.5s.',
+                settings: [
+                    {
+                        id: 'okn-stripe-size', key: 'stripeSize', label: 'Kích thước sọc', numeric: false,
+                        options: [
+                            { value: 'Lớn', label: 'Lớn', selected: false },
+                            { value: 'Vừa', label: 'Vừa', selected: true },
+                            { value: 'Nhỏ', label: 'Nhỏ', selected: false }
+                        ]
+                    },
+                    {
+                        id: 'okn-direction', key: 'direction', label: 'Hướng trôi sọc', numeric: false,
+                        options: [
+                            { value: 'LTR', label: 'Trái → Phải', selected: true },
+                            { value: 'RTL', label: 'Phải → Trái', selected: false }
+                        ]
+                    },
+                    {
+                        id: 'okn-speed', key: 'speed', label: 'Tốc độ trôi', numeric: false,
+                        options: [
+                            { value: 'Chậm', label: 'Chậm', selected: false },
+                            { value: 'Vừa', label: 'Vừa', selected: true },
+                            { value: 'Nhanh', label: 'Nhanh', selected: false }
+                        ]
+                    }
+                ],
+                mandatoryWarning: '⚠️ BẮT BUỘC: CHỈ MỞ MẮT NHƯỢC THỊ (BỊT MẮT LÀNH). Chống chỉ định: Động kinh ánh sáng.'
             }
         ];
 
