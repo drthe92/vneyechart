@@ -1236,6 +1236,13 @@ function formatTherapyClinicalResult(input) {
         return `LogCS: <b>${logCS.toFixed(2)}</b> (Tương phản: <b>${contrastPct}%</b>) | Đảo chiều: ${revs}<br><small><i>Diễn giải: ${interpretation}</i></small>`;
     }
 
+    // Module 12: Dichoptic Smooth Pursuit — tracking accuracy & out-of-bounds
+    if (gameName && gameName.includes('M12')) {
+        let accuracy = metrics?.customData?.trackingAccuracy || 0;
+        let outOfBounds = metrics?.customData?.outOfBoundsHits || 0;
+        return `Chính xác bám đuôi: <b>${accuracy.toFixed(1)}%</b> | Chệch hướng: ${outOfBounds} lần`;
+    }
+
     // Module 1: Contrast threshold fusion (C-Ratio)
     if (gameName.startsWith('M1:') || metrics?.moduleType === 1) {
         const alpha = metrics.customData?.finalAlpha;
