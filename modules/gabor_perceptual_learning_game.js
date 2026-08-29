@@ -154,6 +154,7 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
             this._consecutiveCorrect += 1;
             this._playTone(880, 'sine', 0.12);     // Ting (đúng) — pitch cao
             if (this._consecutiveCorrect >= 3) {
+                this._playLevelUp();               // Hiệu ứng Level Up (trước khi giảm C & reset)
                 this.currentContrast = this.currentContrast * 0.9; // Giảm tương phản (khó hơn)
                 this._consecutiveCorrect = 0;
                 this._stepDirection('down');
@@ -300,6 +301,55 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
     }
 
     /**
+     * Phát âm thanh "Level Up": 2 tiếng beep nối tiếp tăng dần cao độ
+     * (880Hz -> 1200Hz, mỗi tiếng 100ms) khi đạt 3 đúng liên tiếp.
+     */
+    _playLevelUp() {
+        try {
+            if (!this._audioCtx) {
+                const AC = window.AudioContext || window.webkitAudioContext;
+                if (!AC) return;
+                this._audioCtx = new AC();
+            }
+            const ctx = this._audioCtx;
+            if (ctx.state === 'suspended') ctx.resume();
+            const beep = (freq, startOffset) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                const t0 = ctx.currentTime + startOffset;
+                gain.gain.setValueAtTime(0.0001, t0);
+                gain.gain.exponentialRampToValueAtTime(0.25, t0 + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.1);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(t0);
+                osc.stop(t0 + 0.12);
+            };
+            beep(880, 0);      // Tiếng 1: 880Hz
+            beep(1200, 0.12);  // Tiếng 2: 1200Hz (cao hơn)
+        } catch (e) {
+            // Im lặng nếu trình duyệt chặn audio
+        }
+    }
+
+    /**
+     * Vẽ HUD tiến độ nhỏ, ít gây nhiễu (chỉ gọi ngoài pha FLASH)
+     * @param {CanvasRenderingContext2D} ctx
+     */
+    _drawHUD(ctx) {
+        const cw = this.canvas.width;
+        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = '#606060';                 // Xám tối, không gây nhiễu quang học
+        ctx.font = 'bold 20px monospace';
+        ctx.textBaseline = 'top';
+        ctx.textAlign = 'left';
+        ctx.fillText(`Tiến độ: ${this.reversals}/${this.TARGET_REVERSALS}`, 16, 16);
+        ctx.textAlign = 'left';
+    }
+
+    /**
      * Render đồ họa — ÉP ĐƠN NHÃN, Nền xám + Gabor flash + dấu định thị.
      */
     render() {
@@ -324,9 +374,12 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
         // B. Flash Gabor (không vẽ dấu + trong lúc flash)
         if (this.state === 'FLASH' && this._gaborImg) {
             ctx.putImageData(this._gaborImg, this._gaborX, this._gaborY);
+            // RÀNG BUỘC QUANG HỌC: tuyệt đối KHÔNG vẽ HUD trong pha FLASH
         } else {
             // C. Dấu định thị (+) ở các pha chờ
             this._drawCross(ctx, cx, cy);
+            // D. HUD tiến độ (chỉ ngoài pha FLASH)
+            this._drawHUD(ctx);
         }
     }
 
