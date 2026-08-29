@@ -192,19 +192,30 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
 
         if (isCorrect) {
             this.correctAnswers += 1;
-            this._consecutiveCorrect += 1;
             this._playTone(880, 'sine', 0.12);     // Ting (đúng) — pitch cao
-            if (this._consecutiveCorrect >= 3) {
-                this._playLevelUp();               // Hiệu ứng Level Up (trước khi giảm C & reset)
-                this.currentContrast = this.currentContrast * 0.9; // Giảm tương phản (khó hơn)
+
+            if (this.reversals === 0) {
+                // GIAI ĐOẠN 1 (Fast Descent): đúng 1 lần => giảm sâu C = C * 0.5
+                this.currentContrast = this.currentContrast * 0.5;
+                this._playLevelUp();               // Level Up mỗi khi C giảm
                 this._consecutiveCorrect = 0;
-                this._stepDirection('down');
+                this._lastStepDir = 'down';
+            } else {
+                // GIAI ĐOẠN 2 (Fine-tuning 3-Down/1-Up): đúng 3 lần liên tiếp => giảm nhẹ C = C * 0.9
+                this._consecutiveCorrect += 1;
+                if (this._consecutiveCorrect >= 3) {
+                    this.currentContrast = this.currentContrast * 0.9;
+                    this._playLevelUp();           // Level Up mỗi khi C giảm
+                    this._consecutiveCorrect = 0;
+                    this._lastStepDir = 'down';
+                }
             }
         } else {
             this._consecutiveCorrect = 0;
             this._playTone(160, 'square', 0.18);   // Buzzer (sai) — pitch thấp
             this.currentContrast = Math.min(1.0, this.currentContrast * 1.1); // Tăng tương phản
-            this._stepDirection('up');
+            this.reversals += 1;                   // Kích hoạt Giai đoạn 2 (Fast -> Fine)
+            this._lastStepDir = 'up';
         }
 
         this.totalTrials += 1;
@@ -215,17 +226,6 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
         } else {
             this._startTrial();
         }
-    }
-
-    /**
-     * Ghi nhận hướng bước của Cầu thang; tăng `reversals` khi đổi chiều
-     * @param {'down'|'up'} dir
-     */
-    _stepDirection(dir) {
-        if (this._lastStepDir && this._lastStepDir !== dir) {
-            this.reversals += 1;
-        }
-        this._lastStepDir = dir;
     }
 
     /**
