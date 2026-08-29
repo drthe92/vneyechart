@@ -1208,8 +1208,10 @@ if (document.readyState === 'loading') {
  * @param {Object} metrics - The metrics object from therapy record
  * @returns {string} Formatted clinical result string
  */
-function formatTherapyClinicalResult(metrics) {
-    const gameName = metrics?.gameName || '';
+function formatTherapyClinicalResult(input) {
+    // Hỗ trợ truyền cả record (có .metrics) hoặc metrics trực tiếp
+    const metrics = (input && input.metrics) ? input.metrics : input;
+    const gameName = metrics?.gameName || input?.gameName || '';
 
     // Ưu tiên xử lý M11 (chặn rơi vào khối C-Ratio mặc định của M1)
     if (gameName && gameName.includes('M11')) {
@@ -1235,23 +1237,23 @@ function formatTherapyClinicalResult(metrics) {
     }
 
     // Module 1: Contrast threshold fusion (C-Ratio)
-    if (gameName === 'M1' || metrics?.moduleType === 1) {
+    if (gameName.startsWith('M1:') || metrics?.moduleType === 1) {
         const alpha = metrics.customData?.finalAlpha;
         if (alpha !== undefined && alpha !== null) {
             return `Ngưỡng tương phản dung hợp (C-Ratio): ${ (alpha * 100).toFixed(0) }%`;
         }
     }
-    
+
     // Module 2: Foveal visual angle
-    if (gameName === 'M2' || metrics?.moduleType === 2) {
+    if (gameName.startsWith('M2:') || metrics?.moduleType === 2) {
         const angle = metrics.customData?.visualAngleDeg;
         if (angle !== undefined && angle !== null) {
             return `Góc thị giác Foveal tối thiểu: ${ angle.toFixed(2) }°`;
         }
     }
-    
+
     // Module 3: Vergence measurements (BO/BI)
-    if (gameName === 'M3' || metrics?.moduleType === 3) {
+    if (gameName.startsWith('M3:') || metrics?.moduleType === 3) {
         const bo = metrics.customData?.avgBaseOut;
         const bi = metrics.customData?.avgBaseIn;
         if (bo !== undefined && bo !== null && bi !== undefined && bi !== null) {
@@ -1259,8 +1261,24 @@ function formatTherapyClinicalResult(metrics) {
         }
     }
 
+    // Module 4: Saccadic (reaction time)
+    if (gameName.startsWith('M4:') || metrics?.moduleType === 4) {
+        const latency = metrics.customData?.avgLatencyMs;
+        if (latency !== undefined && latency !== null) {
+            return `Thời gian phản xạ: ${ latency } ms`;
+        }
+    }
+
+    // Module 5: Global Stereopsis (RDS) — Arcsec
+    if (gameName.startsWith('M5:') || metrics?.moduleType === 5) {
+        const finalArcsec = metrics.customData?.finalArcsec;
+        if (finalArcsec !== undefined && finalArcsec !== null) {
+            return `Ngưỡng thị giác nổi (Stereoacuity): ${ finalArcsec } Arcsec`;
+        }
+    }
+
     // Module 7: CAM Visual Stimulator (Monocular) — accuracy & reaction time
-    else if (gameName.includes('M7')) {
+    if (gameName.includes('M7')) {
         const acc = metrics.customData?.accuracyRate;
         const rt = metrics.customData?.avgReactionTimeMs;
         if (acc !== undefined && acc !== null && rt !== undefined && rt !== null) {
@@ -1269,7 +1287,7 @@ function formatTherapyClinicalResult(metrics) {
     }
 
     // Module 8: Anti-Crowding Tracker (Monocular) — accuracy & narrowest spacing
-    else if (gameName.includes('M8')) {
+    if (gameName.includes('M8')) {
         const acc = metrics.customData?.accuracy;
         const minSpacing = metrics.customData?.minimumSpacingReached;
         if (acc !== undefined && acc !== null) {
@@ -1278,7 +1296,7 @@ function formatTherapyClinicalResult(metrics) {
     }
 
     // Module 9: RED-Cone Stimulator (Monocular) — accuracy & avg reaction time
-    else if (gameName.includes('M9')) {
+    if (gameName.includes('M9')) {
         const acc = metrics.customData?.accuracy;
         const rt = metrics.customData?.avgReactionTimeMs;
         if (acc !== undefined && acc !== null && rt !== undefined && rt !== null) {
@@ -1287,7 +1305,7 @@ function formatTherapyClinicalResult(metrics) {
     }
 
     // Module 10: OKN Tracker (Monocular) — accuracy & avg reaction time
-    else if (gameName.includes('M10')) {
+    if (gameName.includes('M10')) {
         const acc = metrics.customData?.accuracy;
         const rt = metrics.customData?.avgReactionTimeMs;
         const dir = metrics.customData?.direction;
@@ -1297,23 +1315,12 @@ function formatTherapyClinicalResult(metrics) {
         }
     }
 
-    // Module 11: Gabor Perceptual Learning (Monocular) — contrast threshold & reversals
-    // TUYỆT ĐỐI KHÔNG kế thừa logic C-Ratio của Module 1; trích xuất độc lập từ customData.
-    else if (gameName.includes('M11')) {
-        const fc = metrics.customData?.finalContrast;
-        const rev = metrics.customData?.reversals;
-        if (fc !== undefined && fc !== null) {
-            const revStr = (rev !== undefined && rev !== null) ? rev : 'N/A';
-            return `Ngưỡng tương phản (C): ${ Number(fc).toFixed(3) } | Đảo chiều: ${ revStr }`;
-        }
-    }
-
     // Fallback: generic score
     const score = metrics?.score;
     if (score !== undefined && score !== null) {
         return `Hoàn thành bài tập: Score ${ score }`;
     }
-    
+
     return 'Hoàn thành bài tập';
 }
 
@@ -1365,116 +1372,41 @@ function generateTherapyReportHTML(patientId) {
         const durationSec = record.durationSeconds != null ? record.durationSeconds : '-';
         
         // === LOGIC MỚI: Parse customData & đánh giá ĐẠT/CHƯA ĐẠT ===
-        let resultHTML = "";
-        let statusHTML = "";
-        const customData = record.metrics?.customData || {};
-        const durStr = record.durationSeconds != null ? record.durationSeconds + "s" : "N/A";
-        
-        if (record.gameName && record.gameName.startsWith('M1:')) {
-            const cRatio = customData.finalAlpha !== undefined ? customData.finalAlpha : 1;
-            const isPassed = cRatio <= 0.5; // Đạt khi C-Ratio <= 0.5
-            statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>' : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
-            resultHTML = `C-Ratio: <b>${(cRatio * 100).toFixed(0)}%</b> | Thời gian: <b>${durStr}</b><br>Đánh giá: ${statusHTML}`;
-        }
-        else if (record.gameName && record.gameName.includes('M2')) {
-            const angle = customData.visualAngleDeg !== undefined ? customData.visualAngleDeg : 0;
-            const isPassed = angle > 0 && angle <= 2.0; // Đạt khi Góc Foveal <= 2 độ
-            statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>' : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
-            resultHTML = `Góc Foveal: <b>${angle.toFixed(2)}°</b> | Thời gian: <b>${durStr}</b><br>Đánh giá: ${statusHTML}`;
-        }
-        else if (record.gameName && record.gameName.includes('M3')) {
-            const bo = customData.avgBaseOut !== undefined ? customData.avgBaseOut : 0;
-            const bi = customData.avgBaseIn !== undefined ? customData.avgBaseIn : 0;
-            const isPassed = bo >= 15 && bi >= 8; // Đạt khi BO >= 15 và BI >= 8
-            statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>' : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
-            resultHTML = `BO: <b>${bo.toFixed(1)} Δ</b> | BI: <b>${bi.toFixed(1)} Δ</b><br>Đánh giá: ${statusHTML}`;
-        }
-        else if (record.gameName && record.gameName.includes('M4')) {
-            const latency = customData.avgLatencyMs !== undefined ? customData.avgLatencyMs : 0;
-            // Đọc thiết bị lưu từ phiên tập (fallback nhận diện hiện tại nếu dữ liệu cũ)
-            const device = customData.deviceType || (navigator.maxTouchPoints > 0 ? 'Cảm ứng' : 'Chuột');
-            
-            // Áp dụng định luật Fitts cho ngưỡng lâm sàng
+        // === Sử dụng hàm định dạng tập trung formatTherapyClinicalResult ===
+        const clinicalResultString = formatTherapyClinicalResult(record);
+
+        // Tính isPassed (ĐẠT/CHƯA ĐẠT) theo từng module
+        const cd = record.metrics?.customData || {};
+        let isPassed = false;
+        if (record.gameName.startsWith('M1:')) {
+            isPassed = (cd.finalAlpha ?? 1) <= 0.5;
+        } else if (record.gameName.includes('M2')) {
+            isPassed = (cd.visualAngleDeg ?? 0) > 0 && (cd.visualAngleDeg ?? 0) <= 2.0;
+        } else if (record.gameName.includes('M3')) {
+            isPassed = (cd.avgBaseOut ?? 0) >= 15 && (cd.avgBaseIn ?? 0) >= 8;
+        } else if (record.gameName.includes('M4')) {
+            const device = cd.deviceType || (navigator.maxTouchPoints > 0 ? 'Cảm ứng' : 'Chuột');
             const threshold = device === 'Cảm ứng' ? 500 : 900;
-            const isPassed = latency > 0 && latency <= threshold;
-            
-            statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>'
-                                 : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
-            
-            resultHTML = `Thời gian phản xạ: <b>${latency} ms</b> | Thiết bị: <b>${device}</b><br>Đánh giá: ${statusHTML}`;
+            isPassed = (cd.avgLatencyMs ?? 0) > 0 && (cd.avgLatencyMs ?? 0) <= threshold;
+        } else if (record.gameName.includes('M5')) {
+            isPassed = (cd.finalArcsec ?? 0) > 0 && (cd.finalArcsec ?? 0) <= 40;
+        } else if (record.gameName.includes('M7')) {
+            isPassed = (cd.accuracyRate ?? 0) >= 80 && (cd.avgReactionTimeMs ?? 0) <= 800;
+        } else if (record.gameName.includes('M8')) {
+            isPassed = (cd.accuracy ?? 0) >= 75;
+        } else if (record.gameName.includes('M9')) {
+            isPassed = (cd.accuracy ?? 0) >= 85;
+        } else if (record.gameName.includes('M10')) {
+            isPassed = (cd.accuracy ?? 0) >= 80;
+        } else if (record.gameName.includes('M11')) {
+            isPassed = (cd.finalLogCS ?? 0) >= 1.0 && (cd.reversals ?? 0) >= 4;
         }
-        else if (record.gameName && record.gameName.includes('M5')) {
-            // Module 5: Global Stereopsis (RDS Therapy) — Arcsec threshold
-            const finalArcsec = (customData && customData.finalArcsec) ? customData.finalArcsec : 0;
-            
-            // Đánh giá lâm sàng (<= 40 Arcsec là bình thường, > 40 là suy giảm)
-            let statusHTML = '';
-            if (finalArcsec > 0 && finalArcsec <= 40) {
-                statusHTML = '<span style="color:#16a34a; font-weight:bold;">ĐẠT (Thị giác nổi hoàn hảo)</span>';
-            } else if (finalArcsec > 40 && finalArcsec <= 200) {
-                statusHTML = '<span style="color:#eab308; font-weight:bold;">CHƯA ĐẠT (Suy giảm nhẹ)</span>';
-            } else {
-                statusHTML = '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT (Suy giảm nặng / Mất thị giác nổi)</span>';
-            }
-            
-            // Xử lý hiển thị an toàn nếu bệnh nhân không click trúng lần nào
-            const arcsecDisplay = finalArcsec > 0 ? `${finalArcsec} Arcsec` : 'Không xác định (Fail)';
-            
-            resultHTML = `Ngưỡng thị giác nổi (Stereoacuity): <b style="font-size:1.1em;">${arcsecDisplay}</b> | Thời gian tập: <b>${durStr}</b><br>Đánh giá: ${statusHTML}`;
-        }
-        else if (record.gameName && record.gameName.includes('M7')) {
-            const acc = customData.accuracyRate !== undefined ? customData.accuracyRate : 0;
-            const rt = customData.avgReactionTimeMs !== undefined ? customData.avgReactionTimeMs : 0;
-            // Đạt: Tỷ lệ chính xác >= 80% và Thời gian phản xạ <= 800ms
-            const isPassed = acc >= 80 && rt <= 800;
-            statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>' : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
-            resultHTML = `Tỷ lệ chính xác: <b>${acc.toFixed(0)}%</b> | Phản xạ: <b>${rt.toFixed(0)} ms</b><br>Đánh giá: ${statusHTML}`;
-        }
-        else if (record.gameName && record.gameName.includes('M8')) {
-            const acc = customData.accuracy !== undefined ? customData.accuracy : 0;
-            const minSpacing = customData.minimumSpacingReached !== undefined ? customData.minimumSpacingReached : 'N/A';
-            const finalSpacing = customData.finalSpacing !== undefined ? customData.finalSpacing : 'N/A';
-            // Đạt: Tỷ lệ chính xác >= 75% (Ngưỡng lâm sàng khử chen chúc)
-            const isPassed = acc >= 75;
-            statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>' : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
-            resultHTML = `Chính xác: <b>${acc.toFixed(0)}%</b> | Khoảng cách hẹp nhất: <b>${minSpacing}</b> | Khoảng cách cuối: <b>${finalSpacing}</b><br>Đánh giá: ${statusHTML}`;
-        }
-        else if (record.gameName && record.gameName.includes('M9')) {
-            const acc = customData.accuracy !== undefined ? customData.accuracy : 0;
-            const rt = customData.avgReactionTimeMs !== undefined ? customData.avgReactionTimeMs : 0;
-            // Đạt: Độ chính xác >= 85% (ngưỡng lâm sàng Brinker-Katz)
-            const isPassed = acc >= 85;
-            statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>' : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
-            resultHTML = `Chính xác: <b>${acc.toFixed(0)}%</b> | Phản xạ trung bình: <b>${rt.toFixed(0)} ms</b><br>Đánh giá: ${statusHTML}`;
-        }
-        else if (record.gameName && record.gameName.includes('M10')) {
-            const acc = customData.accuracy !== undefined ? customData.accuracy : 0;
-            const rt = customData.avgReactionTimeMs !== undefined ? customData.avgReactionTimeMs : 0;
-            const dir = customData.direction || 'N/A';
-            const spd = customData.stripeSpeed !== undefined ? customData.stripeSpeed : 0;
-            const spawned = customData.targetsSpawned !== undefined ? customData.targetsSpawned : 0;
-            const hit = customData.targetsHit !== undefined ? customData.targetsHit : 0;
-            // Đạt: Độ chính xác >= 80% (ngưỡng lâm sàng OKN)
-            const isPassed = acc >= 80;
-            statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>' : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
-            resultHTML = `Chính xác: <b>${acc.toFixed(0)}%</b> (${hit}/${spawned}) | Phản xạ trung bình: <b>${rt.toFixed(0)} ms</b> | Hướng: <b>${dir}</b> | Tốc độ: <b>${spd} px/s</b><br>Đánh giá: ${statusHTML}`;
-        }
-        else if (record.gameName && record.gameName.includes('M11')) {
-            const logCS = customData.finalLogCS !== undefined ? customData.finalLogCS : 0;
-            const rev = customData.reversals !== undefined ? customData.reversals : 0;
-            const acc = customData.accuracy !== undefined ? customData.accuracy : 0;
-            const total = customData.totalTrials !== undefined ? customData.totalTrials : 0;
-            const hit = customData.correctAnswers !== undefined ? customData.correctAnswers : 0;
-            const rt = customData.avgReactionTimeMs !== undefined ? customData.avgReactionTimeMs : 0;
-            // Đạt (chuẩn LogCS): LogCS >= 1.0 (tương phản <= 10%) và đã hội tụ (>= 4 đảo chiều)
-            const isPassed = logCS >= 1.0 && rev >= 4;
-            statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>' : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
-            resultHTML = `LogCS: <b>${logCS.toFixed(2)}</b> | Đảo chiều: <b>${rev}</b> | Chính xác: <b>${acc.toFixed(0)}%</b> (${hit}/${total}) | Phản xạ: <b>${rt.toFixed(0)} ms</b><br>Đánh giá: ${statusHTML}`;
-        }
-        else {
-            const score = record.metrics?.score || 0;
-            resultHTML = `Score: <b>${score}</b>`;
-        }
+
+        const statusHTML = isPassed
+            ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>'
+            : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
+
+        const resultHTML = `${clinicalResultString}<br>Đánh giá: ${statusHTML}`;
         
         rowsHTML += `
             <tr>
