@@ -1210,7 +1210,14 @@ if (document.readyState === 'loading') {
  */
 function formatTherapyClinicalResult(metrics) {
     const gameName = metrics?.gameName || '';
-    
+
+    // Ưu tiên xử lý M11 (chặn rơi vào khối C-Ratio mặc định của M1)
+    if (gameName && gameName.includes('M11')) {
+        let cValue = metrics?.customData?.finalContrastThreshold || metrics?.customData?.finalContrast || 0;
+        let revs = metrics?.customData?.reversals || 0;
+        return `Ngưỡng tương phản (C): ${(cValue * 100).toFixed(1)}% | Đảo chiều: ${revs}`;
+    }
+
     // Module 1: Contrast threshold fusion (C-Ratio)
     if (gameName === 'M1' || metrics?.moduleType === 1) {
         const alpha = metrics.customData?.finalAlpha;
@@ -1347,7 +1354,7 @@ function generateTherapyReportHTML(patientId) {
         const customData = record.metrics?.customData || {};
         const durStr = record.durationSeconds != null ? record.durationSeconds + "s" : "N/A";
         
-        if (record.gameName && record.gameName.includes('M1')) {
+        if (record.gameName && record.gameName.startsWith('M1:')) {
             const cRatio = customData.finalAlpha !== undefined ? customData.finalAlpha : 1;
             const isPassed = cRatio <= 0.5; // Đạt khi C-Ratio <= 0.5
             statusHTML = isPassed ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>' : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
