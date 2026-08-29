@@ -353,14 +353,14 @@ class TherapeuticMenuController {
                 medicalPurpose: 'Kích thích trực tiếp tế bào V1 bằng mảng Gabor, tăng cường độ nhạy tương phản (Neuroplasticity) qua thuật toán Cầu thang 3-Down/1-Up.',
                 indication: 'Nhược thị đã ổn định định thị, giảm độ nhạy tương phản (Contrast Sensitivity).',
                 contraindication: 'Chưa bịt mắt lành (Bắt buộc đơn nhãn).',
-                gameplay: 'Bịt mắt sáng. Nhìn dấu (+) ở giữa, khi vằn Gabor loé lên hãy đoán nó nghiêng sang Trái hay Phải, bấm mũi tên tương ứng.',
+                gameplay: 'Bịt mắt sáng. Nhìn dấu (+) ở giữa. Khi vằn Gabor loé lên, hãy quan sát các đường sọc chéo chạy từ trên xuống dưới: nếu sọc rẽ sang Trái thì bấm mũi tên Trái, nếu rẽ sang Phải thì bấm mũi tên Phải.',
                 goal: 'Xác định ngưỡng tương phản (Contrast Threshold) đạt mức thấp (< 10%).',
                 settings: [
                     {
                         id: 'gabor-flash-duration', key: 'flashDuration', label: 'Thời gian flash', numeric: false,
                         options: [
-                            { value: '200', label: '200 ms', selected: true },
-                            { value: '500', label: '500 ms', selected: false }
+                            { value: '200', label: '200 ms - Khó hơn', selected: true },
+                            { value: '500', label: '500 ms - Dễ hơn', selected: false }
                         ]
                     }
                 ],
