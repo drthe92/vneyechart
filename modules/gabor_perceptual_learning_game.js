@@ -47,8 +47,10 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
         this.FIXATE_JITTER = 400;        // Độ nhiễu thêm (ms) -> 400–800ms
         this.REACT_LIMIT_MS = 8000;      // Quá hạn phản xạ (coi như sai) (ms)
 
-        // --- Trạng thái thuật toán Cầu thang ---
-        this.currentContrast = 1.0;      // C bắt đầu = 1.0
+        // --- Trạng thái thuật toán Cầu thang (hệ quy chiếu LogCS) ---
+        // LogCS = -log10(C). LogCS 0.0 => C=1.0 (tương phản tối đa).
+        // LogCS 1.0 => C=0.1 (10%), LogCS 1.3 => C~0.05 (5%).
+        this.currentLogCS = 0.0;         // Bắt đầu ở 0.0 (C = 1.0)
         this._consecutiveCorrect = 0;
         this.reversals = 0;
         this._lastStepDir = null;        // 'down' | 'up'
@@ -119,7 +121,7 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
         this._flashMs = (flashDuration === '500') ? 500 : 200;
 
         // Reset trạng thái phiên & cầu thang
-        this.currentContrast = 1.0;
+        this.currentLogCS = 0.0;
         this._consecutiveCorrect = 0;
         this.reversals = 0;
         this._lastStepDir = null;
@@ -195,16 +197,16 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
             this._playTone(880, 'sine', 0.12);     // Ting (đúng) — pitch cao
 
             if (this.reversals === 0) {
-                // GIAI ĐOẠN 1 (Fast Descent): đúng 1 lần => giảm sâu C = C * 0.5
-                this.currentContrast = this.currentContrast * 0.5;
+                // GIAI ĐOẠN 1 (Dò nhanh): đúng 1 lần => LogCS += 0.3 (C giảm sâu)
+                this.currentLogCS += 0.3;
                 this._playLevelUp();               // Level Up mỗi khi C giảm
                 this._consecutiveCorrect = 0;
                 this._lastStepDir = 'down';
             } else {
-                // GIAI ĐOẠN 2 (Fine-tuning 3-Down/1-Up): đúng 3 lần liên tiếp => giảm nhẹ C = C * 0.9
+                // GIAI ĐOẠN 2 (Tinh chỉnh): đúng 3 lần liên tiếp => LogCS += 0.1 (C giảm nhẹ)
                 this._consecutiveCorrect += 1;
                 if (this._consecutiveCorrect >= 3) {
-                    this.currentContrast = this.currentContrast * 0.9;
+                    this.currentLogCS += 0.1;
                     this._playLevelUp();           // Level Up mỗi khi C giảm
                     this._consecutiveCorrect = 0;
                     this._lastStepDir = 'down';
@@ -213,8 +215,9 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
         } else {
             this._consecutiveCorrect = 0;
             this._playTone(160, 'square', 0.18);   // Buzzer (sai) — pitch thấp
-            this.currentContrast = Math.min(1.0, this.currentContrast * 1.1); // Tăng tương phản
-            this.reversals += 1;                   // Kích hoạt Giai đoạn 2 (Fast -> Fine)
+            // SAI: LogCS giảm 0.1, không bao giờ âm (C không vượt quá 100%)
+            this.currentLogCS = Math.max(0.0, this.currentLogCS - 0.1);
+            this.reversals += 1;                   // Kích hoạt Giai đoạn 2 (Dò nhanh -> Tinh chỉnh)
             this._lastStepDir = 'up';
         }
 
@@ -274,6 +277,9 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
         const frequency = 4 / size;             // ~4 chu kỳ across
         const maskR2 = (halfSize * 0.95) * (halfSize * 0.95);
 
+        // Tính lại độ tương phản từ hệ quy chiếu LogCS: C = 10^(-LogCS)
+        const currentContrast = Math.pow(10, -this.currentLogCS);
+
         const img = this.ctx.createImageData(size, size);
         const data = img.data;
 
@@ -291,7 +297,7 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
                     const yPrime = -x * sinT + y * cosT;
                     const envelope = Math.exp(-(xPrime * xPrime + yPrime * yPrime) / (2 * sigma * sigma));
                     const grating = Math.sin(2 * Math.PI * frequency * xPrime);
-                    L = 128 + 127.5 * this.currentContrast * grating * envelope;
+                    L = 128 + 127.5 * currentContrast * grating * envelope;
                 }
                 const v = Math.max(0, Math.min(255, Math.round(L)));
                 data[idx++] = v;
@@ -444,7 +450,7 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
 
         // Đóng gói customData theo đặc tả cầu thang
         this.sessionMetrics.customData = {
-            finalContrast: this.currentContrast,
+            finalLogCS: this.currentLogCS,
             reversals: this.reversals,
             totalTrials: this.totalTrials,
             correctAnswers: this.correctAnswers,
