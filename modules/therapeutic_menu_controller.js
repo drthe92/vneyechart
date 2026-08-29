@@ -8,11 +8,12 @@ import CamVisualStimulatorGame from './cam_visual_stimulator_game.js';
 import AntiCrowdingGame from './anti_crowding_game.js';
 import RedConeStimulatorGame from './red_cone_stimulator_game.js';
 import OKNStimulationGame from './okn_stimulation_game.js';
+import GaborPerceptualLearningGame from './gabor_perceptual_learning_game.js';
 
 /**
  * Therapeutic Menu Controller (Lazy Binding Architecture)
  *
- * Quản lý giao diện và vòng đời 10 Game module trong khu vực Huấn luyện Thị giác:
+ * Quản lý giao diện và vòng đời 11 Game module trong khu vực Huấn luyện Thị giác:
  * - M1: Hứng hạt (CatchGame)
  * - M2: Khớp khung (ShapeAlignmentGame)
  * - M3: Vận nhãn (VergenceTrackerGame)
@@ -23,6 +24,7 @@ import OKNStimulationGame from './okn_stimulation_game.js';
  * - M8: Khử hiện tượng chen chúc (AntiCrowdingGame)
  * - M9: Kích thích tế bào nón hoàng điểm (RedConeStimulatorGame)
  * - M10: Kích thích phản xạ OKN (OKNStimulationGame)
+ * - M11: Học tri giác Gabor (GaborPerceptualLearningGame)
  */
 
 class TherapeuticMenuController {
@@ -341,6 +343,28 @@ class TherapeuticMenuController {
                     }
                 ],
                 mandatoryWarning: '⚠️ BẮT BUỘC: CHỈ MỞ MẮT NHƯỢC THỊ (BỊT MẮT LÀNH). Chống chỉ định: Động kinh ánh sáng.'
+            },
+            {
+                id: 'gabor-pl',
+                name: 'M11: Học tri giác Gabor (Perceptual Learning)',
+                classRef: GaborPerceptualLearningGame,
+                stage: 'Giai đoạn 2: Tăng cường độ nhạy tương phản (Đơn nhãn)',
+                parentTranslation: 'Giống như tập tạ cho não, bài tập này dùng các vằn sáng tối (Gabor) để ép tế bào V1 của mắt yếu nhạy hơn với độ tương phản, giúp trẻ nhìn rõ vật mờ.',
+                medicalPurpose: 'Kích thích trực tiếp tế bào V1 bằng mảng Gabor, tăng cường độ nhạy tương phản (Neuroplasticity) qua thuật toán Cầu thang 3-Down/1-Up.',
+                indication: 'Nhược thị đã ổn định định thị, giảm độ nhạy tương phản (Contrast Sensitivity).',
+                contraindication: 'Chưa bịt mắt lành (Bắt buộc đơn nhãn).',
+                gameplay: 'Bịt mắt sáng. Nhìn dấu (+) ở giữa, khi vằn Gabor loé lên hãy đoán nó nghiêng sang Trái hay Phải, bấm mũi tên tương ứng.',
+                goal: 'Xác định ngưỡng tương phản (Contrast Threshold) đạt mức thấp (< 10%).',
+                settings: [
+                    {
+                        id: 'gabor-flash-duration', key: 'flashDuration', label: 'Thời gian flash', numeric: false,
+                        options: [
+                            { value: '200', label: '200 ms', selected: true },
+                            { value: '500', label: '500 ms', selected: false }
+                        ]
+                    }
+                ],
+                mandatoryWarning: '⚠️ BẮT BUỘC: CHỈ MỞ MẮT NHƯỢC THỊ (BỊT MẮT LÀNH).'
             }
         ];
 
