@@ -1215,7 +1215,23 @@ function formatTherapyClinicalResult(metrics) {
     if (gameName && gameName.includes('M11')) {
         let logCS = metrics?.customData?.finalLogCS || 0;
         let revs = metrics?.customData?.reversals || 0;
-        return `LogCS: ${logCS.toFixed(2)} | Đảo chiều: ${revs}`;
+
+        // Chuyển đổi LogCS sang % tương phản
+        let contrastPct = (Math.pow(10, -logCS) * 100).toFixed(1);
+
+        // Phân loại diễn giải theo mốc lâm sàng
+        let interpretation = "";
+        if (logCS >= 1.5) {
+            interpretation = "Đạt mục tiêu nhược thị nhẹ (Tiệm cận mắt người bình thường)";
+        } else if (logCS >= 1.3) {
+            interpretation = "Đạt mục tiêu nhược thị trung bình";
+        } else if (logCS >= 1.0) {
+            interpretation = "Đạt mục tiêu nhược thị nặng";
+        } else {
+            interpretation = "Chưa đạt ngưỡng tối thiểu (Cần đạt ≥ 1.0 LogCS)";
+        }
+
+        return `LogCS: <b>${logCS.toFixed(2)}</b> (Tương phản: <b>${contrastPct}%</b>) | Đảo chiều: ${revs}<br><small><i>Diễn giải: ${interpretation}</i></small>`;
     }
 
     // Module 1: Contrast threshold fusion (C-Ratio)
