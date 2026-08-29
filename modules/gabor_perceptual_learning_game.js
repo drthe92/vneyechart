@@ -70,6 +70,7 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
         this._gaborX = 0;
         this._gaborY = 0;
         this._stimAngle = 45;
+        this.currentAngle = 45;
         this._answerDir = 'right';
 
         // --- Sự kiện bàn phím ---
@@ -78,6 +79,32 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
             if (map[e.key]) {
                 e.preventDefault();
                 this._handleInput(map[e.key]);
+            }
+        };
+
+        // --- Sự kiện Touch Swipe (vuốt) ---
+        this._touchStartX = 0;
+        this._touchStartY = 0;
+        this._onTouchStart = (e) => {
+            if (e.touches.length === 0) return;
+            this._touchStartX = e.touches[0].clientX;
+            this._touchStartY = e.touches[0].clientY;
+        };
+        this._onTouchEnd = (e) => {
+            if (e.changedTouches.length === 0) return;
+            const dx = e.changedTouches[0].clientX - this._touchStartX;
+            const dy = e.changedTouches[0].clientY - this._touchStartY;
+            const THRESH = 24; // ngưỡng vuốt (px)
+            if (Math.abs(dx) < THRESH && Math.abs(dy) < THRESH) return;
+            let dir;
+            if (Math.abs(dx) > Math.abs(dy)) {
+                dir = dx > 0 ? 'right' : 'left';
+            } else {
+                dir = dy > 0 ? 'down' : 'up';
+            }
+            // Chỉ chấp nhận vuốt ngang (Trái/Phải) cho bài 2AFC này
+            if (dir === 'left' || dir === 'right') {
+                this._handleInput(dir);
             }
         };
     }
@@ -115,6 +142,10 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
 
         // Gắn sự kiện
         window.addEventListener('keydown', this._onKeyDown);
+        if (this.canvas) {
+            this.canvas.addEventListener('touchstart', this._onTouchStart, { passive: true });
+            this.canvas.addEventListener('touchend', this._onTouchEnd, { passive: true });
+        }
 
         // Bắt đầu lượt đầu
         this._startTrial();
@@ -144,7 +175,17 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
      * @param {string|null} dir - Hướng trả lời, null = quá hạn (sai)
      */
     _processAnswer(dir) {
-        const isCorrect = (dir === this._answerDir);
+        // Ánh xạ đầu vào thành key / swipeDirection để đối chiếu theo góc vẽ
+        const key = (dir === 'left') ? 'ArrowLeft' : (dir === 'right' ? 'ArrowRight' : null);
+        const swipeDirection = dir; // 'left' | 'right' | null (quá hạn)
+
+        // Chấm điểm theo đặc tả lâm sàng (Gabor nghiêng ±45°)
+        let isCorrect = false;
+        if (this.currentAngle === 45 && (key === 'ArrowLeft' || swipeDirection === 'left')) {
+            isCorrect = true;
+        } else if (this.currentAngle === -45 && (key === 'ArrowRight' || swipeDirection === 'right')) {
+            isCorrect = true;
+        }
 
         // Thời gian phản xạ
         this._reactionTimes.push(performance.now() - this._responseStart);
@@ -199,7 +240,11 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
             if (now >= this._fixateUntil) {
                 // Sinh hướng nghiêng ngẫu nhiên: Trái (-45) / Phải (+45)
                 this._stimAngle = (Math.random() < 0.5) ? -45 : 45;
-                this._answerDir = (this._stimAngle === 45) ? 'right' : 'left';
+                this.currentAngle = this._stimAngle;
+                // Ánh xạ chấm điểm lâm sàng:
+                //  +45: sọc chạy từ trên-phải xuống dưới-trái => ĐÚNG = Trái (ArrowLeft / vuốt Trái)
+                //  -45: sọc chạy từ trên-trái xuống dưới-phải => ĐÚNG = Phải (ArrowRight / vuốt Phải)
+                this._answerDir = (this._stimAngle === 45) ? 'left' : 'right';
                 this._generateGabor(this._stimAngle);
                 this.state = 'FLASH';
                 this._flashUntil = now + this._flashMs;
@@ -418,6 +463,10 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
      */
     stop() {
         window.removeEventListener('keydown', this._onKeyDown);
+        if (this.canvas) {
+            this.canvas.removeEventListener('touchstart', this._onTouchStart);
+            this.canvas.removeEventListener('touchend', this._onTouchEnd);
+        }
         super.stop();
     }
 }
