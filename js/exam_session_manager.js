@@ -88,6 +88,101 @@
     let printContainer = null;
     let toastContainer = null;
 
+    // ================================================================
+    //  Firebase & Blind Authentication Helpers
+    // ================================================================
+
+    function normalizeString(str) {
+        if (!str) return "";
+        return str.toLowerCase()
+                  .normalize("NFD")
+                  .replace(/[\u0300-\u036f]/g, "")
+                  .replace(/đ/g, "d")
+                  .replace(/\s+/g, "");
+    }
+
+    async function handleSessionStart(event) {
+        event.preventDefault();
+
+        let phone = document.getElementById("input_phone") ? document.getElementById("input_phone").value.trim() : "";
+        let name = document.getElementById("patient-name") ? document.getElementById("patient-name").value.trim() : "";
+        let yob = document.getElementById("patient-yob") ? document.getElementById("patient-yob").value.trim() : "";
+        const protocolInput = document.getElementById("input_protocol") ? document.getElementById("input_protocol").value : "amblyopia";
+
+        // Kiểm tra trạng thái nút Khám ẩn danh
+        const isAnonymous = document.getElementById("anonymous-check") ? document.getElementById("anonymous-check").checked : false;
+
+        // Cấp giá trị mặc định nếu là khám ẩn danh để vượt qua validate
+        if (isAnonymous) {
+            if (!name) name = "Ẩn danh";
+            if (!yob) yob = "1900";
+            if (!phone) {
+                // Tự động sinh một mã ngẫu nhiên 6 số làm ID tạm thời thay cho SĐT
+                phone = "ANON_" + Math.floor(100000 + Math.random() * 900000).toString();
+            }
+        }
+
+        // Chốt chặn cuối cùng (JS validation)
+        if (!phone || !name || !yob) {
+            alert("Vui lòng nhập đầy đủ Số điện thoại, Họ và Tên, Năm sinh.");
+            return;
+        }
+
+        const phoneInput = phone;
+        const nameInput = name;
+        const yearInput = yob;
+
+        const normalizedName = normalizeString(nameInput);
+        const patientId = `${phoneInput}_${normalizedName}_${yearInput}`;
+
+        const patientRef = db.collection("Patients").doc(patientId);
+
+        try {
+            const doc = await patientRef.get();
+
+            if (doc.exists) {
+                console.log("Hồ sơ hợp lệ.");
+                localStorage.setItem("currentPatientId", patientId);
+                localStorage.setItem("currentPatientName", nameInput);
+                localStorage.setItem("currentProtocol", protocolInput);
+                startExam(nameInput, yearInput);
+                hideModal(startExamModal);
+                const formEl = document.getElementById("start-exam-form");
+                if (formEl) formEl.reset();
+                const nmEl = document.getElementById("patient-name");
+                const ybEl = document.getElementById("patient-yob");
+                if (nmEl) nmEl.disabled = false;
+                if (ybEl) ybEl.disabled = false;
+            } else {
+                const confirmMsg = "Hệ thống không tìm thấy hồ sơ cũ.\n\n- Nếu đây là người bệnh mới, bấm 'OK' để tạo hồ sơ.\n- Nếu gõ sai thông tin, bấm 'Hủy' để sửa lại.";
+                if (confirm(confirmMsg)) {
+                    await patientRef.set({
+                        phone: phoneInput,
+                        fullName: nameInput,
+                        birthYear: yearInput,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        status: "Active",
+                        protocol: protocolInput
+                    });
+                    localStorage.setItem("currentPatientId", patientId);
+                    localStorage.setItem("currentPatientName", nameInput);
+                    localStorage.setItem("currentProtocol", protocolInput);
+                    startExam(nameInput, yearInput);
+                    hideModal(startExamModal);
+                    const formEl = document.getElementById("start-exam-form");
+                    if (formEl) formEl.reset();
+                    const nmEl = document.getElementById("patient-name");
+                    const ybEl = document.getElementById("patient-yob");
+                    if (nmEl) nmEl.disabled = false;
+                    if (ybEl) ybEl.disabled = false;
+                }
+            }
+        } catch (error) {
+            console.error("Lỗi kết nối Firebase: ", error);
+            alert("Không thể kết nối máy chủ. Vui lòng kiểm tra lại mạng.");
+        }
+    }
+
     // Initialize the module
     function init() {
         loadColorCalibration();
@@ -222,14 +317,25 @@
                     <button class="exam-modal-close">&times;</button>
                 </div>
                 <div class="exam-modal-body">
-                    <form id="start-exam-form">
+                    <form id="start-exam-form" novalidate>
                         <div class="form-group">
                             <label for="patient-name">Họ và Tên:</label>
-                            <input type="text" id="patient-name" name="patient-name" required placeholder="VD: Nguyễn Văn B" tabindex="1">
+                            <input type="text" id="patient-name" name="patient-name" placeholder="VD: Nguyễn Văn B" tabindex="1">
+                        </div>
+                        <div class="form-group">
+                            <label for="input_phone">Số điện thoại:</label>
+                            <input type="text" id="input_phone" name="input_phone" placeholder="Nhập số điện thoại" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;" tabindex="1_5">
                         </div>
                         <div class="form-group">
                             <label for="patient-yob">Năm sinh:</label>
-                            <input type="number" id="patient-yob" name="patient-yob" min="1900" max="2099" placeholder="VD: 1990" required tabindex="2">
+                            <input type="number" id="patient-yob" name="patient-yob" min="1900" max="2099" placeholder="VD: 1990" tabindex="2">
+                        </div>
+                        <div class="form-group" style="margin-top: 10px;">
+                            <label for="input_protocol">Phác đồ điều trị:</label>
+                            <select id="input_protocol" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;">
+                                <option value="amblyopia">Nhược thị & Tật khúc xạ</option>
+                                <option value="strabismus_postop">Hậu phẫu Lác (Không bịt mắt)</option>
+                            </select>
                         </div>
                         <div class="form-group checkbox-group">
                             <label>
@@ -256,6 +362,7 @@
         const form = startExamModal.querySelector('#start-exam-form');
         const anonymousCheck = startExamModal.querySelector('#anonymous-check');
         const nameInput = startExamModal.querySelector('#patient-name');
+        const phoneInput = startExamModal.querySelector('#input_phone');
         const yobInput = startExamModal.querySelector('#patient-yob');
         const submitBtn = startExamModal.querySelector('.submit-btn');
 
@@ -306,25 +413,10 @@
         startExamModal.addEventListener('keydown', modalKeydownHandler, true);
 
         nameInput.addEventListener('keydown', handleEnterSubmit);
+        phoneInput.addEventListener('keydown', handleEnterSubmit);
         yobInput.addEventListener('keydown', handleEnterSubmit);
 
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const patientName = nameInput.value.trim();
-            const patientYOB = yobInput.value.trim();
-
-            if (!patientName) {
-                alert('Vui lòng nhập tên bệnh nhân');
-                nameInput.focus();
-                return;
-            }
-
-            startExam(patientName, patientYOB);
-            hideModal(startExamModal);
-            form.reset();
-            nameInput.disabled = false;
-            yobInput.disabled = false;
-        });
+        form.addEventListener('submit', handleSessionStart);
 
         // Close on backdrop click
         startExamModal.addEventListener('click', function(e) {
@@ -2675,11 +2767,38 @@ document.addEventListener('click', function(e) {
                     sessions.push(window.__currentExam);
                 }
                 
-                // Đóng gói và lưu lại
-                localStorage.setItem('emr_patient_sessions', JSON.stringify(sessions));
-                
-                console.log('[Manager] Da Hard-Write ket qua thuan luyen vao Database cho:', window.__currentExam.patientId);
-                return true;
+                 // Đóng gói và lưu lại
+                 localStorage.setItem('emr_patient_sessions', JSON.stringify(sessions));
+                 
+                 // BẮT ĐẦU: ĐỒNG BỘ LÊN FIREBASE
+                 const currentPatientId = localStorage.getItem("currentPatientId");
+                 if (currentPatientId && window.db) {
+                     try {
+                         const sessionsRef = window.db.collection("Patients").doc(currentPatientId).collection("Sessions");
+                         
+                         const clinicalMetrics = (record.metrics && record.metrics.customData) ? record.metrics.customData : {};
+                         
+                         const payload = {
+                             gameName: record.gameName || "Unknown Module",
+                             durationSeconds: record.durationSeconds || 0,
+                             metrics: clinicalMetrics,
+                             opticalSettings: record.opticalSettings || {},
+                             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                             device_userAgent: navigator.userAgent
+                         };
+
+                         sessionsRef.add(payload)
+                             .then(() => console.log(`[Firebase Sync] Đã lưu điểm số bài ${payload.gameName} thành công.`))
+                             .catch(err => console.error("[Firebase Sync] Lỗi ghi dữ liệu:", err));
+                             
+                     } catch (error) {
+                         console.error("[Firebase Sync] Lỗi khởi tạo đồng bộ:", error);
+                     }
+                 }
+                 // KẾT THÚC: ĐỒNG BỘ LÊN FIREBASE
+                 
+                 console.log('[Manager] Da Hard-Write ket qua thuan luyen vao Database cho:', window.__currentExam.patientId);
+                 return true;
             } catch (err) {
                 console.error('[Manager] Loi khi ghi cung vao Database:', err);
                 return false;
@@ -2694,6 +2813,61 @@ document.addEventListener('click', function(e) {
             return window.__currentExam;
         }
     };
+
+    // ================================================================
+    //  GLOBAL CLINICAL RESULT MODAL — Bắt sự kiện kết thúc bài tập
+    //  Thay thế alert() thô ráp bằng Modal báo cáo tập trung (Dark theme)
+    // ================================================================
+    document.addEventListener('therapy_session_completed', (e) => {
+        if (!e || !e.detail) return;
+
+        // Chống hiển thị trùng lặp khi cùng một phiên phát nhiều event
+        const modal = document.getElementById('global-result-modal');
+        if (!modal || modal.style.display === 'flex') return;
+
+        // FORMAT ĐẦU RA Y KHOA DỰA TRÊN MODULE ID
+        let clinicalText = "";
+        const detail = e.detail;
+        const gId = detail.gameId || "";
+
+        if (gId === 'M6' || (detail.gameName && detail.gameName.includes('M6'))) {
+            const diopter = detail.metrics && detail.metrics.finalDivergenceDiopter !== undefined ? detail.metrics.finalDivergenceDiopter : detail.score;
+            clinicalText = `Dự trữ Hợp thị Phân kỳ (NFV): <strong style="color: #00e676; font-size: 18px;">${diopter} &Delta;</strong>`;
+        } else if (gId === 'M13' || (detail.gameName && detail.gameName.includes('M13'))) {
+            const diopter = detail.metrics && detail.metrics.finalConvergenceDiopter !== undefined ? detail.metrics.finalConvergenceDiopter : detail.score;
+            clinicalText = `Dự trữ Hợp thị Hội tụ (PFV): <strong style="color: #00e676; font-size: 18px;">${diopter} &Delta;</strong>`;
+        } else if (gId === 'M3' || (detail.gameName && detail.gameName.includes('M3'))) {
+            // Rút xuất 2 chỉ số từ payload của M3
+            const avgBO = detail.metrics?.customData?.avgBaseOut || 0;
+            const avgBI = detail.metrics?.customData?.avgBaseIn || 0;
+
+            // Đánh giá dựa trên tiêu chuẩn lâm sàng
+            const evalBO = avgBO >= 15 ? '<span style="color: #00e676; font-weight: bold;">ĐẠT</span>' : '<span style="color: #f87171; font-weight: bold;">CHƯA ĐẠT</span>';
+            const evalBI = avgBI >= 8 ? '<span style="color: #00e676; font-weight: bold;">ĐẠT</span>' : '<span style="color: #f87171; font-weight: bold;">CHƯA ĐẠT</span>';
+
+            // Hiển thị cả 2 chỉ số lên Global Modal
+            clinicalText = `
+                <div style="font-size: 15px; line-height: 1.8; text-align: left; padding: 0 10px;">
+                    Dự trữ Hội tụ (PFV): <strong style="color: #fff;">${avgBO} &Delta;</strong> (${evalBO})<br>
+                    Dự trữ Phân kỳ (NFV): <strong style="color: #fff;">${avgBI} &Delta;</strong> (${evalBI})
+                </div>
+            `;
+        } else {
+            clinicalText = `Kết quả / Ngưỡng đạt được: <strong style="color: #00e676; font-size: 18px;">${detail.score}</strong>`;
+        }
+
+        // HIỂN THỊ MODAL GLOBAL
+        document.getElementById('res-modal-name').innerText = detail.gameName || gId;
+        document.getElementById('res-modal-duration').innerText = detail.duration + " giây";
+        document.getElementById('res-modal-score').innerHTML = clinicalText;
+
+        // Thoát Fullscreen nếu đang bật để Modal không bị che khuất
+        if (document.fullscreenElement) {
+            document.exitFullscreen().catch(err => console.log(err));
+        }
+
+        modal.style.display = 'flex';
+    });
 
 })();
 

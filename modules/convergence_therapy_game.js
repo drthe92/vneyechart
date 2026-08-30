@@ -1,14 +1,14 @@
 import BinocularGameEngine from './binocular_game_engine.js';
 
-class DivergenceTherapyGame extends BinocularGameEngine {
+class ConvergenceTherapyGame extends BinocularGameEngine {
     constructor() {
         super();
-        this.gameName = 'M6: Tập Phân Kỳ';
+        this.gameName = 'M13: Tập Hội Tụ';
         this.state = 'PLAYING'; // PLAYING, RESTING, ENDED (LOBBY removed — UI managed by Controller)
         
-        this.currentDiopter = 2;
-        this.targetDiopter = 8;
-        this.holdTimeMs = 10000; // Tăng từ 5000 lên 10000 (10 giây duy trì hợp thị)
+        this.currentDiopter = 3;
+        this.targetDiopter = 15;
+        this.holdTimeMs = 10000; // 10 giây duy trì hợp thị
         this.restTimeMs = 3000; // 3 giây nghỉ khi vỡ
         
         this.stateStartTime = 0;
@@ -29,11 +29,11 @@ class DivergenceTherapyGame extends BinocularGameEngine {
         window.addEventListener('keydown', this._spaceHandler);
         
         // Đọc cấu hình từ Menu Controller truyền vào, hoặc tự tìm trên DOM, hoặc dùng mặc định
-        const domStart = document.getElementById('m6-start') || document.querySelector('[data-start-diopter]');
-        const domTarget = document.getElementById('m6-target') || document.querySelector('[data-target-diopter]');
+        const domStart = document.getElementById('m13-start') || document.querySelector('[data-start-diopter]');
+        const domTarget = document.getElementById('m13-target') || document.querySelector('[data-target-diopter]');
         
-        this.currentDiopter = config.startDiopter || (domStart ? parseInt(domStart.value) : 2);
-        this.targetDiopter = config.targetDiopter || (domTarget ? parseInt(domTarget.value) : 8);
+        this.currentDiopter = config.startDiopter || (domStart ? parseInt(domStart.value) : 3);
+        this.targetDiopter = config.targetDiopter || (domTarget ? parseInt(domTarget.value) : 15);
         
         this.canvas.style.cursor = 'none';
         this.gameStartTime = Date.now();
@@ -69,7 +69,7 @@ class DivergenceTherapyGame extends BinocularGameEngine {
 
         if (this.state === 'PLAYING') {
             if (elapsed >= this.holdTimeMs) {
-                // Vượt qua 5s thành công -> Tăng 2 Diop
+                // Vượt qua 10s thành công -> Tăng 2 Diop
                 if (this.currentDiopter >= this.targetDiopter) {
                     this._endGame('THÀNH CÔNG (Đạt mục tiêu lâm sàng)');
                 } else {
@@ -101,8 +101,9 @@ class DivergenceTherapyGame extends BinocularGameEngine {
         const cx = this.canvas.width / 2;
         const cy = this.canvas.height / 2;
 
-        // 1. Tính toán vị trí Lăng kính Phân kỳ (Base-In)
-        // Mắt Trái (Cyan) dịch phải, Mắt Phải (Đỏ) dịch trái
+        // 1. Tính toán vị trí Lăng kính Hội tụ (Base-Out)
+        // ĐẢO MÀU PHÂN THỊ: Mắt Trái (Đỏ) dịch phải, Mắt Phải (Cyan) dịch trái
+        // → Tạo hiệu ứng Base-Out (Hội tụ) ngược với M6 Phân kỳ
         let visualDiopter = this.currentDiopter;
         if (this.state === 'RESTING') {
             // Khi nghỉ, giảm lăng kính đi 2 Diop để mắt thư giãn
@@ -113,12 +114,12 @@ class DivergenceTherapyGame extends BinocularGameEngine {
         const leftBarX = cx + splitPx;  // Trái tiến sang Phải
         const rightBarX = cx - splitPx; // Phải tiến sang Trái
 
-        // 2. Vẽ hai khối màu (Blend Mode)
+        // 2. Vẽ hai khối màu (Blend Mode) — HOÁN ĐỔI MÀU giữa 2 mắt
         ctx.globalCompositeOperation = 'multiply';
-        ctx.fillStyle = this.colors.left || '#00FFFF'; // Cyan
+        ctx.fillStyle = this.colors.right || '#FF0000'; // Mắt Trái dùng ĐỎ (Base-Out)
         ctx.fillRect(leftBarX - this.barWidth/2, cy - this.barHeight/2, this.barWidth, this.barHeight);
         
-        ctx.fillStyle = this.colors.right || '#FF0000'; // Red
+        ctx.fillStyle = this.colors.left || '#00FFFF'; // Mắt Phải dùng CYAN (Base-Out)
         ctx.fillRect(rightBarX - this.barWidth/2, cy - this.barHeight/2, this.barWidth, this.barHeight);
         ctx.globalCompositeOperation = 'source-over';
         // 4. Tính toán thời gian còn lại
@@ -158,13 +159,13 @@ class DivergenceTherapyGame extends BinocularGameEngine {
         this.totalPlayTime = Math.round((Date.now() - this.gameStartTime) / 1000);
         this.canvas.style.cursor = 'default';
 
-        // Mức phân kỳ tối đa đạt được (Prism Diopters - Δ)
+        // Mức hội tụ tối đa đạt được (Prism Diopters - Δ)
         const maxDiopters = this.currentDiopter;
 
         const customData = {
             maxDiopter: this.currentDiopter,
             targetDiopter: this.targetDiopter,
-            finalDivergenceDiopter: parseFloat(maxDiopters.toFixed(2)),
+            finalConvergenceDiopter: parseFloat(maxDiopters.toFixed(2)),
             totalStrikes: Object.values(this.strikes).reduce((a, b) => a + b, 0),
             status: reason
         };
@@ -180,22 +181,20 @@ class DivergenceTherapyGame extends BinocularGameEngine {
         // Phát sự kiện Backup
         document.dispatchEvent(new CustomEvent('therapy_session_completed', {
             detail: {
-                gameId: 'M6',
+                gameId: 'M13',
                 gameName: this.gameName,
                 duration: this.totalPlayTime,
                 score: maxDiopters,
                 metrics: {
-                    finalDivergenceDiopter: parseFloat(maxDiopters.toFixed(2))
+                    finalConvergenceDiopter: parseFloat(maxDiopters.toFixed(2))
                 }
             }
         }));
 
         // Global Result Modal hiển thị kết quả (thay cho alert() cũ)
-        // if (typeof window.loadTest === 'function') window.loadTest('dashboard');
-        // Điều hướng được xử lý bởi closeGlobalResultModal -> closeTherapyModule khi người dùng xác nhận
     }
 }
 
-if (typeof module !== 'undefined' && module.exports) module.exports = { DivergenceTherapyGame };
+if (typeof module !== 'undefined' && module.exports) module.exports = { ConvergenceTherapyGame };
 
-export default DivergenceTherapyGame;
+export default ConvergenceTherapyGame;
