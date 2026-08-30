@@ -4,6 +4,7 @@ import VergenceTrackerGame from './vergence_tracker_game.js';
 import SaccadicTrackingGame from './saccadic_tracking_game.js';
 import RDSTherapyGame from './rds_therapy_game.js';
 import DivergenceTherapyGame from './divergence_therapy_game.js';
+import ConvergenceTherapyGame from './convergence_therapy_game.js';
 import CamVisualStimulatorGame from './cam_visual_stimulator_game.js';
 import AntiCrowdingGame from './anti_crowding_game.js';
 import RedConeStimulatorGame from './red_cone_stimulator_game.js';
@@ -34,6 +35,14 @@ class TherapeuticMenuController {
         this.currentGame = null;
         this.workspaceContainer = null;
         this.menuContainer = null;
+
+        // Ánh xạ mã hiệu y khoa Mx -> id module game
+        this._moduleIdByM = {
+            M1: 'catch', M2: 'align', M3: 'vergence', M4: 'saccadic',
+            M5: 'rds_therapy', M6: 'divergence', M7: 'cam-stim', M8: 'anti-crowding',
+            M9: 'red-cone', M10: 'okn-stim', M11: 'gabor-pl', M12: 'dichoptic-pursuit',
+            M13: 'convergence'
+        };
 
         this.gameModules = [
             {
@@ -99,11 +108,11 @@ class TherapeuticMenuController {
                 classRef: VergenceTrackerGame,
                 stage: 'Giai đoạn 3 · Hợp thị Vận động & Theo vết (Motor Oculomotor)',
                 parentTranslation: 'Giống như tập tạ, bài tập này giúp hai mắt có lực để kéo chụm vào nhau khi đọc sách, nhìn gần, chống mỏi mắt.',
-                medicalPurpose: 'Tăng biên độ hội tụ (Base Out).',
+                medicalPurpose: 'Đo lường và tăng cường dự trữ hợp thị Hội tụ (PFV) và Phân kỳ (NFV).',
                 indication: 'Lác ngoài (Exotropia) ẩn, mỏi mắt khi học bài, lờ đờ.',
                 contraindication: 'Đang bị liệt cơ vận nhãn.',
                 gameplay: 'Nhìn tập trung để 2 khối màu chập thành 1. Khi 2 khối bị tách làm đôi (vỡ hình), bấm ngay phím SPACE.',
-                goal: 'Chịu đựng được mức hội tụ 15 Đi-ốp (Δ).',
+                goal: 'Đạt mức dự trữ Hội tụ (Base-Out) ≥ 15 Δ và Phân kỳ (Base-In) ≥ 8 Δ.',
                 settings: [
                     {
                         id: 'vergence-start', key: 'startDiopter', label: 'Mức lăng kính xuất phát (Δ)', numeric: true,
@@ -209,6 +218,44 @@ class TherapeuticMenuController {
                             { value: '10', label: '10 Δ', selected: false },
                             { value: '12', label: '12 Δ', selected: false },
                             { value: '15', label: '15 Δ', selected: false }
+                        ]
+                    }
+                ],
+                mandatoryWarning: '⚠️ CẢNH BÁO: Đeo kính Đỏ-Lục Lam (Mắt phải ĐỎ / Mắt trái XANH) trước khi chơi.'
+            },
+            {
+                id: 'convergence',
+                name: 'M13: Mở rộng Hội tụ (Convergence)',
+                icon: '👉👈',
+                classRef: ConvergenceTherapyGame,
+                stage: 'Module Chuyên biệt (Tùy chọn)',
+                parentTranslation: 'Giúp hai mắt tăng lực hội tụ — như tập tạ cho cơ hội tụ, giúp kéo chụm hai mắt vào nhau khi nhìn gần, chống mỏi mắt khi đọc sách.',
+                medicalPurpose: 'Đo lường và tăng cường dự trữ hợp thị Hội tụ (PFV - Positive Fusional Vergence).',
+                indication: 'Suy giảm dự trữ hội tụ, mỏi mắt khi học bài, nhìn gần.',
+                contraindication: 'Đang bị liệt cơ vận nhãn.',
+                gameplay: 'Tập trung giữ 2 khối màu chập 1 khi chúng tách xa nhau.',
+                goal: 'Đạt mức dự trữ hợp thị Hội tụ 15 Δ.',
+                settings: [
+                    {
+                        id: 'convergence-start', key: 'startDiopter', label: 'Mức lăng kính xuất phát (Δ)', numeric: true,
+                        options: [
+                            { value: '3', label: '3 Δ', selected: true },
+                            { value: '6', label: '6 Δ', selected: false },
+                            { value: '9', label: '9 Δ', selected: false },
+                            { value: '12', label: '12 Δ', selected: false },
+                            { value: '15', label: '15 Δ', selected: false },
+                            { value: '18', label: '18 Δ', selected: false }
+                        ]
+                    },
+                    {
+                        id: 'convergence-target', key: 'targetDiopter', label: 'Mức lăng kính mục tiêu (Δ)', numeric: true,
+                        options: [
+                            { value: '3', label: '3 Δ', selected: false },
+                            { value: '6', label: '6 Δ', selected: false },
+                            { value: '9', label: '9 Δ', selected: false },
+                            { value: '12', label: '12 Δ', selected: false },
+                            { value: '15', label: '15 Δ', selected: true },
+                            { value: '18', label: '18 Δ', selected: false }
                         ]
                     }
                 ],
@@ -492,143 +539,23 @@ class TherapeuticMenuController {
     }
 
     renderSidebar() {
-        const container = this.menuContainer;
+        // Giao diện Sảnh (Lobby) được render động theo Phác đồ điều trị
+        // (Phác đồ Nhược thị / Phác đồ Hậu phẫu Lác) bằng CSS Grid.
+        window.renderTherapeuticLobby(this.menuContainer);
+    }
 
-        // 1. Dọn dẹp container cha (Xóa hết tàn dư cũ)
-        container.innerHTML = '';
-        container.style.display = 'flex';
-        container.style.flexDirection = 'column';
-        container.style.alignItems = 'stretch';
-        container.style.justifyContent = 'flex-start'; // Quan trọng: tránh flexbox căn giữa cắt mất Giai đoạn 1
-        container.style.gap = '30px';
-        container.style.width = '100%';
-        container.style.padding = '20px';
-        container.style.overflowY = 'auto'; // Cho phép cuộn khi nội dung vượt khung
-        container.style.maxHeight = 'calc(100vh - 120px)';
-
-        // 2. Định nghĩa mảng chuỗi chuẩn tuyệt đối (Source of Truth)
-        const stagesOrder = [
-            "Giai đoạn 1 · Đánh thức Hoàng điểm (Đơn thị)",
-            "Giai đoạn 2 · Phá vỡ ức chế hợp thị cảm giác (Phân thị Anaglyph)",
-            "Giai đoạn 3 · Hợp thị Vận động & Theo vết (Motor Oculomotor)",
-            "Giai đoạn 4 · Thị giác 3D & Phản xạ Cấp cao",
-            "Module Chuyên biệt (Tùy chọn)"
-        ];
-
-        // 3. Ép lại `stage` cho TỪNG module dựa vào số hiệu (Mx:) trong name
-        // (chống sai lệch chuỗi / tàn dư cũ trong dữ liệu)
-        const idMap = {
-            "7": 0, "8": 0, "9": 0, "10": 0, "11": 0,  // Giai đoạn 1
-            "1": 1, "2": 1,                              // Giai đoạn 2
-            "3": 2, "12": 2,                            // Giai đoạn 3
-            "4": 3, "5": 3,                             // Giai đoạn 4
-            "6": 4                                      // Chuyên biệt
-        };
-
-        this.gameModules.forEach(mod => {
-            // Trích xuất Mx / Mxx từ name (ví dụ: "M7: ..." -> "7", "M12: ..." -> "12")
-            const match = (mod.name || "").match(/M(\d{1,2})/i);
-            if (match) {
-                const stageIndex = idMap[match[1]];
-                if (stageIndex !== undefined) {
-                    mod.stage = stagesOrder[stageIndex];
-                }
-            }
-        });
-
-        // 4. Thuật toán phân nhóm
-        const groupedModules = {};
-        this.gameModules.forEach(mod => {
-            if (!groupedModules[mod.stage]) groupedModules[mod.stage] = [];
-            groupedModules[mod.stage].push(mod);
-        });
-
-        const isCalibrated = window.__anaglyphColors && window.__anaglyphColors.red;
-
-        // 5. Render tuần tự và đóng gói
-        stagesOrder.forEach(stageName => {
-            const modulesInStage = groupedModules[stageName];
-            if (!modulesInStage || modulesInStage.length === 0) return;
-
-            // A. Tạo Tiêu đề
-            const title = document.createElement('h3');
-            title.innerText = stageName;
-            title.style.width = '100%';
-            title.style.color = '#4da6ff';
-            title.style.borderBottom = '1px solid #333';
-            title.style.paddingBottom = '8px';
-            title.style.marginBottom = '16px';
-            title.style.marginTop = '0';
-            title.style.textAlign = 'left';
-            title.style.fontSize = '1.2rem';
-            container.appendChild(title);
-
-            // B. Tạo Container chứa các thẻ Game của Giai đoạn này
-            const gamesContainer = document.createElement('div');
-            gamesContainer.style.display = 'flex';
-            gamesContainer.style.flexDirection = 'row';
-            gamesContainer.style.flexWrap = 'wrap';
-            gamesContainer.style.gap = '16px';
-            gamesContainer.style.justifyContent = 'flex-start';
-            gamesContainer.style.marginBottom = '20px';
-
-            // C. Render các nút bài tập bỏ vào gamesContainer
-            modulesInStage.forEach(mod => {
-                const btn = document.createElement('button');
-                btn.style.flex = '1 1 150px';
-                btn.style.maxWidth = '220px';
-                btn.style.height = 'auto';
-                btn.style.minHeight = '92px';
-                btn.style.padding = '14px';
-                btn.style.display = 'flex';
-                btn.style.flexDirection = 'column';
-                btn.style.alignItems = 'center';
-                btn.style.justifyContent = 'center';
-                btn.style.backgroundColor = '#f8f9fa';
-                btn.style.borderRadius = '12px';
-                btn.style.cursor = 'pointer';
-                btn.style.transition = 'all 0.2s ease';
-                btn.style.border = '2px solid transparent';
-                btn.style.color = '#1a1a1a';
-                btn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-
-                const iconSpan = document.createElement('span');
-                iconSpan.textContent = mod.icon || '▶';
-                iconSpan.style.fontSize = '1.9rem';
-                iconSpan.style.marginBottom = '8px';
-
-                const nameStrong = document.createElement('strong');
-                nameStrong.textContent = mod.name;
-                nameStrong.style.fontSize = '0.95rem';
-                nameStrong.style.textAlign = 'center';
-                nameStrong.style.lineHeight = '1.35';
-
-                btn.appendChild(iconSpan);
-                btn.appendChild(nameStrong);
-
-                if (!isCalibrated) {
-                    btn.disabled = true;
-                    btn.style.opacity = '0.5';
-                    btn.style.cursor = 'not-allowed';
-                    btn.title = 'Chống chỉ định: Cần hiệu chuẩn kính';
-                } else {
-                    btn.onclick = () => this.launchGame(mod);
-                    btn.onmouseover = () => {
-                        btn.style.borderColor = '#007bff';
-                        btn.style.transform = 'translateY(-3px)';
-                    };
-                    btn.onmouseout = () => {
-                        btn.style.borderColor = 'transparent';
-                        btn.style.transform = 'none';
-                    };
-                }
-
-                gamesContainer.appendChild(btn);
-            });
-
-            // D. Đưa toàn bộ nhóm vào container chính
-            container.appendChild(gamesContainer);
-        });
+    /**
+     * Render giao diện Sảnh (Lobby) dạng lưới Grid, phân luồng theo Phác đồ.
+     * Mỗi hàng (Row) = 1 giai đoạn: cột trái là thẻ Giai đoạn (220px),
+     * tối đa 5 module phía sau => tổng cộng tối đa 6 ô trên một hàng ngang.
+     * @param {HTMLElement} container - Phần tử chứa (menu-therapeutic)
+     */
+    // ============================================================
+    // PHÁC ĐỒ ĐIỀU TRỊ (Source of Truth) — ánh xạ Mx -> module id
+    // ============================================================
+    _getModuleByMId(mId) {
+        const moduleId = this._moduleIdByM[mId];
+        return this.gameModules.find(m => m.id === moduleId) || null;
     }
 
     stopCurrentGame() {
@@ -787,11 +714,13 @@ class TherapeuticMenuController {
                     <!-- CỘT PHẢI (40%): ĐIỀU KHIỂN & HÀNH ĐỘNG (STICKY) -->
                     <div style="flex: 4; display: flex; flex-direction: column; gap: 16px; padding-left: 10px;">
 
-                        <!-- FORM CÀI ĐẶT ĐỘNG (theo từng game) -->
+                        <!-- FORM CÀI ĐẶT ĐỘNG (theo từng game) — Ẩn với M3 (không cần cấu hình) -->
+                        ${module.id !== 'vergence' ? `
                         <div style="background: #1e293b; padding: 16px; border-radius: 8px;">
                             <h4 style="color: #38bdf8; margin: 0 0 10px 0; font-size: 14px;">⚙️ CÀI ĐẶT BÀI TẬP:</h4>
                             ${this.renderSettingsForm(module)}
                         </div>
+                        ` : ''}
 
                         <!-- CẢNH BÁO Y KHOA ĐỘNG -->
                         <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; padding: 12px; border-radius: 6px; text-align: center; margin-top: auto;">
@@ -909,6 +838,132 @@ class TherapeuticMenuController {
 // Khởi tạo instance global
 window.therapeuticMenu = new TherapeuticMenuController();
 
+// ============================================================
+// SẢNH (LOBBY) DẠNG LƯỚI GRID — PHÂN LUỒNG THEO PHÁC ĐỒ ĐIỀU TRỊ
+// ============================================================
+
+/**
+ * Kích hoạt module game theo mã hiệu y khoa (M1..M12).
+ * Hàm global để inline onclick trong thẻ module-card gọi được.
+ * @param {string} id - Mã hiệu module (vd: 'M7')
+ */
+window.startTherapyModule = function(id) {
+    const mod = window.therapeuticMenu ? window.therapeuticMenu._getModuleByMId(id) : null;
+    if (mod) {
+        console.log(`[Therapeutic] Kích hoạt module theo phác đồ: ${id} -> ${mod.id}`);
+        window.therapeuticMenu.launchGame(mod);
+    } else {
+        console.warn('[Therapeutic] Không tìm thấy module:', id);
+    }
+};
+
+/**
+ * Render giao diện sảnh (Lobby) dạng lưới Grid, phân luồng theo Phác đồ:
+ * - amblyopia: Phác đồ Nhược thị & Tật khúc xạ (4 giai đoạn)
+ * - strabismus_postop: Phác đồ Hậu phẫu Lác (3 bước, KHÔNG bịt mắt)
+ * Mỗi hàng = 1 giai đoạn: cột trái là thẻ Giai đoạn (220px) + tối đa
+ * 5 module => tổng cộng tối đa 6 ô trên một hàng ngang.
+ * @param {HTMLElement} container - Phần tử chứa (menu-therapeutic)
+ */
+window.renderTherapeuticLobby = function(container) {
+    const protocol = localStorage.getItem("currentProtocol") || "amblyopia";
+
+    // Định nghĩa cấu trúc động
+    const config = {
+        'amblyopia': {
+            title: "Phác đồ Điều trị Nhược thị & Tật khúc xạ",
+            rows: [
+                { title: "Giai đoạn 1: Đánh thức Hoàng điểm (Đơn thị)", modules: [
+                    { id: 'M7', name: 'Kích thích Lưới CAM', icon: '🌀' },
+                    { id: 'M8', name: 'Khử chen chúc (Anti-Crowding)', icon: '🔠' },
+                    { id: 'M9', name: 'Kích thích tế bào nón', icon: '🔴' },
+                    { id: 'M10', name: 'Phản xạ OKN', icon: '🚆' },
+                    { id: 'M11', name: 'Học tri giác Gabor', icon: '🦓' }
+                ]},
+                { title: "Giai đoạn 2: Chống ức chế", modules: [
+                    { id: 'M1', name: 'Hứng hạt', icon: '🧺' },
+                    { id: 'M2', name: 'Khớp khung', icon: '🧩' },
+                    { id: 'M12', name: 'Bám đuôi động', icon: '🎯' }
+                ]},
+                { title: "Giai đoạn 3: Hợp thị Vận động", modules: [
+                    { id: 'M3', name: 'Theo vết Vận nhãn', icon: '👁️' },
+                    { id: 'M6', name: 'Mở rộng Phân kỳ', icon: '↔️' },
+                    { id: 'M13', name: 'Mở rộng Hội tụ', icon: '👉👈' }
+                ]},
+                { title: "Giai đoạn 4: Thị giác nổi 3D", modules: [
+                    { id: 'M5', name: 'Thị giác nổi RDS', icon: '🧊' }
+                ]}
+            ]
+        },
+        'strabismus_postop': {
+            title: "Phác đồ Hậu phẫu Lác (Post-op Vision Therapy)",
+            rows: [
+                { title: "Bước 1: Phá vỡ ức chế + Hợp thị cảm giác", modules: [
+                    { id: 'M1', name: 'Hứng hạt', icon: '🧺' },
+                    { id: 'M2', name: 'Khớp khung', icon: '🧩' },
+                    { id: 'M12', name: 'Bám đuôi động', icon: '🎯' }
+                ]},
+                { title: "Bước 2: Hợp thị Vận động", modules: [
+                    { id: 'M3', name: 'Theo vết Vận nhãn', icon: '👁️' },
+                    { id: 'M6', name: 'Mở rộng Phân kỳ', icon: '↔️' },
+                    { id: 'M13', name: 'Mở rộng Hội tụ', icon: '👉👈' }
+                ]},
+                { title: "Bước 3: Keo 3D (Củng cố hai mắt)", modules: [
+                    { id: 'M5', name: 'Thị giác nổi RDS', icon: '🧊' }
+                ]}
+            ]
+        }
+    };
+
+    const currentSetup = config[protocol] || config['amblyopia'];
+    const isCalibrated = window.__anaglyphColors && window.__anaglyphColors.red;
+
+    // Khởi tạo HTML với CSS Grid nội tuyến
+    let html = `<div style="padding: 20px; color: #fff;">
+        <h2 style="color: #00e676; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px;">${currentSetup.title}</h2>
+        <style>
+            .grid-row { display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 25px; align-items: stretch; }
+            @media (min-width: 1024px) {
+                /* Cột 1: Cố định 220px. Các cột sau: Chia đều, tối đa 5 module = tổng 6 cột */
+                .grid-row { grid-template-columns: 220px repeat(auto-fit, minmax(130px, 1fr)); }
+            }
+            .stage-card { background: rgba(77,166,255,0.1); border-left: 4px solid #4da6ff; padding: 15px; border-radius: 8px; font-weight: 600; font-size: 14px; color: #4da6ff; display: flex; align-items: center; }
+            .module-card { background: #2a2a3e; border: 1px solid #444; border-radius: 8px; padding: 15px 10px; text-align: center; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+            .module-card:hover { border-color: #4da6ff; background: #32324a; transform: translateY(-3px); }
+            .module-icon { font-size: 28px; margin-bottom: 8px; }
+            .module-name { font-size: 12px; line-height: 1.4; color: #ddd; font-weight: 500; }
+        </style>
+        <div class="protocol-container">
+    `;
+
+    // Render từng hàng (Row)
+    currentSetup.rows.forEach(row => {
+        html += `<div class="grid-row">
+                    <div class="stage-card">${row.title}</div>`;
+
+        row.modules.forEach(mod => {
+            const clickAttr = isCalibrated
+                ? `onclick="startTherapyModule('${mod.id}')"`
+                : `title="Chống chỉ định: Cần hiệu chuẩn kính"`;
+            const disabledStyle = isCalibrated ? '' : 'opacity: 0.5; cursor: not-allowed;';
+            html += `<div class="module-card" style="${disabledStyle}" ${clickAttr}>
+                        <div class="module-icon">${mod.icon}</div>
+                        <div class="module-name">${mod.id}: ${mod.name}</div>
+                     </div>`;
+        });
+        html += `</div>`;
+    });
+
+    html += `</div></div>`;
+    container.innerHTML = html;
+
+    // Dọn dẹp style container: Grid nằm trong luồng cuộn dọc của menu
+    container.style.display = 'block';
+    container.style.padding = '0';
+    container.style.overflowY = 'auto';
+    container.style.maxHeight = 'calc(100vh - 120px)';
+};
+
 // Active Polling: Kiểm tra DOM mỗi 200ms, tối đa 25 chu kỳ (5 giây)
 (function autoMountTherapeutic() {
     let cycles = 0;
@@ -945,3 +1000,14 @@ document.addEventListener('onWorkspaceChanged', (e) => {
         window.therapeuticMenu.stopCurrentGame();
     }
 });
+
+/**
+ * Đóng Module trị liệu sau khi người dùng xác nhận kết quả trên Global Result Modal:
+ * Dọn dẹp workspace fullscreen và trả về màn hình Dashboard.
+ */
+window.closeTherapyModule = function() {
+    if (window.therapeuticMenu) {
+        window.therapeuticMenu._handleFullscreenExit();
+    }
+    if (typeof window.loadTest === 'function') window.loadTest('dashboard');
+};

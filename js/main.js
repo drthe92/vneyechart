@@ -1183,6 +1183,19 @@ function init() {
         console.error('[EMR CORE] Khong tim thay instance cua ExamSessionManager.');
         alert('Loi he thong: Khong tim thay quan ly phiem kham. Vui long refresh trang.');
     }
+
+    // Phát sự kiện kết thúc bài tập để Global Result Modal hiển thị
+    // (Chuẩn hóa payload từ mọi game M1..M12 — chỉ hiển thị khi đã lưu thành công)
+    const gameId = String(e.detail.gameName || '').match(/M\d+/);
+    document.dispatchEvent(new CustomEvent('therapy_session_completed', {
+        detail: {
+            gameId: gameId ? gameId[0] : '',
+            gameName: e.detail.gameName,
+            duration: Math.round(e.detail.durationMs / 1000),
+            score: (e.detail.metrics && e.detail.metrics.score) || 0,
+            metrics: e.detail.metrics && e.detail.metrics.customData ? e.detail.metrics.customData : (e.detail.metrics || {})
+        }
+    }));
   });
 
   // Load default test
@@ -1281,6 +1294,24 @@ function formatTherapyClinicalResult(input) {
         const finalArcsec = metrics.customData?.finalArcsec;
         if (finalArcsec !== undefined && finalArcsec !== null) {
             return `Ngưỡng thị giác nổi (Stereoacuity): ${ finalArcsec } Arcsec`;
+        }
+    }
+
+    // Module 13: Convergence Therapy (M13) — Dự trữ Hợp thị Hội tụ (PFV - Positive Fusional Vergence)
+    // LƯU Ý: Phải đặt TRƯỚC khối M3 vì chuỗi 'M13' chứa 'M3'
+    if (gameName && gameName.includes('M13')) {
+        const diopter = metrics?.customData?.finalConvergenceDiopter ?? metrics?.finalConvergenceDiopter ?? metrics?.score;
+        if (diopter !== undefined && diopter !== null) {
+            return `Dự trữ Hợp thị Hội tụ (PFV): <strong style="color: #00e676;">${diopter} &Delta;</strong>`;
+        }
+    }
+
+    // Module 6: Divergence Therapy (M6) — Dự trữ Hợp thị Phân kỳ (NFV - Negative Fusional Vergence)
+    const gameId = input?.gameId || metrics?.gameId || '';
+    if (gameId === 'M6' || (gameName && gameName.includes('M6'))) {
+        const diopter = metrics?.customData?.finalDivergenceDiopter ?? metrics?.finalDivergenceDiopter ?? metrics?.score;
+        if (diopter !== undefined && diopter !== null) {
+            return `Dự trữ Hợp thị Phân kỳ (NFV): <strong style="color: #00e676;">${diopter} &Delta;</strong>`;
         }
     }
 
@@ -1397,6 +1428,10 @@ function generateTherapyReportHTML(patientId) {
             isPassed = (cd.avgLatencyMs ?? 0) > 0 && (cd.avgLatencyMs ?? 0) <= threshold;
         } else if (record.gameName.includes('M5')) {
             isPassed = (cd.finalArcsec ?? 0) > 0 && (cd.finalArcsec ?? 0) <= 40;
+        } else if (record.gameName.includes('M13')) {
+            isPassed = (cd.maxDiopter ?? 0) >= (cd.targetDiopter ?? 15);
+        } else if (record.gameName.includes('M6')) {
+            isPassed = (cd.maxDiopter ?? 0) >= (cd.targetDiopter ?? 8);
         } else if (record.gameName.includes('M7')) {
             isPassed = (cd.accuracyRate ?? 0) >= 80 && (cd.avgReactionTimeMs ?? 0) <= 800;
         } else if (record.gameName.includes('M8')) {

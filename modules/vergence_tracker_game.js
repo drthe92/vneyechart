@@ -192,13 +192,12 @@ class VergenceTrackerGame extends BinocularGameEngine {
     }
 
     /**
-     * Kết thúc game và hiển thị báo cáo lâm sàng (Bulletproof)
+     * Kết thúc game — nhường quyền hiển thị cho Global Result Modal
      * - Tính trung bình avgBO và avgBI từ this.results
-     * - Đánh giá lâm sàng theo tiêu chuẩn 50cm (BO >= 100px, BI >= 50px)
-     * - Tạo overlay đè lên mọi thứ với z-index tối đa
+     * - Đóng gói sessionMetrics và phát event để EMR lưu + Modal hiển thị
      */
     _endGame() {
-        // A. Tính trung bình (mảng rỗng thì gán = 0)
+        // Tính trung bình
         const avgBO = this.results.BO.length > 0
             ? this.results.BO.reduce((a, b) => a + b, 0) / this.results.BO.length
             : 0;
@@ -206,78 +205,16 @@ class VergenceTrackerGame extends BinocularGameEngine {
             ? this.results.BI.reduce((a, b) => a + b, 0) / this.results.BI.length
             : 0;
 
-        // --- Đóng gói sessionMetrics trước khi stop ---
-        this.sessionMetrics.customData = { avgBaseOut: avgBO, avgBaseIn: avgBI };
-        this.finishSession();
-
-        // B. Đánh giá lâm sàng theo tiêu chuẩn Lăng kính mới
-        const evalBO = avgBO >= 15
-            ? '<span style="color:#4ade80">ĐẠT (Bình thường)</span>'
-            : '<span style="color:#f87171">CHƯA ĐẠT (Suy giảm)</span>';
-        const evalBI = avgBI >= 8
-            ? '<span style="color:#4ade80">ĐẠT (Bình thường)</span>'
-            : '<span style="color:#f87171">CHƯA ĐẠT (Suy giảm)</span>';
-
-        // C. Thoát game - đảm bảo chuột đã hiện lại
+        // Đóng gói dữ liệu đo lường
+        this.sessionMetrics.customData = { 
+            avgBaseOut: parseFloat(avgBO.toFixed(1)), 
+            avgBaseIn: parseFloat(avgBI.toFixed(1)) 
+        };
+        
+        // Kết thúc session (Hệ thống sẽ tự kích hoạt Global Modal qua event)
         this.stop();
         this.canvas.style.cursor = 'default';
-
-        // D. Tạo Overlay (Fix lỗi ẩn kết quả - cấp CSS cực mạnh)
-        const overlay = document.createElement('div');
-        overlay.style.cssText = 'position: fixed; inset: 0; z-index: 2147483647; background: #0f172a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: sans-serif;';
-
-        overlay.innerHTML = `
-            <div style="background: #1e293b; border-radius: 12px; padding: 30px; max-width: 600px; width: 90%; box-shadow: 0 4px 24px rgba(0,0,0,0.5);">
-                <h2 style="text-align: center; color: #38bdf8; margin: 0 0 20px 0; font-size: 24px;">BÁO CÁO KẾT QUẢ VẬN NHÃN</h2>
-
-                <div style="background: rgba(56, 189, 248, 0.1); border: 1px solid #38bdf8; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-                    <p style="font-size: 16px; color: #94a3b8; margin: 0 0 8px 0;"><strong>Chi tiết từng lượt:</strong></p>
-                    <p style="font-size: 15px; margin: 4px 0;">Base-Out (Hội tụ): [${this.results.BO.map(v => v.toFixed(1)).join(', ') || '—'}Δ]</p>
-                    <p style="font-size: 15px; margin: 4px 0;">Base-In (Phân kỳ): [${this.results.BI.map(v => v.toFixed(1)).join(', ') || '—'}Δ]</p>
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
-                    <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; border-radius: 8px; padding: 15px; text-align: center;">
-                        <p style="font-size: 14px; color: #94a3b8; margin: 0 0 8px 0;">Biên độ Hội tụ (Base-Out)</p>
-                        <p style="font-size: 28px; color: #10b981; margin: 0; font-weight: bold;">${avgBO.toFixed(1)}Δ</p>
-                        <p style="font-size: 14px; margin: 4px 0 0 0;">${evalBO}</p>
-                    </div>
-                    <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid #f59e0b; border-radius: 8px; padding: 15px; text-align: center;">
-                        <p style="font-size: 14px; color: #94a3b8; margin: 0 0 8px 0;">Biên độ Phân kỳ (Base-In)</p>
-                        <p style="font-size: 28px; color: #f59e0b; margin: 0; font-weight: bold;">${avgBI.toFixed(1)}Δ</p>
-                        <p style="font-size: 14px; margin: 4px 0 0 0;">${evalBI}</p>
-                    </div>
-                </div>
-
-                <div style="background: rgba(100, 116, 139, 0.1); border: 1px solid #64748b; border-radius: 8px; padding: 12px; margin-bottom: 20px;">
-                    <p style="font-size: 13px; color: #94a3b8; margin: 0; line-height: 1.5;">
-                        <strong>Mục tiêu lâm sàng:</strong> Hội tụ (Base-Out) ≥ 15Δ | Phân kỳ (Base-In) ≥ 8Δ
-                    </p>
-                </div>
-
-                <div style="text-align: center;">
-                    <button id="btn-finish-m3" style="padding: 12px 30px; font-size: 16px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">HOÀN THÀNH PHÁC ĐỒ</button>
-                </div>
-            </div>
-        `;
-
-        // E. Bắt buộc gắn trực tiếp vào body để không bị SPA xóa
-        document.body.appendChild(overlay);
-
-        // F. Xử lý sự kiện nút Hoàn Thành
-        const finishBtn = document.getElementById('btn-finish-m3');
-        if (finishBtn) {
-            finishBtn.onclick = () => {
-                if (document.fullscreenElement) {
-                    document.exitFullscreen().catch(e => console.log(e));
-                }
-                overlay.remove();
-                if (this.workspace) {
-                    this.workspace.innerHTML = '';
-                }
-                console.log('[Vergence] Hoàn thành phác đồ điều trị.');
-            };
-        }
+        this.finishSession();
     }
 }
 
