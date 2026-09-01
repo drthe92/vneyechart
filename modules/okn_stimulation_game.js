@@ -55,9 +55,12 @@ class OKNStimulationGame extends BinocularGameEngine {
         this._reactionTimes = [];         // ms phản xạ các lượt trúng
 
         // --- Cấu hình từ Lobby (mặc định) ---
-        this.stripeWidth = 40;            // px (nửa chu kỳ: 1 sọc đen + 1 sọc trắng)
-        this.stripeSpeed = 160;           // px/s
+        this.level = 1;                   // Cấp độ hiện tại (1..10) — gamify
+        this.stripeWidth = 40;            // px (nửa chu kỳ: 1 sọc đen + 1 sọc trắng) — set theo Level
+        this.stripeSpeed = 160;           // px/s — set theo Level
         this.direction = 'LTR';           // 'LTR' | 'RTL'
+        this.targetLifeMinMs = 1500;      // Thời gian tồn tại tối thiểu đốm sáng — theo Level
+        this.targetLifeMaxMs = 2000;      // Thời gian tồn tại tối đa đốm sáng — theo Level
 
         // --- Trạng thái đồ họa ---
         this.offsetX = 0;                 // Dịch chuyển sọc tích lũy (px)
@@ -80,26 +83,34 @@ class OKNStimulationGame extends BinocularGameEngine {
     }
 
     /**
+     * Ánh xạ Level (1..10) → Thông số vật lý nội bộ.
+     * Level càng cao: sọc hẹp hơn (kích thích OKN mạnh hơn), trôi nhanh hơn,
+     * đốm đỏ tồn tại ngắn hơn → phản xạ phải nhanh hơn.
+     * @param {number|string} level - Cấp độ người dùng chọn (mặc định 1)
+     * @returns {number} Level hợp lệ (clamp 1..10)
+     */
+    _applyLevel(level) {
+        const lvl = Math.max(1, Math.min(10, parseInt(level, 10) || 1));
+        // Độ rộng sọc: L1 = 56px → L10 = 24px
+        this.stripeWidth = Math.max(24, Math.round(56 - (lvl - 1) * 3.56));
+        // Tốc độ trôi: L1 = 90 px/s → L10 = 260 px/s
+        this.stripeSpeed = Math.round(90 + (lvl - 1) * 18.9);
+        // Thời gian đốm: L1 = 2000ms → L10 = 900ms
+        this.targetLifeMaxMs = Math.max(900, Math.round(2000 - (lvl - 1) * 122));
+        this.targetLifeMinMs = Math.max(500, this.targetLifeMaxMs - 500);
+        return lvl;
+    }
+
+    /**
      * Khởi chạy game với cấu hình từ Lobby
-     * @param {Object} config - { stripeSize, direction, speed }
+     * @param {Object} config - { level, direction }
      */
     start(config = {}) {
-        // Cấu hình kích thước sọc (nửa chu kỳ)
-        const stripeSize = (config && config.stripeSize) ? config.stripeSize : 'Vừa';
-        const sizeFactor = (
-            stripeSize === 'Lớn' ? 0.09 :
-            stripeSize === 'Nhỏ' ? 0.035 : 0.055
-        );
+        // Cấu hình Level → Thông số vật lý (thay thế dropdown sọc/tốc độ)
+        this.level = this._applyLevel(config && config.level);
 
-        // Cấu hình hướng trôi
+        // Cấu hình hướng trôi (trục lâm sàng — giữ nguyên cho bệnh nhân chọn)
         this.direction = (config && config.direction === 'RTL') ? 'RTL' : 'LTR';
-
-        // Cấu hình tốc độ sọc (px/s)
-        const speed = (config && config.speed) ? config.speed : 'Vừa';
-        this.stripeSpeed = (
-            speed === 'Chậm' ? 90 :
-            speed === 'Nhanh' ? 260 : 160
-        );
 
         // Reset trạng thái phiên
         this.targetsSpawned = 0;
@@ -169,7 +180,7 @@ class OKNStimulationGame extends BinocularGameEngine {
         const driftSpeed = Math.min(100, this.stripeSpeed * 0.3);
         const vx = (this.direction === 'LTR') ? -driftSpeed : driftSpeed;
 
-        const life = this.MIN_LIFE_MS + Math.random() * (this.MAX_LIFE_MS - this.MIN_LIFE_MS);
+        const life = this.targetLifeMinMs + Math.random() * (this.targetLifeMaxMs - this.targetLifeMinMs);
         const now = performance.now();
 
         this._target = { x, y, r, bornAt: now, expiresAt: now + life, vx };
@@ -298,7 +309,7 @@ class OKNStimulationGame extends BinocularGameEngine {
         ctx.font = 'bold 20px monospace';
         ctx.textBaseline = 'top';
         ctx.textAlign = 'left';
-        ctx.fillText(`Đốm: ${this.targetsHit} / ${this.targetsSpawned}`, 16, 16);
+        ctx.fillText(`Đốm: ${this.targetsHit} / ${this.targetsSpawned} | Level ${this.level}`, 16, 16);
         ctx.textAlign = 'left';
     }
 
@@ -316,14 +327,27 @@ class OKNStimulationGame extends BinocularGameEngine {
             ? Math.round(this._reactionTimes.reduce((a, b) => a + b, 0) / this._reactionTimes.length)
             : 0;
 
+        // --- Mở khóa Level kế tiếp nếu đạt ≥ 80% và chưa phải Level tối đa ---
+        const LEVEL_KEY = 'vision-therapy-m10-max-level';
+        const maxLevel = parseInt(localStorage.getItem(LEVEL_KEY) || '1', 10) || 1;
+        let unlockedNew = false;
+        if (accuracy >= 80 && this.level >= maxLevel && this.level < 10) {
+            localStorage.setItem(LEVEL_KEY, String(this.level + 1));
+            unlockedNew = true;
+        }
+
         // Đóng gói customData theo đặc tả
         this.sessionMetrics.customData = {
+            level: this.level,
+            completionRate: accuracy,
             stripeSpeed: this.stripeSpeed,
+            stripeWidth: this.stripeWidth,
             direction: this.direction,
             targetsSpawned: this.targetsSpawned,
             targetsHit: this.targetsHit,
             accuracy: accuracy,
-            avgReactionTimeMs: avgReactionTimeMs
+            avgReactionTimeMs: avgReactionTimeMs,
+            nextLevelUnlocked: unlockedNew
         };
         this.sessionMetrics.hits = this.targetsHit;
         this.sessionMetrics.misses = this.targetsSpawned - this.targetsHit;

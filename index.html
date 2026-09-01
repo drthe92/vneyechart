@@ -338,19 +338,19 @@
         <h2 style="margin: 0; color: #4da6ff;">Biểu đồ Tiến triển Thị giác</h2>
         <button onclick="closeDashboard()" style="padding: 8px 16px; background: #444; border: none; color: white; border-radius: 4px; cursor: pointer;">Đóng</button>
       </div>
-      <div style="margin-bottom: 20px;">
-        <label>Chọn chỉ số theo dõi: </label>
-        <select id="dashboard-metric-select" onchange="renderChart()" style="padding: 5px; border-radius: 4px;">
-          <option value="M5_Arcsec">Thị giác nổi 3D (M5) - Arcsec</option>
-          <option value="M1_Alpha">Ức chế hợp thị (M1) - C-Ratio</option>
-          <option value="M4_Latency">Phản xạ Vận nhãn (M4) - Latency</option>
-        </select>
+      <div style="display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-bottom: 16px;">
+        <label>Module:
+          <select id="dashboard-module-select" onchange="renderDashboard()" style="padding: 5px; border-radius: 4px;"></select>
+        </label>
+        <label>Khoảng thời gian:
+          <input type="date" id="dashboard-date-from" onchange="renderDashboard()" style="padding: 4px; border-radius: 4px;">
+          → 
+          <input type="date" id="dashboard-date-to" onchange="renderDashboard()" style="padding: 4px; border-radius: 4px;">
+        </label>
       </div>
-      <div style="position: relative; height: 50vh; width: 100%;">
-        <canvas id="progressChart"></canvas>
-      </div>
+      <div id="dashboard-charts" class="dashboard-charts-grid"></div>
       <p style="font-size: 0.9em; color: #aaa; margin-top: 15px; font-style: italic;">
-        * Dao động điểm số ±15% giữa các phiên tập là hiện tượng sinh lý bình thường.
+        * Mỗi điểm dữ liệu tương ứng 1 phiên tập (cần ≥ 2 phiên để vẽ biểu đồ). Dao động điểm số ±15% giữa các phiên tập là hiện tượng sinh lý bình thường.
       </p>
     </div>
 

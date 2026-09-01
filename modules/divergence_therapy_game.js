@@ -161,38 +161,18 @@ class DivergenceTherapyGame extends BinocularGameEngine {
         // Mức phân kỳ tối đa đạt được (Prism Diopters - Δ)
         const maxDiopters = this.currentDiopter;
 
-        const customData = {
+        // Lưu hệ thống Therapy theo chuẩn Engine (Firebase & LocalStorage)
+        this.sessionMetrics.customData = {
             maxDiopter: this.currentDiopter,
             targetDiopter: this.targetDiopter,
             finalDivergenceDiopter: parseFloat(maxDiopters.toFixed(2)),
             totalStrikes: Object.values(this.strikes).reduce((a, b) => a + b, 0),
             status: reason
         };
-
-        // Lưu hệ thống Therapy
-        if (this.sessionMetrics) {
-            this.sessionMetrics.customData = customData;
-            this.sessionMetrics.score = maxDiopters; // Fallback: score = số Diop
-            this.sessionMetrics.durationSeconds = this.totalPlayTime;
-            if (typeof this.finishSession === 'function') this.finishSession();
-        }
-
-        // Phát sự kiện Backup
-        document.dispatchEvent(new CustomEvent('therapy_session_completed', {
-            detail: {
-                gameId: 'M6',
-                gameName: this.gameName,
-                duration: this.totalPlayTime,
-                score: maxDiopters,
-                metrics: {
-                    finalDivergenceDiopter: parseFloat(maxDiopters.toFixed(2))
-                }
-            }
-        }));
-
-        // Global Result Modal hiển thị kết quả (thay cho alert() cũ)
-        // if (typeof window.loadTest === 'function') window.loadTest('dashboard');
-        // Điều hướng được xử lý bởi closeGlobalResultModal -> closeTherapyModule khi người dùng xác nhận
+        this.sessionMetrics.score = maxDiopters;
+        this.sessionMetrics.durationSeconds = this.totalPlayTime;
+        this.score = maxDiopters;
+        this.finishSession();
     }
 }
 

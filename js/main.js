@@ -1204,6 +1204,37 @@ function init() {
     state.steps = mod.steps;
     renderStep();
   }
+
+  // [DEEP LINKING ROUTER] Kiểm tra tham số URL để mở trực tiếp module từ Docs
+  const urlParams = new URLSearchParams(window.location.search);
+  const action = urlParams.get('action');
+  const moduleId = urlParams.get('module');
+
+  if (action === 'practice' && moduleId) {
+    // 1. Chuyển sang workspace Phòng tập (nếu đang ở màn hình chẩn đoán có icon gamepad)
+    const workspaceBtn = document.getElementById('workspace-toggle-btn');
+    if (workspaceBtn && workspaceBtn.innerHTML.includes('fa-gamepad')) {
+      workspaceBtn.click();
+    }
+
+    // 2. Trì hoãn nhẹ để DOM lưới Lobby kịp mount, sau đó bung Modal của Module
+    setTimeout(() => {
+      if (typeof window.startTherapyModule === 'function') {
+        // Chuẩn hóa mã module: 'M01'/'M1'/'m01' → 'M1' (khớp khóa _moduleIdByM)
+        let mId = String(moduleId || '').trim().toUpperCase();
+        mId = mId.replace(/^M0+(\d+)$/, 'M$1');
+        if (/^M\d+$/.test(mId)) {
+          window.startTherapyModule(mId);
+        } else {
+          console.warn('[DeepLink] Mã module không hợp lệ:', moduleId);
+        }
+      }
+    }, 300);
+
+    // 3. Xóa query params trên thanh địa chỉ để chống kẹt luồng khi F5 (Refresh)
+    const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+    window.history.replaceState({path: cleanUrl}, '', cleanUrl);
+  }
 }
 
 if (document.readyState === 'loading') {
@@ -1259,16 +1290,20 @@ function formatTherapyClinicalResult(input) {
     // Module 1: Contrast threshold fusion (C-Ratio)
     if (gameName.startsWith('M1:') || metrics?.moduleType === 1) {
         const alpha = metrics.customData?.finalAlpha;
+        const level = metrics.customData?.level;
         if (alpha !== undefined && alpha !== null) {
-            return `Ngưỡng tương phản dung hợp (C-Ratio): ${ (alpha * 100).toFixed(0) }%`;
+            const levelStr = level !== undefined && level !== null ? ` | Level ${level}` : '';
+            return `Ngưỡng tương phản dung hợp (C-Ratio): ${ (alpha * 100).toFixed(0) }%${levelStr}`;
         }
     }
 
     // Module 2: Foveal visual angle
     if (gameName.startsWith('M2:') || metrics?.moduleType === 2) {
         const angle = metrics.customData?.visualAngleDeg;
+        const lv = metrics.customData?.level;
+        const streak = metrics.customData?.streak;
         if (angle !== undefined && angle !== null) {
-            return `Góc thị giác Foveal tối thiểu: ${ angle.toFixed(2) }°`;
+            return `Góc thị giác Foveal: ${ angle.toFixed(2) }°${ lv ? ` | Level ${ lv }` : '' }${ streak !== undefined ? ` | Chuỗi: ${ streak }/5` : '' }`;
         }
     }
 
@@ -1284,8 +1319,9 @@ function formatTherapyClinicalResult(input) {
     // Module 4: Saccadic (reaction time)
     if (gameName.startsWith('M4:') || metrics?.moduleType === 4) {
         const latency = metrics.customData?.avgLatencyMs;
+        const lv = metrics.customData?.level;
         if (latency !== undefined && latency !== null) {
-            return `Thời gian phản xạ: ${ latency } ms`;
+            return `Thời gian phản xạ: ${ latency } ms${ lv ? ` | Level ${ lv }` : '' }`;
         }
     }
 
@@ -1337,8 +1373,9 @@ function formatTherapyClinicalResult(input) {
     if (gameName.includes('M9')) {
         const acc = metrics.customData?.accuracy;
         const rt = metrics.customData?.avgReactionTimeMs;
+        const lv = metrics.customData?.level;
         if (acc !== undefined && acc !== null && rt !== undefined && rt !== null) {
-            return `Chính xác: ${ acc.toFixed(0) }% | Phản xạ trung bình: ${ rt.toFixed(0) } ms`;
+            return `Chính xác: ${ acc.toFixed(0) }% | Phản xạ trung bình: ${ rt.toFixed(0) } ms${ lv ? ` | Level ${ lv }` : '' }`;
         }
     }
 
@@ -1346,10 +1383,9 @@ function formatTherapyClinicalResult(input) {
     if (gameName.includes('M10')) {
         const acc = metrics.customData?.accuracy;
         const rt = metrics.customData?.avgReactionTimeMs;
-        const dir = metrics.customData?.direction;
-        const spd = metrics.customData?.stripeSpeed;
+        const lv = metrics.customData?.level;
         if (acc !== undefined && acc !== null && rt !== undefined && rt !== null) {
-            return `Chính xác: ${ acc.toFixed(0) }% | Phản xạ trung bình: ${ rt.toFixed(0) } ms${ dir ? ` | Hướng: ${ dir }` : '' }${ spd ? ` | Tốc độ: ${ spd } px/s` : '' }`;
+            return `Chính xác: ${ acc.toFixed(0) }% | Phản xạ trung bình: ${ rt.toFixed(0) } ms${ lv ? ` | Level ${ lv }` : '' }`;
         }
     }
 
@@ -1419,13 +1455,27 @@ function generateTherapyReportHTML(patientId) {
         if (record.gameName.startsWith('M1:')) {
             isPassed = (cd.finalAlpha ?? 1) <= 0.5;
         } else if (record.gameName.includes('M2')) {
-            isPassed = (cd.visualAngleDeg ?? 0) > 0 && (cd.visualAngleDeg ?? 0) <= 2.0;
+            // M2: QUA MÀN khi khớp khung đủ 5 lần LIÊN TIẾP (passed=true)
+            isPassed = cd.passed === true;
         } else if (record.gameName.includes('M3')) {
             isPassed = (cd.avgBaseOut ?? 0) >= 15 && (cd.avgBaseIn ?? 0) >= 8;
         } else if (record.gameName.includes('M4')) {
-            const device = cd.deviceType || (navigator.maxTouchPoints > 0 ? 'Cảm ứng' : 'Chuột');
-            const threshold = device === 'Cảm ứng' ? 500 : 900;
-            isPassed = (cd.avgLatencyMs ?? 0) > 0 && (cd.avgLatencyMs ?? 0) <= threshold;
+            // TIÊU CHÍ QUA MÀN ĐỘNG M4 theo Chặng (dựa trên Level đã lưu trong customData)
+            const lvl = parseInt(cd.level ?? 1, 10) || 1;
+            const acc = cd.accuracy ?? 0;
+            const rt = cd.avgLatencyMs ?? 0;
+            const isTouch = (cd.deviceType === 'Cảm ứng')
+                || (navigator.maxTouchPoints > 0 && cd.deviceType !== 'Chuột');
+            if (lvl <= 3) {
+                isPassed = acc > 90;
+            } else if (lvl <= 6) {
+                isPassed = acc > 85 && rt > 0 && rt <= 1500;
+            } else if (lvl <= 9) {
+                isPassed = acc > 85 && rt > 0 && rt <= 1000;
+            } else {
+                const t = isTouch ? 600 : 800;
+                isPassed = acc > 90 && rt > 0 && rt <= t;
+            }
         } else if (record.gameName.includes('M5')) {
             isPassed = (cd.finalArcsec ?? 0) > 0 && (cd.finalArcsec ?? 0) <= 40;
         } else if (record.gameName.includes('M13')) {
@@ -1437,9 +1487,13 @@ function generateTherapyReportHTML(patientId) {
         } else if (record.gameName.includes('M8')) {
             isPassed = (cd.accuracy ?? 0) >= 75;
         } else if (record.gameName.includes('M9')) {
-            isPassed = (cd.accuracy ?? 0) >= 85;
+            // M9: Chính xác > 85% VÀ Phản xạ < 1200ms (nới lỏng hơn M4 — mắt lười Giai đoạn 1)
+            isPassed = (cd.accuracy ?? 0) > 85 && (cd.avgReactionTimeMs ?? 0) > 0 && (cd.avgReactionTimeMs ?? 0) < 1200;
         } else if (record.gameName.includes('M10')) {
             isPassed = (cd.accuracy ?? 0) >= 80;
+        } else if (record.gameName.includes('M12')) {
+            // M12: Accuracy bám đuôi > 85%
+            isPassed = (cd.trackingAccuracy ?? 0) > 85;
         } else if (record.gameName.includes('M11')) {
             isPassed = (cd.finalLogCS ?? 0) >= 1.0 && (cd.reversals ?? 0) >= 4;
         }

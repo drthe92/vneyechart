@@ -17,6 +17,27 @@
 
 import BinocularGameEngine from './binocular_game_engine.js';
 
+// ============================================================
+// BẢNG ĐỘ KHÓ 10 MỨC (M12) — Smooth Pursuit Dichoptic
+// widthPx    : Độ rộng đường ray (Rộng → Rất hẹp)
+// speedF     : Tốc độ cuộn (Chậm → Siêu nhanh)
+// amplitudePx: Độ uốn lượn (Thoải → Sâu)
+// waveform   : 'sine' = uốn lượn chữ S mềm;
+//              'zigzag' = zic-zac gắt (đảo chiều liên tục)
+// ============================================================
+const M12_LEVELS = [
+    { level: 1,  widthPx: 160, speedF: 0.45, amplitudePx: 20,  waveform: 'sine' },
+    { level: 2,  widthPx: 150, speedF: 0.55, amplitudePx: 40,  waveform: 'sine' },
+    { level: 3,  widthPx: 140, speedF: 0.70, amplitudePx: 60,  waveform: 'sine' },
+    { level: 4,  widthPx: 120, speedF: 0.90, amplitudePx: 100, waveform: 'sine' },
+    { level: 5,  widthPx: 105, speedF: 1.10, amplitudePx: 130, waveform: 'sine' },
+    { level: 6,  widthPx: 90,  speedF: 1.30, amplitudePx: 160, waveform: 'sine' },
+    { level: 7,  widthPx: 75,  speedF: 1.60, amplitudePx: 140, waveform: 'zigzag' },
+    { level: 8,  widthPx: 62,  speedF: 1.90, amplitudePx: 170, waveform: 'zigzag' },
+    { level: 9,  widthPx: 50,  speedF: 2.20, amplitudePx: 190, waveform: 'zigzag' },
+    { level: 10, widthPx: 40,  speedF: 2.60, amplitudePx: 200, waveform: 'zigzag' }
+];
+
 class DichopticPursuitGame extends BinocularGameEngine {
     /**
      * Khởi tạo Smooth Pursuit
@@ -44,12 +65,14 @@ class DichopticPursuitGame extends BinocularGameEngine {
         this.targetX = 0;
         this.targetY = 0; // Khóa cứng ở nửa dưới màn hình (thiết lập trong start)
 
-        // --- Thông số động (ghi đè bởi Lobby) ---
+        // --- Thông số động (ghi đè bởi Lobby theo Level) ---
+        this.level = 1;           // Cấp độ hiện tại (Level 1..10)
         this.frequency = 0.022;   // Tần số lượng giác (rad/px)
         this.amplitudePx = 110;   // Biên độ uốn lượn (px)
         this.pathWidthPx = 80;    // Độ rộng băng đường ray (px)
         this.speedFactor = 1.0;   // Tốc độ trôi (rad/s cho timeOffset)
-        this.durationMs = 180000; // Thời lượng mặc định (180s)
+        this.waveform = 'sine';   // Dạng sóng: 'sine' (chữ S) | 'zigzag' (zic-zac)
+        this.durationMs = 180000; // Thời lượng cố định (180s = 3 phút)
 
         // --- Trạng thái đánh giá ---
         this.totalFrames = 0;
@@ -67,34 +90,33 @@ class DichopticPursuitGame extends BinocularGameEngine {
     }
 
     /**
+     * Ánh xạ Level (1..10) → Thông số vật lý nội bộ theo bảng M12_LEVELS.
+     * Level càng cao: đường ray hẹp hơn, tốc độ nhanh hơn, uốn lượn sâu hơn,
+     * bắt đầu dạng zic-zac gắt từ Level 7.
+     * @param {number|string} level - Cấp độ người dùng chọn (mặc định 1)
+     * @returns {number} Level hợp lệ (clamp 1..10)
+     */
+    _applyLevel(level) {
+        const lvl = Math.max(1, Math.min(10, parseInt(level, 10) || 1));
+        const cfg = M12_LEVELS.find(l => l.level === lvl) || M12_LEVELS[0];
+        this.pathWidthPx = cfg.widthPx;
+        this.speedFactor = cfg.speedF;
+        this.amplitudePx = cfg.amplitudePx;
+        this.waveform = cfg.waveform;
+        return lvl;
+    }
+
+    /**
      * Bắt đầu game
      * Đọc cấu hình từ Lobby, khởi tạo AudioContext, gắn sự kiện pointer, chạy loop.
-     * @param {Object} config - Cấu hình từ form Lobby (speed, pathWidth, amplitude, duration)
+     * @param {Object} config - Cấu hình từ form Lobby (level)
      */
     start(config = {}) {
-        // --- Đọc cấu hình Tốc độ trôi ---
-        const speed = (config && config.speed) ? config.speed : 'medium';
-        this.speedFactor = (
-            speed === 'slow' ? 0.6 :
-            speed === 'fast' ? 1.8 : 1.0
-        );
+        // --- Ánh xạ Level → Thông số vật lý (thay thế dropdown rời rạc) ---
+        this.level = this._applyLevel(config && config.level);
 
-        // --- Đọc cấu hình Độ rộng đường ray ---
-        const pathWidth = (config && config.pathWidth) ? config.pathWidth : 'medium';
-        this.pathWidthPx = (
-            pathWidth === 'wide' ? 140 :
-            pathWidth === 'narrow' ? 40 : 80
-        );
-
-        // --- Đọc cấu hình Biên độ uốn lượn ---
-        const amplitude = (config && config.amplitude) ? config.amplitude : 'medium';
-        this.amplitudePx = (
-            amplitude === 'low' ? 50 :
-            amplitude === 'high' ? 200 : 110
-        );
-
-        // --- Đọc cấu hình Thời lượng ---
-        this.durationMs = (config && config.duration) ? Number(config.duration) : 180000;
+        // --- Thời lượng cố định: 180 giây (3 phút) ---
+        this.durationMs = 180000;
 
         // --- Khóa cứng tọa độ Y của Tàu ở nửa dưới màn hình ---
         this.targetY = this.canvas.height * 0.75;
@@ -175,12 +197,20 @@ class DichopticPursuitGame extends BinocularGameEngine {
 
     /**
      * Hàm lượng giác tính tọa độ X của đường ray tại độ cao Y
-     * PathX(Y) = CanvasWidth/2 + sin(Y * Frequency + TimeOffset) * Amplitude
+     * PathX(Y) = CanvasWidth/2 + Wave(Y, timeOffset) * Amplitude
+     * - waveform 'sine'  : sin() — uốn lượn chữ S mềm mại
+     * - waveform 'zigzag': sóng tam giác (asin(sin())) — zic-zac gắt, đảo chiều liên tục
      * @param {number} y - Tọa độ Y
      * @returns {number} Tọa độ X tương ứng
      */
     _pathXAt(y) {
-        return this.canvas.width / 2 + Math.sin(y * this.frequency + this._timeOffset) * this.amplitudePx;
+        let wave;
+        if (this.waveform === 'zigzag') {
+            wave = (2 / Math.PI) * Math.asin(Math.sin(y * this.frequency + this._timeOffset));
+        } else {
+            wave = Math.sin(y * this.frequency + this._timeOffset);
+        }
+        return this.canvas.width / 2 + wave * this.amplitudePx;
     }
 
     /**
@@ -336,7 +366,7 @@ class DichopticPursuitGame extends BinocularGameEngine {
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
         ctx.fillText(`Thời gian: ${remainS}s`, 24, 24);
-        ctx.fillText(`Chính xác: ${acc.toFixed(1)}%`, 24, 52);
+        ctx.fillText(`Level ${this.level} | Chính xác: ${acc.toFixed(1)}%`, 24, 52);
         ctx.fillStyle = flashing ? '#f87171' : '#94a3b8';
         ctx.fillText(`Chệch hướng: ${this.outOfBoundsHits}`, 24, 80);
 
@@ -351,34 +381,48 @@ class DichopticPursuitGame extends BinocularGameEngine {
      * @private
      */
     _endGame() {
-        // 1. Tính độ chính xác bám đuôi
+        // 1. Tính độ chính xác bám đuôi (= tỷ lệ hoàn thành tín hiệu của Level)
         const trackingAccuracy = this.totalFrames > 0
             ? (this.inBoundsFrames / this.totalFrames * 100)
             : 0;
+        const completionRate = trackingAccuracy;
 
-        // 2. Chuỗi độ khó (ghép từ Tốc độ, Độ rộng, Biên độ, Thời lượng)
+        // 2. Mở khóa Level kế tiếp nếu đạt > 85% (chưa phải Level tối đa)
+        const LEVEL_KEY = 'vision-therapy-m12-max-level';
+        const maxLevel = parseInt(localStorage.getItem(LEVEL_KEY) || '1', 10) || 1;
+        let unlockedNew = false;
+        if (completionRate > 85 && this.level >= maxLevel && this.level < 10) {
+            localStorage.setItem(LEVEL_KEY, String(this.level + 1));
+            unlockedNew = true;
+        }
+
+        // 3. Chuỗi độ khó (ghi rõ Level đã chinh phục)
         const speedLabel = this.speedFactor <= 0.6 ? 'Chậm' : (this.speedFactor >= 1.8 ? 'Nhanh' : 'Vừa');
-        const widthLabel = this.pathWidthPx >= 140 ? 'Rộng' : (this.pathWidthPx <= 40 ? 'Hẹp' : 'Vừa');
-        const ampLabel = this.amplitudePx <= 50 ? 'Thấp' : (this.amplitudePx >= 200 ? 'Cao' : 'Vừa');
-        const durationLabel = Math.round(this.durationMs / 1000) + 's';
-        const difficulty = `Tốc độ: ${speedLabel} | Độ rộng: ${widthLabel} | Biên độ: ${ampLabel} | ${durationLabel}`;
+        const widthLabel = this.pathWidthPx >= 140 ? 'Rộng' : (this.pathWidthPx <= 40 ? 'Rất hẹp' : 'Vừa');
+        const waveLabel = this.waveform === 'zigzag' ? 'Zic-zac' : (this.amplitudePx <= 60 ? 'Thoải' : 'Chữ S');
+        const difficulty = `Level ${this.level} | Tốc độ: ${speedLabel} | Đường ray: ${widthLabel} | Dạng sóng: ${waveLabel} | 180s`;
 
-        // 3. Đóng gói customData gửi cho EMR Core
+        // 4. Đóng gói customData gửi cho EMR Core
         this.sessionMetrics.customData = {
+            level: this.level,
+            completionRate: completionRate,
             totalFrames: this.totalFrames,
             inBoundsFrames: this.inBoundsFrames,
             outOfBoundsHits: this.outOfBoundsHits,
             trackingAccuracy: trackingAccuracy,
-            difficulty: difficulty
+            difficulty: difficulty,
+            nextLevelUnlocked: unlockedNew
         };
         this.finishSession();
 
-        // 4. Đánh giá lâm sàng
-        const isPassed = trackingAccuracy >= 70;
+        // 5. Đánh giá lâm sàng
+        const isPassed = completionRate > 85;
         const evalColor = isPassed ? '#4ade80' : '#f87171';
-        const evalText = isPassed ? 'ĐẠT (Bám đuôi ổn định)' : 'CHƯA ĐẠT (Cần luyện tập thêm)';
+        const evalText = isPassed
+            ? `${unlockedNew ? 'ĐẠT — Đã mở khóa Level ' + (this.level + 1) + '!' : 'ĐẠT (Bám đuôi ổn định)'}`
+            : 'CHƯA ĐẠT (Cần đạt > 85% để mở khóa Level kế tiếp)';
 
-        // 5. Dừng game
+        // 6. Dừng game
         this.stop();
 
         // 6. Overlay kết quả
@@ -399,6 +443,7 @@ class DichopticPursuitGame extends BinocularGameEngine {
                     </div>
                 </div>
                 <div style="background: rgba(100, 116, 139, 0.1); border: 1px solid #64748b; border-radius: 8px; padding: 12px; margin-bottom: 20px;">
+                    <p style="color: #94a3b8; margin: 0 0 5px 0; font-size: 13px;">Cấp độ đã chinh phục: <b style="color: #e2e8f0;">Level ${this.level}</b> | Tỷ lệ hoàn thành: <b style="color: #e2e8f0;">${completionRate.toFixed(1)}%</b></p>
                     <p style="color: #94a3b8; margin: 0 0 5px 0; font-size: 13px;">Tổng số khung hình: <b>${this.totalFrames}</b> | Bám đúng: <b>${this.inBoundsFrames}</b></p>
                     <p style="color: #94a3b8; margin: 0; font-size: 13px;">Cấu hình: <b>${difficulty}</b></p>
                 </div>

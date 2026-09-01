@@ -7,57 +7,13 @@
     <link rel="stylesheet" href="css/docs.css">
 </head>
 <body>
-<div class="docs-layout">
+    <div class="docs-container">
+        <nav class="docs-sidebar">
+            <a href="index.html" class="back-link">← Về danh mục</a>
+        </nav>
 
-    <!-- ============ SIDEBAR ============ -->
-    <aside class="docs-sidebar">
-<div class="docs-brand">
-    <a href="index.html">📖 Phác đồ Huấn luyện Thị giác</a>
-</div>
-<nav class="docs-nav">
-    <div class="docs-nav-group">
-        <h3>Giai đoạn 1 · Đánh thức Hoàng điểm (Đơn thị)</h3>
-        <ul>
-            <li><a href="m07_cam.html">M7 · Kích thích Lưới quay CAM</a></li>
-            <li><a href="m08_anticrowding.html">M8 · Khử hiện tượng chen chúc (Anti-Crowding)</a></li>
-            <li><a href="m09_redcone.html">M9 · Kích thích tế bào nón hoàng điểm (RED-Cone)</a></li>
-            <li><a href="m10_okn.html">M10 · Kích thích phản xạ OKN (Optokinetic)</a></li>
-            <li><a href="m11_gabor.html">M11 · Học tri giác Gabor (Perceptual Learning)</a></li>
-        </ul>
-    </div>
-    <div class="docs-nav-group">
-        <h3>Giai đoạn 2 · Phá vỡ ức chế hợp thị cảm giác (Phân thị Anaglyph)</h3>
-        <ul>
-            <li><a href="m01_catch.html">M1 · Hứng hạt (Catch)</a></li>
-            <li><a href="m02_align.html" class="active">M2 · Khớp khung (Shape Alignment)</a></li>
-        </ul>
-    </div>
-    <div class="docs-nav-group">
-        <h3>Giai đoạn 3 · Hợp thị Vận động & Theo vết (Motor Oculomotor)</h3>
-        <ul>
-            <li><a href="m03_vergence.html">M3 · Vận nhãn (Vergence)</a></li>
-            <li><a href="m12_pursuit.html">M12 · Bám đuôi phân thị (Smooth Pursuit)</a></li>
-        </ul>
-    </div>
-    <div class="docs-nav-group">
-        <h3>Giai đoạn 4 · Thị giác 3D & Phản xạ Cấp cao</h3>
-        <ul>
-            <li><a href="m04_saccadic.html">M4 · Vận nhãn nhanh (Saccadic)</a></li>
-            <li><a href="m05_rds.html">M5 · Huấn luyện Thị giác nổi (RDS)</a></li>
-        </ul>
-    </div>
-    <div class="docs-nav-group">
-        <h3>Module Chuyên biệt (Tùy chọn)</h3>
-        <ul>
-            <li><a href="m06_divergence.html">M6 · Huấn luyện Phân kỳ (Divergence)</a></li>
-        </ul>
-    </div>
-</nav>
-    </aside>
+        <main class="docs-content">
 
-    <!-- ============ MAIN CONTENT ============ -->
-    <main class="docs-main">
-        <article class="docs-content">
             <h1>M2: Khớp khung (Shape Alignment / MFBF)</h1>
 <p class="alert"><strong>Nguyên tắc bắt buộc: GIAI ĐOẠN 2 (PHÂN THỊ ANAGLYPH)</strong> - Đeo kính lọc màu Đỏ - Lục lam. Khối đặc bắt buộc nhìn bằng mắt nhược thị, khung rỗng nhìn bằng mắt khỏe.</p>
 
@@ -84,15 +40,26 @@
 <ul>
     <li><strong>Giao diện:</strong> Bệnh nhân sẽ thấy một Khung rỗng cố định và một Khối màu đặc.</li>
     <li><strong>Nhiệm vụ:</strong> Dùng chuột (hoặc chạm kéo) di chuyển Khối đặc lọt khít vào bên trong Khung rỗng.</li>
-    <li><strong>Thử thách duy trì:</strong> Sau khi đưa khối vào khung, bệnh nhân phải <em>giữ yên vị trí đó trong 2-3 giây</em>. Đây là khoảng thời gian để kiểm tra xem ám điểm ức chế trung tâm có chớp tắt (nhấp nháy) hay không.</li>
-    <li><strong>Cài đặt độ khó:</strong> Độ khó tăng dần qua các cấp độ (Level). Hình khối sẽ nhỏ dần đi (đòi hỏi định thị fovea cực kỳ chính xác) và có thể thêm các hạt nhiễu (Crowding effect) vào nền để gây rối loạn.</li>
+    <li><strong>Thử thách duy trì:</strong> Sau khi đưa khối vào khung, bệnh nhân phải <em>giữ yên vị trí đó đủ Hold Time theo Level (1s → 3s)</em>. Đây là khoảng thời gian để kiểm tra xem ám điểm ức chế trung tâm có chớp tắt (nhấp nháy) hay không. Nếu trượt ra ngoài khung giữa chừng lúc đang đếm giữ → bị tính là lỗi và <strong>phá vỡ chuỗi khớp liên tiếp</strong>.</li>
+    <li><strong>Cài đặt độ khó (Level 1–10):</strong> Chọn Cấp độ từ Lobby. Mỗi Level mã hóa 3 trục:
+        <ul>
+            <li><strong>Kích thước khung & khối:</strong> 180px (To, ~20% màn hình) → 20px (Siêu nhỏ — chỉ bằng dấu chấm, ép Fovea làm việc).</li>
+            <li><strong>Hold Time:</strong> 1.0s (Chặng 1) → 2.0s (Chặng 2) → 3.0s (Chặng 3–4).</li>
+            <li><strong>Nhiễu nền (Crowding):</strong> Trơn → Vài đốm tĩnh → Đốm nhấp nháy rải màn → "Rừng" nhiễu động (28 đốm, Mức 10).</li>
+        </ul>
+    </li>
 </ul>
 
-<h2>6. Mục tiêu Luyện tập</h2>
-<p>Hoàn thành số lượng cấp độ quy định (VD: 10 cấp). Bệnh nhân giữ được khối đặc trong khung mà không thấy khối đặc biến mất, chứng tỏ não bộ đã xóa bỏ hoàn toàn ám điểm ức chế trung tâm. Bệnh nhân sẵn sàng bước sang Giai đoạn 3 (Vận nhãn cơ học).</p>
-        </article>
-    </main>
+<h2>6. Mục tiêu Luyện tập — Tiêu chí qua màn</h2>
+<p>Không còn "hoàn thành 10 cấp trong 1 phiên" như trước. Mỗi phiên chơi <strong>1 Level duy nhất</strong>: bệnh nhân phải khớp khung thành công <strong>5 lần LIÊN TIẾP</strong> (không trượt giữa chừng khi đang đếm ngược Hold Time) để <strong>QUA MÀN</strong> và mở khóa Level kế tiếp. Tối đa 15 lần khớp/phiên — quá số này mà chưa đủ chuỗi 5 lần thì CHƯA ĐẠT (phải thử lại).</p>
+<p>Chỉ số lâm sàng: <strong>Góc thị giác Foveal (Visual Angle)</strong> quy đổi từ kích thước khung cuối cùng. Giữ được khối đặc trong khung mà không thấy khối biến mất chứng tỏ não bộ đã xóa bỏ ám điểm ức chế trung tâm — sẵn sàng bước sang Giai đoạn 3 (Vận nhãn cơ học).</p>
 
-</div>
+    <div style="text-align: center; margin: 40px 0 20px 0; padding-top: 20px; border-top: 1px dashed #444;">
+        <a href="../index.html?action=practice&module=M02" 
+           style="display: inline-block; background: #3b82f6; color: white; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);">
+           🎮 Thực hành Module này ngay
+        </a>
+    </div>
+    </main>
+    </div>
 </body>
-</html>

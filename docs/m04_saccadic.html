@@ -7,57 +7,13 @@
     <link rel="stylesheet" href="css/docs.css">
 </head>
 <body>
-<div class="docs-layout">
+    <div class="docs-container">
+        <nav class="docs-sidebar">
+            <a href="index.html" class="back-link">← Về danh mục</a>
+        </nav>
 
-    <!-- ============ SIDEBAR ============ -->
-    <aside class="docs-sidebar">
-<div class="docs-brand">
-    <a href="index.html">📖 Phác đồ Huấn luyện Thị giác</a>
-</div>
-<nav class="docs-nav">
-    <div class="docs-nav-group">
-        <h3>Giai đoạn 1 · Đánh thức Hoàng điểm (Đơn thị)</h3>
-        <ul>
-            <li><a href="m07_cam.html">M7 · Kích thích Lưới quay CAM</a></li>
-            <li><a href="m08_anticrowding.html">M8 · Khử hiện tượng chen chúc (Anti-Crowding)</a></li>
-            <li><a href="m09_redcone.html">M9 · Kích thích tế bào nón hoàng điểm (RED-Cone)</a></li>
-            <li><a href="m10_okn.html">M10 · Kích thích phản xạ OKN (Optokinetic)</a></li>
-            <li><a href="m11_gabor.html">M11 · Học tri giác Gabor (Perceptual Learning)</a></li>
-        </ul>
-    </div>
-    <div class="docs-nav-group">
-        <h3>Giai đoạn 2 · Phá vỡ ức chế hợp thị cảm giác (Phân thị Anaglyph)</h3>
-        <ul>
-            <li><a href="m01_catch.html">M1 · Hứng hạt (Catch)</a></li>
-            <li><a href="m02_align.html">M2 · Khớp khung (Shape Alignment)</a></li>
-        </ul>
-    </div>
-    <div class="docs-nav-group">
-        <h3>Giai đoạn 3 · Hợp thị Vận động & Theo vết (Motor Oculomotor)</h3>
-        <ul>
-            <li><a href="m03_vergence.html">M3 · Vận nhãn (Vergence)</a></li>
-            <li><a href="m12_pursuit.html">M12 · Bám đuôi phân thị (Smooth Pursuit)</a></li>
-        </ul>
-    </div>
-    <div class="docs-nav-group">
-        <h3>Giai đoạn 4 · Thị giác 3D & Phản xạ Cấp cao</h3>
-        <ul>
-            <li><a href="m04_saccadic.html" class="active">M4 · Vận nhãn nhanh (Saccadic)</a></li>
-            <li><a href="m05_rds.html">M5 · Huấn luyện Thị giác nổi (RDS)</a></li>
-        </ul>
-    </div>
-    <div class="docs-nav-group">
-        <h3>Module Chuyên biệt (Tùy chọn)</h3>
-        <ul>
-            <li><a href="m06_divergence.html">M6 · Huấn luyện Phân kỳ (Divergence)</a></li>
-        </ul>
-    </div>
-</nav>
-    </aside>
+        <main class="docs-content">
 
-    <!-- ============ MAIN CONTENT ============ -->
-    <main class="docs-main">
-        <article class="docs-content">
             <h1>M4: Vận nhãn nhanh (Saccadic Dichoptic Tracking)</h1>
 <p class="alert"><strong>Nguyên tắc bắt buộc: GIAI ĐOẠN 4 (THỊ GIÁC 3D & PHẢN XẠ CẤP CAO)</strong> - Đeo kính lọc màu Đỏ - Lục lam để đảm bảo hai mắt cùng phải kích hoạt để tìm mục tiêu. Huấn luyện tốc độ xử lý thông tin và phản xạ tay - mắt.</p>
 
@@ -83,19 +39,49 @@
 <h2>5. Hướng dẫn Luyện tập trên Phần mềm</h2>
 <ul>
     <li><strong>Giao diện & Nhiệm vụ:</strong> Mục tiêu (ví dụ: các đốm sáng, con vật) xuất hiện ngẫu nhiên tại các góc độ và khoảng cách khác nhau trên màn hình. Bệnh nhân đảo mắt tìm kiếm và Click chuột / Chạm tay vào mục tiêu càng nhanh càng tốt.</li>
-    <li><strong>Cài đặt độ khó:</strong> Bác sĩ có thể chỉnh kích thước mục tiêu (To/Nhỏ) và số lượng mục tiêu cần hoàn thành trong một phiên (20 / 40 / 60 mục tiêu).</li>
+    <li><strong>Cài đặt độ khó:</strong> Chọn Cấp độ (Level 1–10). Mỗi Level được mã hóa bởi bảng độ khó gồm 3 trục: Kích thước mục tiêu (đường kính px), Biên độ xuất hiện (gần / nửa màn / toàn màn / vắt chéo) và Thời gian chờ (Vô hạn → 800ms).</li>
 </ul>
 
-<h2>6. Mục tiêu Luyện tập</h2>
-<p>Chỉ số lâm sàng quan trọng nhất là Độ trễ phản xạ (Avg Reaction Time).</p>
+<table style="width:100%; border-collapse:collapse; margin:12px 0; font-size:13px;">
+    <thead>
+        <tr style="background:#1e3a5f; color:#fff;">
+            <th style="padding:8px; border:1px solid #444;">Mức</th>
+            <th style="padding:8px; border:1px solid #444;">Kích thước</th>
+            <th style="padding:8px; border:1px solid #444;">Biên độ</th>
+            <th style="padding:8px; border:1px solid #444;">Thời gian chờ</th>
+            <th style="padding:8px; border:1px solid #444;">Chặng</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr><td style="padding:6px; border:1px solid #444;">1</td><td style="padding:6px; border:1px solid #444;">150px (Rất to)</td><td style="padding:6px; border:1px solid #444;">Gần (quanh trung tâm)</td><td style="padding:6px; border:1px solid #444;">Vô hạn</td><td rowspan="3" style="padding:6px; border:1px solid #444; text-align:center;">Chặng 1<br>Khởi động</td></tr>
+        <tr><td style="padding:6px; border:1px solid #444;">2</td><td style="padding:6px; border:1px solid #444;">120px (To)</td><td style="padding:6px; border:1px solid #444;">Nửa màn hình</td><td style="padding:6px; border:1px solid #444;">Vô hạn</td></tr>
+        <tr><td style="padding:6px; border:1px solid #444;">3</td><td style="padding:6px; border:1px solid #444;">90px (Vừa)</td><td style="padding:6px; border:1px solid #444;">Toàn màn (nhảy chéo góc)</td><td style="padding:6px; border:1px solid #444;">Vô hạn</td></tr>
+        <tr><td style="padding:6px; border:1px solid #444;">4</td><td style="padding:6px; border:1px solid #444;">90px (Vừa)</td><td style="padding:6px; border:1px solid #444;">Toàn màn</td><td style="padding:6px; border:1px solid #444;">3.0s</td><td rowspan="3" style="padding:6px; border:1px solid #444; text-align:center;">Chặng 2<br>Ép xung tốc độ</td></tr>
+        <tr><td style="padding:6px; border:1px solid #444;">5</td><td style="padding:6px; border:1px solid #444;">90px (Vừa)</td><td style="padding:6px; border:1px solid #444;">Toàn màn</td><td style="padding:6px; border:1px solid #444;">2.0s</td></tr>
+        <tr><td style="padding:6px; border:1px solid #444;">6</td><td style="padding:6px; border:1px solid #444;">60px (Nhỏ)</td><td style="padding:6px; border:1px solid #444;">Toàn màn</td><td style="padding:6px; border:1px solid #444;">2.0s</td></tr>
+        <tr><td style="padding:6px; border:1px solid #444;">7</td><td style="padding:6px; border:1px solid #444;">60px (Nhỏ)</td><td style="padding:6px; border:1px solid #444;">Vắt chéo (mép đối diện)</td><td style="padding:6px; border:1px solid #444;">1.5s</td><td rowspan="3" style="padding:6px; border:1px solid #444; text-align:center;">Chặng 3<br>Thể thao thị giác</td></tr>
+        <tr><td style="padding:6px; border:1px solid #444;">8</td><td style="padding:6px; border:1px solid #444;">40px (Rất nhỏ)</td><td style="padding:6px; border:1px solid #444;">Vắt chéo xa</td><td style="padding:6px; border:1px solid #444;">1.2s</td></tr>
+        <tr><td style="padding:6px; border:1px solid #444;">9</td><td style="padding:6px; border:1px solid #444;">30px (Siêu nhỏ - Fovea)</td><td style="padding:6px; border:1px solid #444;">Toàn màn</td><td style="padding:6px; border:1px solid #444;">1.0s</td></tr>
+        <tr><td style="padding:6px; border:1px solid #444;">10</td><td style="padding:6px; border:1px solid #444;">30px (Siêu nhỏ)</td><td style="padding:6px; border:1px solid #444;">Vắt chéo</td><td style="padding:6px; border:1px solid #444;">0.8s</td><td style="padding:6px; border:1px solid #444; text-align:center;">Chặng 4<br>Tốt nghiệp</td></tr>
+    </tbody>
+</table>
+
+<h2>6. Mục tiêu Luyện tập — Tiêu chí qua màn động (Dynamic Pass Condition)</h2>
+<p>Chỉ số lâm sàng gồm <strong>Tỷ lệ chính xác (Accuracy)</strong> và <strong>Độ trễ phản xạ (Avg Reaction Time)</strong>. Tiêu chí mở khóa Level được siết chặt dần theo 4 Chặng phục hồi thần kinh:</p>
 <ul>
-    <li><strong>Nếu dùng màn hình cảm ứng (Touch):</strong> Mục tiêu đạt &le; 500ms.</li>
-    <li><strong>Nếu dùng chuột (Mouse):</strong> Mục tiêu đạt &le; 900ms.</li>
+    <li><strong>Chặng 1 (Level 1–3):</strong> Accuracy &gt; 90%. Không giới hạn thời gian phản xạ (xây dựng sự tự tin — khen bé vì đã nhìn chuẩn).</li>
+    <li><strong>Chặng 2 (Level 4–6):</strong> Accuracy &gt; 85% VÀ Avg RT &le; 1500ms (bắt đầu ép xung tốc độ truyền tín hiệu).</li>
+    <li><strong>Chặng 3 (Level 7–9):</strong> Accuracy &gt; 85% VÀ Avg RT &le; 1000ms (ngưỡng lâm sàng chuẩn hóa phản xạ).</li>
+    <li><strong>Chặng 4 (Level 10 — Tốt nghiệp):</strong> Accuracy &gt; 90% VÀ Avg RT &le; 600ms (Cảm ứng) hoặc &le; 800ms (Chuột) — đạt chuẩn "thể thao thị giác".</li>
 </ul>
-<p>Đạt được mức này, phản xạ tay-mắt của bệnh nhân đã hoàn toàn bình thường.</p>
-        </article>
-    </main>
+<p>Mỗi mục tiêu có thời gian chờ theo bảng trên (Chặng 1: Vô hạn — chưa tạo áp lực thời gian; Chặng 2–4: 3.0s → 0.8s); hết giờ không click trúng tính là 1 lỗi Miss và làm giảm tỷ lệ chính xác.</p>
 
-</div>
+    <div style="text-align: center; margin: 40px 0 20px 0; padding-top: 20px; border-top: 1px dashed #444;">
+        <a href="../index.html?action=practice&module=M04" 
+           style="display: inline-block; background: #3b82f6; color: white; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);">
+           🎮 Thực hành Module này ngay
+        </a>
+    </div>
+    </main>
+    </div>
 </body>
-</html>
