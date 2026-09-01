@@ -145,6 +145,14 @@
                 localStorage.setItem("currentPatientId", patientId);
                 localStorage.setItem("currentPatientName", nameInput);
                 localStorage.setItem("currentProtocol", protocolInput);
+                if (typeof window.syncM12ProgressFromFirebase === 'function') {
+                    window.syncM12ProgressFromFirebase(patientId, 'M12');
+                    window.syncM12ProgressFromFirebase(patientId, 'M1');
+                    window.syncM12ProgressFromFirebase(patientId, 'M2');
+                    window.syncM12ProgressFromFirebase(patientId, 'M9');
+                    window.syncM12ProgressFromFirebase(patientId, 'M10');
+                    window.syncM12ProgressFromFirebase(patientId, 'M4');
+                }
                 startExam(nameInput, yearInput);
                 hideModal(startExamModal);
                 const formEl = document.getElementById("start-exam-form");
@@ -167,6 +175,14 @@
                     localStorage.setItem("currentPatientId", patientId);
                     localStorage.setItem("currentPatientName", nameInput);
                     localStorage.setItem("currentProtocol", protocolInput);
+                    if (typeof window.syncM12ProgressFromFirebase === 'function') {
+                        window.syncM12ProgressFromFirebase(patientId, 'M12');
+                        window.syncM12ProgressFromFirebase(patientId, 'M1');
+                        window.syncM12ProgressFromFirebase(patientId, 'M2');
+                        window.syncM12ProgressFromFirebase(patientId, 'M9');
+                        window.syncM12ProgressFromFirebase(patientId, 'M10');
+                        window.syncM12ProgressFromFirebase(patientId, 'M4');
+                    }
                     startExam(nameInput, yearInput);
                     hideModal(startExamModal);
                     const formEl = document.getElementById("start-exam-form");
@@ -815,6 +831,18 @@
                     showToast(`Đã khôi phục phiên khám: ${exam.patientName}`);
                 }
             }
+
+            // Khôi phục tiến trình gamify (Level đã mở khóa) từ Firebase nếu đã đăng nhập
+            if (localStorage.getItem('currentPatientId')) {
+                if (typeof window.syncM12ProgressFromFirebase === 'function') {
+                    window.syncM12ProgressFromFirebase(localStorage.getItem('currentPatientId'), 'M12');
+                    window.syncM12ProgressFromFirebase(localStorage.getItem('currentPatientId'), 'M1');
+                    window.syncM12ProgressFromFirebase(localStorage.getItem('currentPatientId'), 'M2');
+                    window.syncM12ProgressFromFirebase(localStorage.getItem('currentPatientId'), 'M9');
+                    window.syncM12ProgressFromFirebase(localStorage.getItem('currentPatientId'), 'M10');
+                    window.syncM12ProgressFromFirebase(localStorage.getItem('currentPatientId'), 'M4');
+                }
+            }
         } catch (e) {
             console.error('[ExamSessionManager] Failed to restore session:', e);
             localStorage.removeItem(SESSION_STORAGE_KEY);
@@ -1196,6 +1224,18 @@
 
         // Update UI
         updateExamUI();
+
+        // [ĐỒNG BỘ GIAO DIỆN PHÁC ĐỒ]
+        // Nếu đang đứng ở màn hình Phòng tập, tự động render lại Lobby để cập nhật đúng Phác đồ vừa chọn
+        const therapeuticWorkspace = document.getElementById('workspace-therapeutic');
+        if (therapeuticWorkspace && therapeuticWorkspace.style.display !== 'none') {
+            if (typeof window.autoMountTherapeutic === 'function') {
+                window.autoMountTherapeutic();
+            } else if (typeof window.renderTherapeuticLobby === 'function') {
+                const container = document.getElementById('therapeutic-content');
+                if (container) window.renderTherapeuticLobby(container);
+            }
+        }
 
         // Enter fullscreen
         enterFullscreen();
@@ -2838,8 +2878,10 @@ document.addEventListener('click', function(e) {
             clinicalText = `Dự trữ Hợp thị Hội tụ (PFV): <strong style="color: #00e676; font-size: 18px;">${diopter} &Delta;</strong>`;
         } else if (gId === 'M3' || (detail.gameName && detail.gameName.includes('M3'))) {
             // Rút xuất 2 chỉ số từ payload của M3
-            const avgBO = detail.metrics?.customData?.avgBaseOut || 0;
-            const avgBI = detail.metrics?.customData?.avgBaseIn || 0;
+            // LƯU Ý: main.js dispatch đã unwrap customData sẵn, nên detail.metrics là chính customData
+            // (đọc an toàn cả 2 cấu trúc: phẳng lẫn lồng, fallback về 0 nếu thiếu)
+            const avgBO = detail.metrics?.avgBaseOut ?? detail.metrics?.customData?.avgBaseOut ?? 0;
+            const avgBI = detail.metrics?.avgBaseIn ?? detail.metrics?.customData?.avgBaseIn ?? 0;
 
             // Đánh giá dựa trên tiêu chuẩn lâm sàng
             const evalBO = avgBO >= 15 ? '<span style="color: #00e676; font-weight: bold;">ĐẠT</span>' : '<span style="color: #f87171; font-weight: bold;">CHƯA ĐẠT</span>';
@@ -2850,6 +2892,101 @@ document.addEventListener('click', function(e) {
                 <div style="font-size: 15px; line-height: 1.8; text-align: left; padding: 0 10px;">
                     Dự trữ Hội tụ (PFV): <strong style="color: #fff;">${avgBO} &Delta;</strong> (${evalBO})<br>
                     Dự trữ Phân kỳ (NFV): <strong style="color: #fff;">${avgBI} &Delta;</strong> (${evalBI})
+                </div>
+            `;
+        } else if (gId === 'M4' || (detail.gameName && detail.gameName.includes('M4'))) {
+            // M4: Vận nhãn nhanh (Saccadic) — hiển thị độ chính xác + độ trễ + Level
+            // PassCondition động theo Chặng: dùng đúng logic của game (bang 1: chỉ cần acc, bang cuối: touch<chuột)
+            const latency = detail.metrics?.avgLatencyMs ?? detail.metrics?.customData?.avgLatencyMs ?? 0;
+            const accuracy = detail.metrics?.accuracy ?? detail.metrics?.customData?.accuracy ?? 0;
+            const level = detail.metrics?.level ?? detail.metrics?.customData?.level ?? '-';
+            const isTouch = navigator.maxTouchPoints > 0;
+            const lvlNum = parseInt(level, 10) || 1;
+            let isPassed = false;
+            if (lvlNum <= 3) {
+                isPassed = accuracy > 90;
+            } else if (lvlNum <= 6) {
+                isPassed = accuracy > 85 && latency > 0 && latency <= 1500;
+            } else if (lvlNum <= 9) {
+                isPassed = accuracy > 85 && latency > 0 && latency <= 1000;
+            } else {
+                const t = isTouch ? 600 : 800;
+                isPassed = accuracy > 90 && latency > 0 && latency <= t;
+            }
+            const evalPass = isPassed
+                ? '<span style="color: #00e676; font-weight: bold;">ĐẠT</span>'
+                : '<span style="color: #f87171; font-weight: bold;">CHƯA ĐẠT</span>';
+            clinicalText = `
+                <div style="font-size: 15px; line-height: 1.8; text-align: left; padding: 0 10px;">
+                    Chính xác: <strong style="color: #fff;">${accuracy.toFixed(1)}%</strong> | Độ trễ: <strong style="color: #fff;">${latency} ms</strong> (${evalPass})<br>
+                    Level đã chinh phục: <strong style="color: #22d3ee;">Level ${level}</strong>
+                </div>
+            `;
+        } else if (gId === 'M12' || (detail.gameName && detail.gameName.includes('M12'))) {
+            // M12: Bám đuôi phân thị — hiển thị Tỷ lệ hoàn thành + Level đã chinh phục
+            const completion = detail.metrics?.completionRate ?? detail.metrics?.customData?.completionRate ?? 0;
+            const level = detail.metrics?.level ?? detail.metrics?.customData?.level ?? '-';
+            const evalPass = completion > 85
+                ? '<span style="color: #00e676; font-weight: bold;">ĐẠT</span>'
+                : '<span style="color: #f87171; font-weight: bold;">CHƯA ĐẠT (cần > 85%)</span>';
+            clinicalText = `
+                <div style="font-size: 15px; line-height: 1.8; text-align: left; padding: 0 10px;">
+                    Tỷ lệ hoàn thành: <strong style="color: #fff;">${completion.toFixed(1)}%</strong> (${evalPass})<br>
+                    Level đã chinh phục: <strong style="color: #22d3ee;">Level ${level}</strong>
+                </div>
+            `;
+        } else if (gId === 'M9' || (detail.gameName && detail.gameName.includes('M9'))) {
+            // M9: RED-Cone — Chính xác + Phản xạ + Level (tiêu chí: >85% VÀ <1200ms)
+            const accuracy = detail.metrics?.accuracy ?? detail.metrics?.customData?.accuracy ?? 0;
+            const rt = detail.metrics?.avgReactionTimeMs ?? detail.metrics?.customData?.avgReactionTimeMs ?? 0;
+            const level = detail.metrics?.level ?? detail.metrics?.customData?.level ?? '-';
+            const evalPass = (accuracy > 85 && rt > 0 && rt < 1200)
+                ? '<span style="color: #00e676; font-weight: bold;">ĐẠT</span>'
+                : '<span style="color: #f87171; font-weight: bold;">CHƯA ĐẠT (cần > 85% & < 1200ms)</span>';
+            clinicalText = `
+                <div style="font-size: 15px; line-height: 1.8; text-align: left; padding: 0 10px;">
+                    Chính xác: <strong style="color: #fff;">${accuracy.toFixed(1)}%</strong> | Phản xạ: <strong style="color: #fff;">${rt} ms</strong> (${evalPass})<br>
+                    Level đã chinh phục: <strong style="color: #22d3ee;">Level ${level}</strong>
+                </div>
+            `;
+        } else if (gId === 'M2' || (detail.gameName && detail.gameName.includes('M2'))) {
+            // M2: Khớp khung — chuỗi khớp liên tiếp + Level (qua màn: 5 lần liên tiếp)
+            const streak = detail.metrics?.streak ?? detail.metrics?.customData?.streak ?? 0;
+            const passed = detail.metrics?.passed ?? detail.metrics?.customData?.passed ?? false;
+            const level = detail.metrics?.level ?? detail.metrics?.customData?.level ?? '-';
+            const evalPass = passed
+                ? '<span style="color: #00e676; font-weight: bold;">ĐẠT</span>'
+                : '<span style="color: #f87171; font-weight: bold;">CHƯA ĐẠT (cần 5 lần liên tiếp)</span>';
+            clinicalText = `
+                <div style="font-size: 15px; line-height: 1.8; text-align: left; padding: 0 10px;">
+                    Chuỗi khớp: <strong style="color: #fff;">${streak}/5 liên tiếp</strong> (${evalPass})<br>
+                    Level đã chinh phục: <strong style="color: #22d3ee;">Level ${level}</strong>
+                </div>
+            `;
+        } else if (gId === 'M10' || (detail.gameName && detail.gameName.includes('M10'))) {
+            // M10: OKN — độ chính xác + Level đã chinh phục (BẮT BUỘC TRƯỚC M1 vì 'M10' chứa 'M1')
+            const accuracy = detail.metrics?.accuracy ?? detail.metrics?.customData?.accuracy ?? 0;
+            const level = detail.metrics?.level ?? detail.metrics?.customData?.level ?? '-';
+            const evalPass = accuracy >= 80
+                ? '<span style="color: #00e676; font-weight: bold;">ĐẠT</span>'
+                : '<span style="color: #f87171; font-weight: bold;">CHƯA ĐẠT (cần ≥ 80%)</span>';
+            clinicalText = `
+                <div style="font-size: 15px; line-height: 1.8; text-align: left; padding: 0 10px;">
+                    Độ chính xác: <strong style="color: #fff;">${accuracy.toFixed(1)}%</strong> (${evalPass})<br>
+                    Level đã chinh phục: <strong style="color: #22d3ee;">Level ${level}</strong>
+                </div>
+            `;
+        } else if (gId === 'M1' || (detail.gameName && detail.gameName.includes('M1'))) {
+            // M1: Hứng hạt — Tỷ lệ hoàn thành + Level đã chinh phục
+            const completion = detail.metrics?.completionRate ?? detail.metrics?.customData?.completionRate ?? 0;
+            const level = detail.metrics?.level ?? detail.metrics?.customData?.level ?? '-';
+            const evalPass = completion >= 80
+                ? '<span style="color: #00e676; font-weight: bold;">ĐẠT</span>'
+                : '<span style="color: #f87171; font-weight: bold;">CHƯA ĐẠT (cần ≥ 80%)</span>';
+            clinicalText = `
+                <div style="font-size: 15px; line-height: 1.8; text-align: left; padding: 0 10px;">
+                    Tỷ lệ hứng trúng: <strong style="color: #fff;">${completion.toFixed(1)}%</strong> (${evalPass})<br>
+                    Level đã chinh phục: <strong style="color: #22d3ee;">Level ${level}</strong>
                 </div>
             `;
         } else {

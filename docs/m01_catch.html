@@ -7,57 +7,13 @@
     <link rel="stylesheet" href="css/docs.css">
 </head>
 <body>
-<div class="docs-layout">
+    <div class="docs-container">
+        <nav class="docs-sidebar">
+            <a href="index.html" class="back-link">← Về danh mục</a>
+        </nav>
 
-    <!-- ============ SIDEBAR ============ -->
-    <aside class="docs-sidebar">
-<div class="docs-brand">
-    <a href="index.html">📖 Phác đồ Huấn luyện Thị giác</a>
-</div>
-<nav class="docs-nav">
-    <div class="docs-nav-group">
-        <h3>Giai đoạn 1 · Đánh thức Hoàng điểm (Đơn thị)</h3>
-        <ul>
-            <li><a href="m07_cam.html">M7 · Kích thích Lưới quay CAM</a></li>
-            <li><a href="m08_anticrowding.html">M8 · Khử hiện tượng chen chúc (Anti-Crowding)</a></li>
-            <li><a href="m09_redcone.html">M9 · Kích thích tế bào nón hoàng điểm (RED-Cone)</a></li>
-            <li><a href="m10_okn.html">M10 · Kích thích phản xạ OKN (Optokinetic)</a></li>
-            <li><a href="m11_gabor.html">M11 · Học tri giác Gabor (Perceptual Learning)</a></li>
-        </ul>
-    </div>
-    <div class="docs-nav-group">
-        <h3>Giai đoạn 2 · Phá vỡ ức chế hợp thị cảm giác (Phân thị Anaglyph)</h3>
-        <ul>
-            <li><a href="m01_catch.html" class="active">M1 · Hứng hạt (Catch)</a></li>
-            <li><a href="m02_align.html">M2 · Khớp khung (Shape Alignment)</a></li>
-        </ul>
-    </div>
-    <div class="docs-nav-group">
-        <h3>Giai đoạn 3 · Hợp thị Vận động & Theo vết (Motor Oculomotor)</h3>
-        <ul>
-            <li><a href="m03_vergence.html">M3 · Vận nhãn (Vergence)</a></li>
-            <li><a href="m12_pursuit.html">M12 · Bám đuôi phân thị (Smooth Pursuit)</a></li>
-        </ul>
-    </div>
-    <div class="docs-nav-group">
-        <h3>Giai đoạn 4 · Thị giác 3D & Phản xạ Cấp cao</h3>
-        <ul>
-            <li><a href="m04_saccadic.html">M4 · Vận nhãn nhanh (Saccadic)</a></li>
-            <li><a href="m05_rds.html">M5 · Huấn luyện Thị giác nổi (RDS)</a></li>
-        </ul>
-    </div>
-    <div class="docs-nav-group">
-        <h3>Module Chuyên biệt (Tùy chọn)</h3>
-        <ul>
-            <li><a href="m06_divergence.html">M6 · Huấn luyện Phân kỳ (Divergence)</a></li>
-        </ul>
-    </div>
-</nav>
-    </aside>
+        <main class="docs-content">
 
-    <!-- ============ MAIN CONTENT ============ -->
-    <main class="docs-main">
-        <article class="docs-content">
             <h1>M1: Hứng hạt (Dichoptic Contrast Balancing)</h1>
 <p class="alert"><strong>Nguyên tắc bắt buộc: GIAI ĐOẠN 2 (PHÂN THỊ ANAGLYPH)</strong> - Bệnh nhân bắt buộc đeo kính lọc màu Đỏ - Lục lam. Nguyên lý cốt lõi: <em>"Phạt mắt khỏe - Thưởng mắt yếu"</em> nhằm phá vỡ ức chế vỏ não, ép não bộ mở cửa nhận tín hiệu từ cả hai mắt cùng lúc.</p>
 
@@ -90,14 +46,19 @@
     <li><strong>Cài đặt hệ thống:</strong> Bác sĩ cấu hình sao cho mắt Lành nhìn thấy vật thể có thể thay đổi tương phản, mắt Nhược thị nhìn thấy vật thể tương phản cao nhất.</li>
     <li><strong>Nhiệm vụ:</strong> Người chơi dùng chuột/cảm ứng di chuyển thanh ngang ở đáy màn hình để hứng các "hạt" đang rơi từ trên xuống. Hứng trúng: +1 điểm. Trượt: -1 điểm.</li>
     <li><strong>Cơ chế thích nghi (Thuật toán ẩn):</strong> Mỗi khi hứng trúng (chứng tỏ não đang không ức chế), phần mềm sẽ tự động <em>tăng</em> độ tương phản ở mắt lành lên (ví dụ: +5%), làm tăng độ khó của việc hợp thị. Nếu trượt, phần mềm sẽ <em>giảm</em> độ tương phản mắt lành xuống (ví dụ: -10%) để mắt nhược thị dễ thở hơn.</li>
-    <li><strong>Cài đặt độ khó:</strong> Tốc độ rơi (Chậm/Vừa/Nhanh) và Kích thước thanh hứng.</li>
+    <li><strong>Cài đặt độ khó:</strong> Chọn Cấp độ (Level 1–10). Level càng cao: hạt rơi nhanh hơn (3→7 px/frame), thanh hứng hẹp hơn (120→60px), hạt nhỏ hơn (34→20px), hạt sinh dày hơn (1s → 0.5s/hạt). Mỗi phiên kết thúc khi đủ 30 điểm.</li>
 </ul>
 
 <h2>6. Mục tiêu Luyện tập</h2>
-<p>Bài tập kết thúc khi bệnh nhân đạt đủ số điểm mục tiêu (ví dụ: 30 điểm). Chỉ số lâm sàng quan trọng nhất là <strong>C-Ratio (Tỷ lệ tương phản)</strong> đạt được ở cuối bài. Mục tiêu là bệnh nhân vẫn hứng trúng ngay cả khi độ tương phản của hai mắt tiệm cận mức <strong>1:1</strong> (mức cân bằng hoàn hảo như người bình thường).</p>
-        </article>
-    </main>
+<p>Bài tập kết thúc khi bệnh nhân đạt đủ số điểm mục tiêu (30 điểm). Chỉ số lâm sàng quan trọng nhất là <strong>C-Ratio (Tỷ lệ tương phản)</strong> đạt được ở cuối bài. Mục tiêu là bệnh nhân vẫn hứng trúng ngay cả khi độ tương phản của hai mắt tiệm cận mức <strong>1:1</strong> (mức cân bằng hoàn hảo như người bình thường).</p>
+<p><strong>Tiêu chí mở khóa:</strong> Đạt tỷ lệ hứng trúng ≥ 80% (completionRate = số trúng / tổng lần thử) tại Level hiện tại để mở khóa Level kế tiếp. Tiến trình được lưu và đồng bộ qua Firebase giữa các thiết bị.</p>
 
-</div>
+    <div style="text-align: center; margin: 40px 0 20px 0; padding-top: 20px; border-top: 1px dashed #444;">
+        <a href="../index.html?action=practice&module=M01" 
+           style="display: inline-block; background: #3b82f6; color: white; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);">
+           🎮 Thực hành Module này ngay
+        </a>
+    </div>
+    </main>
+    </div>
 </body>
-</html>

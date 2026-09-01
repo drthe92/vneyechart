@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tổng quan về App Mắt Cầu Vồng - Vision Therapy</title>
+    <link rel="stylesheet" href="css/docs.css">
+    <style>
+        .highlight-box { background: #f0fdf4; border-left: 4px solid #16a34a; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .warning-box { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="docs-container">
+        <nav class="docs-sidebar">
+            <a href="index.html" class="back-link">← Về danh mục</a>
+        </nav>
+
+        <main class="docs-content">
+            <header class="doc-header">
+                <h1>TỔNG QUAN VỀ PHẦN MỀM MẮT CẦU VỒNG</h1>
+                <p class="doc-subtitle">Nền tảng Khám và Huấn luyện Thị giác Kỹ thuật số</p>
+            </header>
+
+            <section class="doc-section">
+                <h2>1. Cấu trúc Hệ thống</h2>
+                <p>Hệ thống Mắt Cầu Vồng được chia thành 2 phân hệ độc lập nhưng liên kết chặt chẽ về mặt dữ liệu:</p>
+                <ul>
+                    <li><strong>Phần Khám (Diagnostic Workspace):</strong> Dành riêng cho Bác sĩ và Kỹ thuật viên nhãn khoa. Cung cấp các công cụ đo lường thị lực, chẩn đoán lác, kiểm tra thị giác nổi và các test chuyên sâu. Giao diện được tối ưu hóa cho thao tác nhanh bằng phím tắt.</li>
+                    <li><strong>Phần Luyện tập (Therapeutic Workspace):</strong> Khu vực dành cho người bệnh thực hiện các module huấn luyện (Vision Therapy) dưới sự chỉ định và giám sát của bác sĩ điều trị.</li>
+                </ul>
+            </section>
+
+            <section class="doc-section">
+                <h2>2. Điều kiện Ứng dụng Điều trị tại nhà (Telehealth)</h2>
+                <p>Phần Luyện tập được thiết kế để bệnh nhân có thể tự sử dụng tại nhà trên các màn hình phổ thông (PC, Laptop). Tuy nhiên, để đảm bảo tính chính xác lâm sàng, điều kiện tiên quyết là:</p>
+                <div class="warning-box">
+                    <strong>⚠️ Yêu cầu Bắt buộc về Kính:</strong> Bệnh nhân huấn luyện thị giác bắt buộc phải trang bị kính phân thị Đỏ - Lục lam (Mắt phải kính Đỏ / Mắt trái kính Xanh). Không có kính này, các module phân thị và 3D sẽ không hoạt động.
+                </div>
+                <ul>
+                    <li><strong>Hiệu chỉnh phần cứng:</strong> Phải thực hiện quy trình hiệu chỉnh Kích thước vật lý (qua thẻ tín dụng), Khoảng cách ngồi, và Màu sắc màn hình.</li>
+                    <li><strong>Tính lưu trữ cục bộ:</strong> Quá trình hiệu chỉnh chỉ cần thực hiện <strong>một lần duy nhất</strong> đối với mỗi trình duyệt. Hệ thống sẽ tự động lưu các thông số này vào bộ nhớ cục bộ (LocalStorage) cho các phiên tập sau.</li>
+                </ul>
+            </section>
+
+            <section class="doc-section">
+                <h2>3. Quản lý Hồ sơ & Thống kê Lâm sàng</h2>
+                <p>Phần mềm tích hợp hệ thống Dashboard theo dõi tiến trình (EMR). Để đảm bảo biểu đồ điều trị được vẽ chính xác theo thời gian, người bệnh cần tuân thủ quy tắc định danh:</p>
+                <div class="highlight-box">
+                    Khai báo thống nhất thông tin <strong>Họ và tên, Năm sinh, Số điện thoại</strong> (hoặc một dãy ID 10 chữ số cố định) <strong>một lần duy nhất trước khi bắt đầu phiên tập</strong>. Hệ thống sẽ sử dụng ID này để liên kết mọi kết quả bài tập vào cùng một bệnh án.
+                </div>
+            </section>
+        </main>
+    </div>
+</body>
+</html>

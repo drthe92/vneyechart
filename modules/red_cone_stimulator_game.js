@@ -25,6 +25,25 @@
 
 import BinocularGameEngine from './binocular_game_engine.js';
 
+// ============================================================
+// BẢNG ĐỘ KHÓ 10 MỨC (M9) — RED-Cone Stimulator (Tumbling E)
+// sizeFactor : Kích thước chữ E = sizeFactor * min(canvasW, canvasH)
+//              (Lớn 0.16 → Siêu nhỏ 0.05, tương đương 3/10 thị lực ở Chặng 3)
+// displayMs  : Thời gian hiển thị mỗi lượt; 0 = VÔ HẠN (chờ trẻ tìm & bấm)
+// ============================================================
+const M9_LEVELS = [
+    { level: 1,  sizeFactor: 0.16, displayMs: 0    },
+    { level: 2,  sizeFactor: 0.14, displayMs: 0    },
+    { level: 3,  sizeFactor: 0.12, displayMs: 0    },
+    { level: 4,  sizeFactor: 0.10, displayMs: 3000 },
+    { level: 5,  sizeFactor: 0.095, displayMs: 3000 },
+    { level: 6,  sizeFactor: 0.09, displayMs: 3000 },
+    { level: 7,  sizeFactor: 0.08, displayMs: 1500 },
+    { level: 8,  sizeFactor: 0.07, displayMs: 1500 },
+    { level: 9,  sizeFactor: 0.06, displayMs: 1500 },
+    { level: 10, sizeFactor: 0.05, displayMs: 800  }
+];
+
 class RedConeStimulatorGame extends BinocularGameEngine {
     constructor() {
         super(); // Khởi tạo cha: kiểm tra hiệu chuẩn, tạo canvas, bind SPA listener
@@ -54,8 +73,9 @@ class RedConeStimulatorGame extends BinocularGameEngine {
         this._reactionTimes = [];        // ms phản xạ từng lượt
 
         // --- Cấu hình từ Lobby (mặc định) ---
-        this._sizeFactor = 0.12;         // T = sizeFactor * min(canvasW, canvasH)
-        this._displayMs = 0;             // 0 = không giới hạn; >0 = giới hạn hiển thị
+        this.level = 1;             // Cấp độ hiện tại (1..10) — gamify
+        this._sizeFactor = 0.12;    // T = sizeFactor * min(canvasW, canvasH) — theo bảng M9_LEVELS
+        this._displayMs = 0;        // 0 = không giới hạn; >0 = giới hạn hiển thị
 
         // --- Trạng thái lượt chơi ---
         this.state = 'REST';             // 'REST' | 'WAITING_INPUT'
@@ -109,22 +129,26 @@ class RedConeStimulatorGame extends BinocularGameEngine {
     }
 
     /**
+     * Ánh xạ Level (1..10) → Cấu hình độ khó theo bảng M9_LEVELS.
+     * Level càng cao: chữ E nhỏ hơn, thời gian hiển thị ngắn hơn (chớp tắt).
+     * @param {number|string} level - Cấp độ người dùng chọn (mặc định 1)
+     * @returns {number} Level hợp lệ (clamp 1..10)
+     */
+    _applyLevel(level) {
+        const lvl = Math.max(1, Math.min(10, parseInt(level, 10) || 1));
+        const cfg = M9_LEVELS.find(l => l.level === lvl) || M9_LEVELS[0];
+        this._sizeFactor = cfg.sizeFactor;
+        this._displayMs = cfg.displayMs;
+        return lvl;
+    }
+
+    /**
      * Khởi chạy game với cấu hình từ Lobby
-     * @param {Object} config - { targetSize: 'Lớn'|'Vừa'|'Nhỏ', displayTime: 'unlimited'|'3000' }
+     * @param {Object} config - { level }
      */
     start(config = {}) {
-        // Cấu hình kích thước vật tiêu (T)
-        const targetSize = (config && config.targetSize) ? config.targetSize : 'Vừa';
-        this._sizeFactor = (
-            targetSize === 'Lớn' ? 0.18 :
-            targetSize === 'Nhỏ' ? 0.08 : 0.12
-        );
-
-        // Cấu hình thời gian hiển thị
-        const displayTime = (config && config.displayTime) ? config.displayTime : 'unlimited';
-        this._displayMs = (
-            displayTime === '3000' ? 3000 : 0
-        );
+        // Cấu hình Level → Kích thước & Thời gian hiển thị (thay thế dropdown rời rạc)
+        this.level = this._applyLevel(config && config.level);
 
         // Reset trạng thái phiên
         this.trialIndex = 0;
@@ -373,7 +397,13 @@ class RedConeStimulatorGame extends BinocularGameEngine {
         ctx.font = 'bold 20px monospace';
         ctx.textBaseline = 'top';
         ctx.textAlign = 'left';
-        ctx.fillText(`Lượt: ${this.trialIndex} / ${this.TOTAL_TRIALS}`, 16, 16);
+        ctx.fillText(`Lượt: ${this.trialIndex} / ${this.TOTAL_TRIALS} | Level ${this.level}`, 16, 16);
+        // Dòng phụ: thời gian hiển thị (nếu có giới hạn)
+        if (this.state === 'WAITING_INPUT' && this._displayMs > 0) {
+            const remain = Math.max(0, Math.ceil((this._displayMs - (performance.now() - this._trialStart)) / 1000));
+            ctx.font = '16px monospace';
+            ctx.fillText(`Còn ${remain}s`, this.canvas.width - 90, 16);
+        }
         ctx.textAlign = 'left';
     }
 
@@ -391,12 +421,29 @@ class RedConeStimulatorGame extends BinocularGameEngine {
             ? Math.round(this._reactionTimes.reduce((a, b) => a + b, 0) / this._reactionTimes.length)
             : 0;
 
+        // --- TIÊU CHÍ QUA MÀN M9: Accuracy > 85% VÀ Avg RT < 1200ms
+        // (Nới lỏng hơn M4 vì mắt lười Giai đoạn 1 phản xạ chậm) ---
+        const isPassed = accuracy > 85 && avgReactionTimeMs > 0 && avgReactionTimeMs < 1200;
+
+        // --- Mở khóa Level kế tiếp nếu đạt tiêu chí và chưa phải Level tối đa ---
+        const LEVEL_KEY = 'vision-therapy-m9-max-level';
+        const maxLevel = parseInt(localStorage.getItem(LEVEL_KEY) || '1', 10) || 1;
+        let unlockedNew = false;
+        if (isPassed && this.level >= maxLevel && this.level < 10) {
+            localStorage.setItem(LEVEL_KEY, String(this.level + 1));
+            unlockedNew = true;
+        }
+
         // Đóng gói customData theo đặc tả
         this.sessionMetrics.customData = {
+            level: this.level,
+            completionRate: accuracy,
             totalTrials: this.TOTAL_TRIALS,
             correctAnswers: this.correctAnswers,
             accuracy: accuracy,
-            avgReactionTimeMs: avgReactionTimeMs
+            avgReactionTimeMs: avgReactionTimeMs,
+            nextLevelUnlocked: unlockedNew,
+            passed: isPassed
         };
         this.sessionMetrics.hits = this.correctAnswers;
         this.sessionMetrics.misses = this.TOTAL_TRIALS - this.correctAnswers;

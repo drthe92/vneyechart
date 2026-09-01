@@ -2409,3 +2409,55 @@ justify-content: center;
 #workspace-toggle-btn i {
   transition: transform 0.3s ease;
 }
+/* ===== Dashboard Tiến trình Thị giác — Grid biểu đồ đa chỉ số ===== */
+.dashboard-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 20px;
+  width: 100%;
+}
+
+.dashboard-chart-card {
+  position: relative;
+  height: 420px;
+  min-width: 0;
+  background: #1e1e32;
+  border: 1px solid #333;
+  border-radius: 10px;
+  padding: 16px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.dashboard-chart-card h4 {
+  margin: 0 0 12px 0;
+  color: #e2e8f0;
+  font-size: 15px;
+  text-align: center;
+}
+
+.dashboard-chart-card .chart-box {
+  position: relative;
+  height: calc(100% - 34px);
+  width: 100%;
+}
+
+.dashboard-empty {
+  grid-column: 1 / -1;
+  padding: 40px;
+  text-align: center;
+  color: #94a3b8;
+  background: #1e1e32;
+  border: 1px dashed #444;
+  border-radius: 10px;
+  font-style: italic;
+}
+
+@media (max-width: 900px) {
+  .dashboard-charts-grid {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-chart-card {
+    height: 360px;
+  }
+}
