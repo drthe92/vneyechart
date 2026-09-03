@@ -112,7 +112,6 @@ const dynamicFixation = {
    * @param {number} idx - Step index (unused, single-screen module)
    */
   render(idx) {
-    console.log('[DynamicFixation] render() called with idx:', idx);
     try {
       this._calculateTargetSize();
       this._initAudioContext();
@@ -130,7 +129,6 @@ const dynamicFixation = {
     const hideGuide = localStorage.getItem(HIDE_GUIDE_KEY) === 'true';
 
     if (hideGuide) {
-      console.log('[DynamicFixation] Skipping guide (hide-fixation-guide = true)');
       this._startPhase2();
     } else {
       this._startPhase1();
@@ -147,7 +145,6 @@ const dynamicFixation = {
    */
   _startPhase1() {
     this._currentPhase = 1;
-    console.log('[DynamicFixation] Phase 1: Pre-test Guide');
 
     const board = document.getElementById('display-board');
     if (!board) return;
@@ -230,7 +227,6 @@ const dynamicFixation = {
       // Save preference if checked
       if (hideCheckbox.checked) {
         localStorage.setItem(HIDE_GUIDE_KEY, 'true');
-        console.log('[DynamicFixation] Saved hide-fixation-guide = true');
       }
       this._startPhase2();
     });
@@ -246,7 +242,6 @@ const dynamicFixation = {
    */
   _startPhase2() {
     this._currentPhase = 2;
-    console.log('[DynamicFixation] Phase 2: Active Test (Zero Distraction)');
 
     const board = document.getElementById('display-board');
     if (!board) return;
@@ -352,7 +347,6 @@ const dynamicFixation = {
    */
   _startPhase3() {
     this._currentPhase = 3;
-    console.log('[DynamicFixation] Phase 3: Post-test Grading');
 
     // Stop animation
     if (this._animFrameId !== null) {
@@ -530,8 +524,6 @@ const dynamicFixation = {
         status.textContent = '✗';
       }
     }
-
-    console.log('[DynamicFixation] CSM Grades:', this._csmGrades);
   },
 
   /**
@@ -554,8 +546,6 @@ const dynamicFixation = {
         maintained: this._csmGrades.maintained ? 'PASS' : 'FAIL',
       },
     };
-
-    console.log('[DynamicFixation] Test completed. Payload:', payload);
 
     // Dispatch custom event
     const event = new CustomEvent('visionTestCompleted', { detail: payload });
@@ -581,7 +571,6 @@ const dynamicFixation = {
         if (!isNaN(ccPxPerMm) && ccPxPerMm > 0) {
           // Convert 1.5 cm to mm (15 mm), then to pixels
           this._targetSizePx = Math.round(15 * ccPxPerMm);
-          console.log(`[DynamicFixation] Using calibrated size: ${this._targetSizePx}px (${ccPxPerMm} px/mm)`);
           return;
         }
       }
@@ -591,7 +580,6 @@ const dynamicFixation = {
 
     // Fallback to default size
     this._targetSizePx = FALLBACK_SIZE_PX;
-    console.log(`[DynamicFixation] Using fallback size: ${this._targetSizePx}px`);
   },
 
   /**
@@ -786,8 +774,6 @@ const dynamicFixation = {
    * and close Web AudioContext.
    */
   cleanup() {
-    console.log('[DynamicFixation] cleanup() called');
-
     // Cancel animation frame
     if (this._animFrameId !== null) {
       cancelAnimationFrame(this._animFrameId);
@@ -830,8 +816,6 @@ const dynamicFixation = {
       board.style.position = '';
       board.style.overflow = '';
     }
-
-    console.log('[DynamicFixation] cleanup complete');
   },
 };
 

@@ -81,7 +81,6 @@ function loadTest(testId, steps) {
   // Modules should NOT have their own conflicting event handlers
   if (universalInput) {
     universalInput.resume();
-    console.log(`[Main] Resumed UniversalInput for module: ${testId}`);
   }
 
   state.history.push({ test: state.currentTest, index: state.stepIndex });
@@ -143,11 +142,9 @@ function back() {
     if (test && test.customControls === true) {
       // Previous module also has custom controls - keep suspended
       universalInput.suspend();
-      console.log(`[Main] Back: Keeping UniversalInput suspended for module: ${state.currentTest}`);
     } else {
       // Previous module uses standard controls - resume UniversalInput
       universalInput.resume();
-      console.log(`[Main] Back: Resumed UniversalInput for module: ${state.currentTest}`);
     }
   }
 
@@ -253,7 +250,6 @@ const maddoxGridModule = {
         const cal = _getMaddoxCalibration();
         this._instance = new MaddoxGridModule(cal);
         this._instance.start();
-        console.log(`[Main] Đã cấp PPM cho Maddox Grid: ${cal.pixelsPerMm}`);
     },
 
     cleanup() {
@@ -376,14 +372,12 @@ function setupSidebar() {
       // Enable module switching when menu is visible
       if (universalInput) {
         universalInput.enableModuleSwitching();
-        console.log('[Main] Enabled module switching - menu opened');
       }
     } else if (forceShow === false) {
       sidebar.classList.add('sidebar-hidden');
       // Disable module switching when menu is hidden
       if (universalInput) {
         universalInput.disableModuleSwitching();
-        console.log('[Main] Disabled module switching - menu closed');
       }
     } else {
       sidebar.classList.toggle('sidebar-hidden');
@@ -391,10 +385,8 @@ function setupSidebar() {
       if (universalInput) {
         if (sidebar.classList.contains('sidebar-hidden')) {
           universalInput.disableModuleSwitching();
-          console.log('[Main] Disabled module switching - menu closed');
         } else {
           universalInput.enableModuleSwitching();
-          console.log('[Main] Enabled module switching - menu opened');
         }
       }
     }
@@ -912,7 +904,6 @@ function setupSidebar() {
       'input:not([type="hidden"]):not([disabled]):not([type="checkbox"]):not([type="radio"]), ' +
       'textarea:not([disabled])'
     )).find(isVisibleFocusableElement);
-    console.log("Mục tiêu Focus tìm thấy:", firstInput);
 
     if (firstInput) {
       const currentActive = document.activeElement;
@@ -926,11 +917,6 @@ function setupSidebar() {
         lastFocusedElementBeforeModal = currentActive;
       }
     }
-
-    // Tracer: bắt quả tang kẻ cướp focus 1 giây sau khi modal được nâng cấp
-    setTimeout(() => {
-      console.log("Cảnh sát Focus. Phần tử đang sáng là:", document.activeElement);
-    }, 1000);
 
     return modalElement;
   };
@@ -1290,10 +1276,8 @@ function setupCalibrator() {
   function setupCCButton() {
     const ccBtn = document.getElementById('cc-calib-btn');
     if (ccBtn) {
-      console.log('[Main] Credit card button found, adding event listener');
       ccBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        console.log('[Main] Credit card button clicked');
         if (window.__ccCal) {
           window.__ccCal.showModal();
         } else {
@@ -1377,7 +1361,6 @@ function toggleWorkspace() {
     toggleBtn.setAttribute('aria-label', 'Quay lại Phòng khám');
 
     currentWorkspace = 'therapeutic';
-    console.log('[Workspace] Switched to: Huấn luyện thị giác (Therapeutic)');
 
   } else {
     // Switch TO Diagnostic
@@ -1404,7 +1387,6 @@ function toggleWorkspace() {
     toggleBtn.setAttribute('aria-label', 'Chuyển đổi sang Huấn luyện thị giác');
 
     currentWorkspace = 'diagnostic';
-    console.log('[Workspace] Switched to: Phòng khám (Diagnostic)');
   }
 }
 
@@ -1420,7 +1402,6 @@ function setupWorkspaceToggle() {
       e.stopPropagation();
       toggleWorkspace();
     });
-    console.log('[Workspace] Toggle button wired up successfully');
   } else {
     console.warn('[Workspace] Toggle button #workspace-toggle-btn not found in DOM!');
   }
@@ -1442,7 +1423,6 @@ function init() {
 
   // Listen for visionTestCompleted event to resume UniversalInput
   document.addEventListener('visionTestCompleted', (e) => {
-    console.log('[Main] visionTestCompleted event received, resuming UniversalInput');
     if (universalInput) {
       universalInput.resume();
     }
@@ -1466,9 +1446,7 @@ function init() {
     // Delegate to ExamSessionManager for storage
     if (window.examSessionManager && typeof window.examSessionManager.addTherapyRecord === 'function') {
         const success = window.examSessionManager.addTherapyRecord(therapyRecord);
-        if (success) {
-            console.log('[EMR CORE] Da ban giao du lieu Game cho Manager xu ly.');
-        } else {
+        if (!success) {
             alert('Vui long tao phien kham truoc khi luu ket qua!');
         }
     } else {

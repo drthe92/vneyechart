@@ -8,7 +8,6 @@
  * Export:
  *   - default: DisplayCalibrator class
  *   - named:   getOptotypeSize (standalone function)
- *   - named:   debugPrintSizes (console diagnostic table)
  */
 
 // ================================================================
@@ -165,11 +164,6 @@ class DisplayCalibrator {
   _init() {
     this._loadFromStorage();
     this._recalculate();
-    console.log(
-      `%c[DisplayCalibrator]%c ${this.ppi.toFixed(2)} PPI  |  ${this.distanceM}m`,
-      'color:#4a90d9; font-weight:700;',
-      'color:#555; font-weight:400;'
-    );
   }
 
   // ================================================================
@@ -227,11 +221,6 @@ class DisplayCalibrator {
    */
   applyNearVisionPreset() {
     this.setDistance(0.4);
-    console.log(
-      `%c[DisplayCalibrator]%c Near Vision preset — 0.4m, ${this.ppi.toFixed(2)} PPI`,
-      'color:#4a90d9; font-weight:700;',
-      'color:#555; font-weight:400;'
-    );
   }
 
   /**
@@ -239,11 +228,6 @@ class DisplayCalibrator {
    */
   applyDistanceVisionPreset() {
     this.setDistance(4);
-    console.log(
-      `%c[DisplayCalibrator]%c Distance Vision preset — 4m, ${this.ppi.toFixed(2)} PPI`,
-      'color:#4a90d9; font-weight:700;',
-      'color:#555; font-weight:400;'
-    );
   }
 
   // ================================================================
@@ -378,166 +362,7 @@ class DisplayCalibrator {
 }
 
 // ================================================================
-//  Debug: debugPrintSizes()
-// ================================================================
-
-/**
- * In bảng đối chiếu kích thước vật lý (mm) và pixel tương ứng
- * cho các hàng từ LogMAR 1.0 đến -0.3 ở các khoảng cách khám
- * 3 mét, 5 mét và 6 mét.
- *
- * Gọi từ Console: `debugPrintSizes()` hoặc `window.__debugPrintSizes()`
- */
-function debugPrintSizes() {
-  const distances = [3, 5, 6]; // mét
-  const logmarLevels = [];
-  for (let l = 1.0; l >= -0.35; l = Math.round((l - 0.1) * 100) / 100) {
-    logmarLevels.push(l);
-  }
-
-  // Lấy PPI hiện tại
-  let ppi = 96;
-  let ppiSource = 'fallback (96)';
-  try {
-    const calib = _loadCalibFromStorage();
-    if (calib && calib.ppi > 0) {
-      ppi = calib.ppi;
-      ppiSource = 'calibrated';
-    } else {
-      ppi = _estimatePPI();
-      ppiSource = 'estimated';
-    }
-  } catch (e) {
-    ppi = _estimatePPI();
-    ppiSource = 'estimated (error fallback)';
-  }
-
-  const dpr = window.devicePixelRatio || 1;
-  const pxPerMm = ppi / MM_PER_INCH;
-
-  console.log(
-    `%c══════════════════════════════════════════════════════════════`,
-    'color:#4a90d9; font-weight:700;'
-  );
-  console.log(
-    `%c🔬 Vision Therapy — Optotype Size Diagnostic Table`,
-    'color:#4a90d9; font-weight:700; font-size:1.1em;'
-  );
-  console.log(
-    `%cPPI: ${ppi.toFixed(2)} (${ppiSource})  |  devicePixelRatio: ${dpr}  |  px/mm: ${pxPerMm.toFixed(4)}`,
-    'color:#555;'
-  );
-  console.log(
-    `%cCông thức: h_mm = D_mm × tan(5' × 10^LogMAR)  |  px = h_mm × (PPI / 25.4)`,
-    'color:#888; font-style:italic;'
-  );
-  console.log(
-    `%c══════════════════════════════════════════════════════════════`,
-    'color:#4a90d9; font-weight:700;'
-  );
-
-  // Header
-  const headerCols = ['LogMAR', 'Snellen', "Angle(')"];
-  distances.forEach((d) => {
-    headerCols.push(`${d}m mm`);
-    headerCols.push(`${d}m px`);
-  });
-
-  const rows = [headerCols];
-
-  logmarLevels.forEach((logmar) => {
-    const arcminutes = ARC_MINUTES_BASELINE * Math.pow(10, logmar);
-    const snellenDenom = Math.round(20 * Math.pow(10, logmar));
-    const row = [
-      logmar.toFixed(1),
-      `20/${snellenDenom}`,
-      arcminutes.toFixed(2),
-    ];
-
-    distances.forEach((d) => {
-      const distanceMm = d * 1000;
-      const radians = (arcminutes / 60) * (Math.PI / 180);
-      const heightMm = distanceMm * Math.tan(radians);
-      const heightPx = heightMm * pxPerMm;
-      row.push(heightMm.toFixed(4));
-      row.push(heightPx.toFixed(2));
-    });
-
-    rows.push(row);
-  });
-
-  // Tính độ rộng cột
-  const colWidths = headerCols.map((_, ci) =>
-    Math.max(...rows.map((r) => String(r[ci]).length))
-  );
-
-  // In từng dòng
-  const sepLine = '─'.repeat(colWidths.reduce((a, b) => a + b + 3, 0));
-
-  console.log(`%c${sepLine}`, 'color:#ccc;');
-  // Header
-  const headerStr = headerCols
-    .map((c, i) => String(c).padStart(colWidths[i]))
-    .join(' │ ');
-  console.log(`%c${headerStr}`, 'color:#000; font-weight:700;');
-  console.log(`%c${sepLine}`, 'color:#ccc;');
-
-  // Data rows
-  rows.slice(1).forEach((row, ri) => {
-    const logmar = parseFloat(row[0]);
-    // Highlight các mốc quan trọng
-    let color = '#333';
-    if (logmar === 0.0) color = '#0056b3'; // 20/20
-    else if (logmar === 0.3) color = '#28a745'; // 20/40
-    else if (logmar === 1.0) color = '#dc3545'; // 20/200
-
-    const rowStr = row
-      .map((c, i) => String(c).padStart(colWidths[i]))
-      .join(' │ ');
-    console.log(`%c${rowStr}`, `color:${color};`);
-  });
-
-  console.log(`%c${sepLine}`, 'color:#ccc;');
-  console.log(
-    `%c✅ Kết luận: Kích thước pixel là số thực (float), không clamp, không làm tròn.`,
-    'color:#28a745; font-weight:700;'
-  );
-  console.log(
-    `%c   Sub-pixel rendering của trình duyệt sẽ xử lý phần thập phân.`,
-    'color:#28a745;'
-  );
-
-  // Trả về object để có thể dùng programmatically
-  const result = {
-    ppi,
-    ppiSource,
-    devicePixelRatio: dpr,
-    pxPerMm,
-    distances,
-    rows: rows.slice(1).map((r) => ({
-      logmar: parseFloat(r[0]),
-      snellen: r[1],
-      arcminutes: parseFloat(r[2]),
-      sizes: distances.reduce((acc, d, di) => {
-        acc[`${d}m`] = {
-          mm: parseFloat(r[3 + di * 2]),
-          px: parseFloat(r[4 + di * 2]),
-        };
-        return acc;
-      }, {}),
-    })),
-  };
-
-  return result;
-}
-
-// Gắn vào window để gọi từ Console
-if (typeof window !== 'undefined') {
-  window.__debugPrintSizes = debugPrintSizes;
-}
-
-// ================================================================
 //  Export
 // ================================================================
 export default DisplayCalibrator;
-export { DisplayCalibrator, getOptotypeSize, debugPrintSizes };
+export { DisplayCalibrator, getOptotypeSize };

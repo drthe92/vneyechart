@@ -520,10 +520,9 @@ class RDSTherapyGame extends BinocularGameEngine {
         if (finishBtn) {
             finishBtn.onclick = () => {
                 if (document.fullscreenElement) {
-                    document.exitFullscreen().catch(e => console.log(e));
+                    document.exitFullscreen().catch(() => {});
                 }
                 overlay.remove();
-                console.log('[RDS Therapy] Hoàn thành phác đồ điều trị.');
             };
         }
     }

@@ -518,39 +518,7 @@ const neuroOknModule = {
 };
 
 // ================================================================
-//  Red Desaturation Placeholder
-// ================================================================
-
-const neuroRedDesatModule = {
-  id: 'neuro-red-desat',
-  label: 'Bão hoà màu đỏ',
-  steps: [0],
-
-  render() {
-    const board = document.getElementById('display-board');
-    if (!board) return;
-
-    board.innerHTML = `
-      <div class="okn-container" style="display:flex; justify-content:center; align-items:center; height:100%;">
-        <div style="text-align:center; padding:40px;">
-          <div style="font-size:4rem; margin-bottom:20px;">🟥</div>
-          <h2 style="font-size:1.8rem; color:#333; margin-bottom:12px;">Bão hoà màu đỏ</h2>
-          <p style="font-size:1rem; color:#999; font-style:italic;">
-            Red Desaturation Test — Module đang được phát triển
-          </p>
-          <p style="font-size:0.85rem; color:#bbb; margin-top:20px;">
-            Nhấn ESC để quay lại
-          </p>
-        </div>
-      </div>
-    `;
-  },
-
-  randomize() {},
-};
-
-// ================================================================
 //  Export
 // ================================================================
 export default neuroOknModule;
-export { neuroOknModule, neuroRedDesatModule, WebGLOKNRenderer, calculatePPD };
+export { neuroOknModule, WebGLOKNRenderer, calculatePPD };

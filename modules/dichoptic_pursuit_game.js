@@ -462,10 +462,9 @@ class DichopticPursuitGame extends BinocularGameEngine {
         if (finishBtn) {
             finishBtn.onclick = () => {
                 if (document.fullscreenElement) {
-                    document.exitFullscreen().catch(e => console.log(e));
+                    document.exitFullscreen().catch(() => {});
                 }
                 overlay.remove();
-                console.log('[DichopticPursuit] Hoàn thành phác đồ điều trị.');
             };
         }
     }

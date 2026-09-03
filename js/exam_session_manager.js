@@ -101,6 +101,22 @@
                   .replace(/\s+/g, "");
     }
 
+    /**
+     * Build canonical Patient ID theo format chuẩn: [Số điện thoại]_[Họ và Tên]_[Năm sinh]
+     * KHÔNG chứa timestamp — đảm bảo cùng một bệnh nhân (trùng SĐT + Tên + Năm sinh)
+     * luôn quy về cùng một định danh, tránh phân mảnh hồ sơ EMR.
+     * @param {string} phone - Số điện thoại
+     * @param {string} name - Họ và Tên (sẽ được sanitize)
+     * @param {string} yob - Năm sinh
+     * @returns {string} patientId dạng phone_name_yob
+     */
+    function buildPatientId(phone, name, yob) {
+        const phonePart = (phone || 'UNKNOWN').trim();
+        const namePart = normalizeString(name || '');
+        const yobPart = (yob || 'NOYOB').trim();
+        return `${phonePart}_${namePart}_${yobPart}`;
+    }
+
     async function handleSessionStart(event) {
         event.preventDefault();
 
@@ -132,8 +148,7 @@
         const nameInput = name;
         const yearInput = yob;
 
-        const normalizedName = normalizeString(nameInput);
-        const patientId = `${phoneInput}_${normalizedName}_${yearInput}`;
+        const patientId = buildPatientId(phoneInput, nameInput, yearInput);
 
         const patientRef = db.collection("Patients").doc(patientId);
 
@@ -141,7 +156,6 @@
             const doc = await patientRef.get();
 
             if (doc.exists) {
-                console.log("Hồ sơ hợp lệ.");
                 localStorage.setItem("currentPatientId", patientId);
                 localStorage.setItem("currentPatientName", nameInput);
                 localStorage.setItem("currentProtocol", protocolInput);
@@ -159,8 +173,9 @@
                 if (formEl) formEl.reset();
                 const nmEl = document.getElementById("patient-name");
                 const ybEl = document.getElementById("patient-yob");
-                if (nmEl) nmEl.disabled = false;
+if (nmEl) nmEl.disabled = false;
                 if (ybEl) ybEl.disabled = false;
+                startExam(nameInput, yearInput, patientId);
             } else {
                 const confirmMsg = "Hệ thống không tìm thấy hồ sơ cũ.\n\n- Nếu đây là người bệnh mới, bấm 'OK' để tạo hồ sơ.\n- Nếu gõ sai thông tin, bấm 'Hủy' để sửa lại.";
                 if (confirm(confirmMsg)) {
@@ -189,8 +204,9 @@
                     if (formEl) formEl.reset();
                     const nmEl = document.getElementById("patient-name");
                     const ybEl = document.getElementById("patient-yob");
-                    if (nmEl) nmEl.disabled = false;
+if (nmEl) nmEl.disabled = false;
                     if (ybEl) ybEl.disabled = false;
+                    startExam(nameInput, yearInput, patientId);
                 }
             }
         } catch (error) {
@@ -566,8 +582,6 @@
         if (dfContainer && dfContainer.offsetParent !== null && typeof DynamicFixationRefresh === 'function') {
             DynamicFixationRefresh();
         }
-
-        console.log('[refreshTestViews] All active test views refreshed with new anaglyph colors.');
     };
 
     /**
@@ -786,7 +800,6 @@
                 const exam = JSON.parse(savedData);
                 if (exam && exam.patientName && exam.startTime) {
                     window.__currentExam = exam;
-                    console.log('[ExamSessionManager] Restored active session:', exam.patientName);
                     
                     // Restore UI to "in-exam" state
                     updateExamUI();
@@ -1116,22 +1129,24 @@
     }
 
     // Start exam
-    function startExam(patientName, patientYOB) {
+    function startExam(patientName, patientYOB, patientId) {
         // Calculate age from Year of Birth
         const age = patientYOB && !isNaN(parseInt(patientYOB))
             ? (new Date().getFullYear() - parseInt(patientYOB))
             : 'N/A';
 
-        // Generate a unique patientId for this exam session (used for therapy report lookup)
-        // Format: PATIENTNAME_YOB_TIMESTAMP for uniqueness
-        const safeName = (patientName || 'UNKNOWN').replace(/[^a-zA-Z0-9À-ỹ\s]/g, '').trim().replace(/\s+/g, '_');
-        const patientId = `${safeName}_${patientYOB || 'NOYOB'}_${Date.now()}`;
+        // patientId chuẩn theo format phone_name_yob (KHÔNG chứa timestamp):
+        // cùng một bệnh nhân nhập trùng SĐT + Tên + Năm sinh luôn quy về cùng một ID,
+        // tránh phân mảnh hồ sơ EMR. Timestamp chỉ được lưu ở thuộc tính riêng startTime.
+        const canonicalPatientId = patientId
+            || localStorage.getItem('currentPatientId')
+            || buildPatientId('UNKNOWN', patientName || '', patientYOB || '');
 
         window.__currentExam = {
             patientName: patientName,
             patientYOB: patientYOB || 'N/A',
             patientAge: age,
-            patientId: patientId,
+            patientId: canonicalPatientId,
             startTime: Date.now(),
             results: []
         };
@@ -1342,7 +1357,6 @@
             }
             
             localStorage.setItem(EMR_HISTORY_KEY, JSON.stringify(history));
-            console.log('[ExamSessionManager] Saved to EMR history. Total records:', history.length);
         } catch (e) {
             console.error('[ExamSessionManager] Failed to save to history:', e);
         }
@@ -2347,8 +2361,6 @@
     }
 
 function openClinicSettingsModal() {
-    console.log('[System] Settings button clicked');
-    
     // 1. Tìm modal trong DOM
     let modal = document.getElementById('clinic-settings-modal') || document.querySelector('.clinic-settings-modal');
 
@@ -2434,8 +2446,6 @@ function openClinicSettingsModal() {
 
     // 2. NẾU CHƯA CÓ, TỰ ĐỘNG TẠO MỚI TOÀN BỘ DOM CHO MODAL CÀI ĐẶT
     if (!modal) {
-        console.log('[System] Modal chưa tồn tại, đang tự động khởi tạo giao diện...');
-        
         modal = document.createElement('div');
         modal.id = 'clinic-settings-modal';
         modal.className = 'custom-modal';
@@ -2573,8 +2583,6 @@ function openClinicSettingsModal() {
     if (typeof window.enhanceModalUX === 'function') {
         window.enhanceModalUX(modal);
     }
-    console.log('[System] Modal set to display: flex successfully!');
-
     // Làm mới trạng thái active của các nút Chế độ hiển thị theo preset hiện tại
     renderDisplayPresetButtons();
 
@@ -2629,7 +2637,6 @@ document.addEventListener('click', function(e) {
     if (e.target.closest('.settings-btn') || e.target.closest('.fa-cog')) {
         e.preventDefault();
         e.stopPropagation();
-        console.log('[System] Settings button clicked via Delegation');
         openClinicSettingsModal();
     }
 });
@@ -2743,7 +2750,6 @@ document.addEventListener('click', function(e) {
                          };
 
                          sessionsRef.add(payload)
-                             .then(() => console.log(`[Firebase Sync] Đã lưu điểm số bài ${payload.gameName} thành công.`))
                              .catch(err => console.error("[Firebase Sync] Lỗi ghi dữ liệu:", err));
                              
                      } catch (error) {
@@ -2752,7 +2758,6 @@ document.addEventListener('click', function(e) {
                  }
                  // KẾT THÚC: ĐỒNG BỘ LÊN FIREBASE
                  
-                 console.log('[Manager] Da Hard-Write ket qua thuan luyen vao Database cho:', window.__currentExam.patientId);
                  return true;
             } catch (err) {
                 console.error('[Manager] Loi khi ghi cung vao Database:', err);
@@ -2915,7 +2920,7 @@ document.addEventListener('click', function(e) {
 
         // Thoát Fullscreen nếu đang bật để Modal không bị che khuất
         if (document.fullscreenElement) {
-            document.exitFullscreen().catch(err => console.log(err));
+            document.exitFullscreen().catch(() => {});
         }
 
         modal.style.display = 'flex';
