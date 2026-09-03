@@ -123,12 +123,6 @@ class DisplayManager {
       // localStorage may be unavailable in some contexts
     }
 
-    console.log(
-      `%c[DisplayManager]%c ${preset.label}  —  ${preset.filter}`,
-      'color:#4a90d9; font-weight:700;',
-      'color:#555; font-weight:400;'
-    );
-
     return true;
   }
 

@@ -298,8 +298,6 @@ const hidingHeidi = {
    * @private
    */
   _showIntro() {
-    console.log('[HidingHeidi] Showing intro screen');
-
     // Check localStorage preference
     const hideGuide = localStorage.getItem(HEIDI_GUIDE_KEY);
     if (hideGuide === 'true') {
@@ -401,8 +399,6 @@ const hidingHeidi = {
    * @private
    */
   _startTest() {
-    console.log('[HidingHeidi] Starting test phase with Staircase algorithm');
-
     // Set state to test
     this._state = 'test';
 
@@ -416,8 +412,6 @@ const hidingHeidi = {
     for (let i = 0; i < CONTRAST_LEVELS.length; i++) {
       this._failCounts[i] = 0;
     }
-
-    console.log('[HidingHeidi] Fail counts initialized:', this._failCounts);
 
     // Clear board and set gray background
     this._board.innerHTML = '';
@@ -448,8 +442,6 @@ const hidingHeidi = {
     document.addEventListener('keydown', this._boundKeydown);
     document.addEventListener('contextmenu', this._boundContextMenu);
     document.body.addEventListener('click', this._boundClick);
-
-    console.log('[HidingHeidi] Test started with contrast:', contrast, 'position:', this._facePosition);
   },
 
   /**
@@ -465,14 +457,11 @@ const hidingHeidi = {
     if (this._introModal && this._introModal.contains(e.target)) return;
     if (this._resultModal && this._resultModal.contains(e.target)) return;
 
-    console.log('[HidingHeidi] Left click - Child CORRECT');
-
     // Reset fail count for current level
     this._failCounts[this._contrastIndex] = 0;
 
     // Check if at lowest level (1.25% - index 5)
     if (this._contrastIndex >= CONTRAST_LEVELS.length - 1) {
-      console.log('[HidingHeidi] Reached lowest level (1.25%) - Test complete');
       this._finalThreshold = CONTRAST_LEVELS[this._contrastIndex];
       this._showResult();
       return;
@@ -481,11 +470,9 @@ const hidingHeidi = {
     // Increase difficulty: decrease contrast (move to next level)
     this._contrastIndex++;
     this._updateContrast();
-    console.log('[HidingHeidi] Contrast decreased to:', this._getCurrentContrast());
 
     // Randomize position to a DIFFERENT quadrant
     this._randomizePosition();
-    console.log('[HidingHeidi] Position changed to:', this._facePosition);
   },
 
   /**
@@ -502,7 +489,6 @@ const hidingHeidi = {
       case 'Spacebar':
         // Space = same as left click (child correct)
         e.preventDefault();
-        console.log('[HidingHeidi] Space - Child CORRECT');
 
         this._failCounts[this._contrastIndex] = 0;
 
@@ -529,16 +515,12 @@ const hidingHeidi = {
     if (this._state !== 'test') return;
 
     e.preventDefault();
-    console.log('[HidingHeidi] Right-click - Child INCORRECT');
 
     // Increase fail count for current level
     this._failCounts[this._contrastIndex]++;
 
-    console.log('[HidingHeidi] Fail count for level', this._contrastIndex, ':', this._failCounts[this._contrastIndex]);
-
     // Check if failed 2 times at current level
     if (this._failCounts[this._contrastIndex] >= 2) {
-      console.log('[HidingHeidi] 2 failures at current level - Test complete');
 
       // Threshold is previous level (if not at level 0)
       if (this._contrastIndex > 0) {
@@ -554,11 +536,9 @@ const hidingHeidi = {
     // Decrease difficulty: increase contrast (move to previous level) to encourage child
     this._contrastIndex = Math.max(0, this._contrastIndex - 1);
     this._updateContrast();
-    console.log('[HidingHeidi] Contrast increased to:', this._getCurrentContrast());
 
     // Randomize position to a DIFFERENT quadrant
     this._randomizePosition();
-    console.log('[HidingHeidi] Position changed to:', this._facePosition);
   },
 
   /**
@@ -566,8 +546,6 @@ const hidingHeidi = {
    * @private
    */
   _showResult() {
-    console.log('[HidingHeidi] Showing result screen with threshold:', this._finalThreshold);
-
     // Set state to result
     this._state = 'result';
 
@@ -665,8 +643,6 @@ const hidingHeidi = {
    * @private
    */
   _saveAndExit() {
-    console.log('[HidingHeidi] Saving result and exiting');
-
     // Prepare threshold value for JSON
     const thresholdValue = typeof this._finalThreshold === 'string'
       ? this._finalThreshold
@@ -685,8 +661,6 @@ const hidingHeidi = {
     });
 
     document.dispatchEvent(event);
-
-    console.log('[HidingHeidi] Dispatched visionTestCompleted with threshold:', thresholdValue);
 
     // Cleanup
     setTimeout(() => {
@@ -711,7 +685,6 @@ const hidingHeidi = {
    * @param {number} idx - Step index (unused, test is single-screen)
    */
   render(idx) {
-    console.log('[HidingHeidi] render() called with idx:', idx);
     try {
       this._init();
     } catch (e) {
@@ -724,8 +697,6 @@ const hidingHeidi = {
    * @private
    */
   _init() {
-    console.log('[HidingHeidi] _init() started');
-
     // Reset state
     this._state = 'intro';
     this._contrastIndex = 0;
@@ -748,8 +719,6 @@ const hidingHeidi = {
    * Called by main.js when switching tests.
    */
   cleanup() {
-    console.log('[HidingHeidi] cleanup() called');
-
     // Remove event listeners
     if (this._boundKeydown) {
       document.removeEventListener('keydown', this._boundKeydown);
@@ -793,8 +762,6 @@ const hidingHeidi = {
     // Reset state
     this._state = 'intro';
     this._failCounts = {};
-
-    console.log('[HidingHeidi] Cleanup complete');
   }
 };
 

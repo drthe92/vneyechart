@@ -228,7 +228,6 @@ class MaddoxGridModule {
                 clearInterval(tryFocus);
                 window.requestAnimationFrame(() => {
                     targetInput.focus();
-                    console.log(successLog);
                 });
             }
 
@@ -306,13 +305,11 @@ class MaddoxGridModule {
                 const hdInput = document.getElementById('maddox-hd');
                 if (hdInput) hdInput.value = prismValue;
                 this._hdValue = prismValue;
-                console.log('[MaddoxGrid] Canvas click → H_d:', this._hdValue);
             } else {
                 // CHỈ xử lý cho Lưới Gần — KHÔNG ảnh hưởng H_d
                 const hnInput = document.getElementById('maddox-hn');
                 if (hnInput) hnInput.value = prismValue;
                 this._hnValue = prismValue;
-                console.log('[MaddoxGrid] Canvas click → H_n:', this._hnValue);
             }
             this._showClickFeedback(clickX, clickY, prismValue);
         };
@@ -397,7 +394,6 @@ class MaddoxGridModule {
                 }
                 // State nội bộ riêng cho H_d
                 this._hdValue = parseFloat(e.target.value) || null;
-                console.log('[MaddoxGrid] H_d updated:', this._hdValue);
             });
         }
 
@@ -412,7 +408,6 @@ class MaddoxGridModule {
                 }
                 // State nội bộ riêng cho H_n — TÁCH BIỆT hoàn toàn với H_d
                 this._hnValue = parseFloat(e.target.value) || null;
-                console.log('[MaddoxGrid] H_n updated:', this._hnValue);
             });
         }
 

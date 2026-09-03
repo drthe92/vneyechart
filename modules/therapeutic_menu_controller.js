@@ -492,8 +492,6 @@ class TherapeuticMenuController {
 
         this.workspaceContainer.innerHTML = '';
 
-        console.log("[Therapeutic] Request launch module:", module.name);
-
         // B. Render Lobby (Instruction) interface
         this._renderLobby(module);
     }
@@ -800,7 +798,6 @@ class TherapeuticMenuController {
             this.currentGame = new GameClass();
 
             this.currentGame.start(config);
-            console.log(`[Therapeutic] Started ${module.name} successfully`, config);
         } catch (error) {
             console.error("[LỖI ENGINE NGHIÊM TRỌNG]:", error);
             alert((error && error.message) ? error.message : "Không thể khởi động bài tập. Vui lòng xem Console.");
@@ -827,7 +824,6 @@ window.therapeuticMenu = new TherapeuticMenuController();
 window.startTherapyModule = function(id) {
     const mod = window.therapeuticMenu ? window.therapeuticMenu._getModuleByMId(id) : null;
     if (mod) {
-        console.log(`[Therapeutic] Kích hoạt module theo phác đồ: ${id} -> ${mod.id}`);
         window.therapeuticMenu.launchGame(mod);
     } else {
         console.warn('[Therapeutic] Không tìm thấy module:', id);
@@ -844,6 +840,11 @@ window.startTherapyModule = function(id) {
  */
 window.renderTherapeuticLobby = function(container) {
     const protocol = localStorage.getItem("currentProtocol") || "amblyopia";
+
+    // Phòng mọi đường gọi trực tiếp (init/renderSidebar): chỉ hiển thị menu
+    // Huấn luyện, ẩn menu Khám để tránh chia đôi sidebar.
+    const diagnosticMenu = document.getElementById('menu-diagnostic');
+    if (diagnosticMenu) diagnosticMenu.style.display = 'none';
 
     // Định nghĩa cấu trúc động
     const config = {
@@ -956,6 +957,11 @@ window.refreshTherapeuticMenu = function() {
     const container = document.getElementById('menu-therapeutic');
     if (!container) return null;
 
+    // Chỉ hiển thị menu Huấn luyện: ẩn menu Khám (display:none) để tránh hai menu
+    // cùng lúc xếp dọc chia đôi sidebar sau khi đăng nhập bệnh nhân.
+    const diagnosticMenu = document.getElementById('menu-diagnostic');
+    if (diagnosticMenu) diagnosticMenu.style.display = 'none';
+
     // Đảm bảo controller đã khởi tạo (gắn menuContainer/workspaceContainer +
     // bind fullscreenchange). Auto-mount có thể bỏ cuộc nếu workspace-therapeutic
     // chưa hiển thị (offsetParent === null), khiến workspaceContainer = null và
@@ -994,7 +1000,6 @@ window.refreshTherapeuticMenu = function() {
         // Kiểm tra DOM tồn tại VÀ đã hiển thị thật (offsetParent !== null)
         if (menuEl && workspaceEl && menuEl.offsetParent !== null && workspaceEl.offsetParent !== null) {
             window.therapeuticMenu.init();
-            console.log('[Therapeutic] Mount thành công');
             clearInterval(mountCheck);
             return;
         }
@@ -1053,7 +1058,6 @@ window.syncM12ProgressFromFirebase = async function(patientId, moduleKey = 'M12'
 
         maxLevel = Math.max(1, Math.min(10, maxLevel));
         localStorage.setItem(LEVEL_KEY, String(maxLevel));
-        console.log(`[${moduleKey} Progress] Đã khôi phục từ Firebase: Level tối đa = ${maxLevel}`);
 
         // Nếu Lobby module đang mở, làm mới trạng thái khóa/mở khóa các nút Level
         const WRAP_ID_MAP = {

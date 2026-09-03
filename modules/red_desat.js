@@ -352,12 +352,6 @@ const redDesatModule = {
         saveBtn.style.color = '';
       }, 1200);
     }
-
-    console.log(
-      `%c[RedDesat]%c Lưu kết quả — Mắt: ${laterality} | Saturation: ${this._saturation}% | ${timestamp}`,
-      'color:#c0392b;font-weight:700;',
-      'color:#555;font-weight:400;'
-    );
   },
 
   // ================================================================

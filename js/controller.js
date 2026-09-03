@@ -416,17 +416,7 @@ class UniversalInput {
   _emit(action, detail = {}) {
     this.lastAction = action;
 
-    // 1. Console log
-    if (this.logToConsole) {
-      console.log(
-        `%c[UniversalInput] %c${action}%c  —  ${JSON.stringify(detail)}`,
-        'color:#888; font-weight:300;',
-        'color:#4a90d9; font-weight:700;',
-        'color:#555; font-weight:300;'
-      );
-    }
-
-    // 2. Dispatch CustomEvent lên document
+    // 1. Dispatch CustomEvent lên document
     const eventName = `app:${action.toLowerCase()}`;  // app:next, app:prev, app:back, app:shuffle
     document.dispatchEvent(new CustomEvent(eventName, {
       bubbles: true,

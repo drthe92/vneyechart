@@ -294,7 +294,7 @@ class CatchGame extends BinocularGameEngine {
 
             // Thoát fullscreen để về lại workspace Phòng tập
             if (document.fullscreenElement) {
-                document.exitFullscreen().catch(e => console.log(e));
+                document.exitFullscreen().catch(() => {});
             }
         };
     }

@@ -367,7 +367,7 @@ class ShapeAlignmentGame extends BinocularGameEngine {
             overlay.remove();
             // Thoát fullscreen để về lại workspace Phòng tập (Lobby)
             if (document.fullscreenElement) {
-                document.exitFullscreen().catch(e => console.log(e));
+                document.exitFullscreen().catch(() => {});
             }
         });
     }
