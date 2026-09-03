@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tổng quan Phác đồ Huấn luyện Thị giác</title>
+    <title>Giới thiệu phần mềm</title>
     <link rel="stylesheet" href="css/docs.css">
 </head>
 <body>
@@ -14,7 +14,13 @@
         <div class="sidebar-header">
             <h2>📚 MỤC LỤC TÀI LIỆU</h2>
         </div>
-        
+
+        <div class="menu-group">
+            <ul>
+                <li><a href="index.html" class="active">Giới thiệu</a></li>
+            </ul>
+        </div>
+
         <div class="menu-group">
             <h3>1. Hướng dẫn sử dụng chung</h3>
             <ul>
@@ -61,32 +67,63 @@
 
     <!-- ============ MAIN CONTENT ============ -->
     <main class="docs-content">
-        <article class="docs-content">
-            <h1>BÀI TỔNG QUAN: HIỂU VỀ NHƯỢC THỊ VÀ LÝ THUYẾT HUẤN LUYỆN THỊ GIÁC</h1>
+        <header class="doc-header">
+            <h1>GIỚI THIỆU PHẦN MỀM HUẤN LUYỆN THỊ GIÁC</h1>
+            <p class="doc-subtitle">Nền tảng Khám và Huấn luyện Thị giác Kỹ thuật số - chia sẻ miễn phí cho cộng đồng</p>
+        </header>
 
-<h2>1. Quá trình phát triển thị giác và Bản chất tổn thương</h2>
-<p>Thị giác của con người không hoàn thiện ngay khi chào đời mà là một quá trình học tập của vỏ não (Cortical plasticity), trải qua một "giai đoạn vàng" (từ lúc sinh ra đến 7-8 tuổi). Trình tự phát triển tự nhiên diễn ra như sau:</p>
-<ol>
-    <li>Cảm nhận ánh sáng và tương phản (Võng mạc và Hoàng điểm kích hoạt).</li>
-    <li>Nhận diện hình khối và phương hướng (Tế bào thần kinh tại vỏ não thị giác V1 phân giải).</li>
-    <li>Định thị và vận nhãn (Kiểm soát cơ học để giữ mục tiêu luôn nằm trên điểm vàng).</li>
-    <li>Hợp thị cảm giác (Não bộ chập hai hình ảnh từ hai mắt thành một).</li>
-    <li>Thị giác nổi 3D (Stereopsis) (Đỉnh cao của thị giác, nhận thức chiều sâu không gian).</li>
-</ol>
-<p>Nhược thị (Amblyopia) xảy ra khi quá trình phát triển này bị gián đoạn do các cản trở quang học (đục thủy tinh thể, sụp mi), tật khúc xạ cao/bất đồng khúc xạ, hoặc lác mắt. Khi hai mắt gửi về não bộ hai tín hiệu không đồng nhất (một mờ, một rõ; hoặc hai hình ảnh lệch nhau), não bộ sẽ rơi vào trạng thái nhầm lẫn cảm giác (Sensory confusion) và song thị (Diplopia).</p>
-<p>Để sinh tồn, vỏ não thị giác kích hoạt một cơ chế phòng vệ cực đoan: <strong>Ức chế vỏ não chủ động (Active Cortical Suppression)</strong>. Não bộ chủ động "tắt" tín hiệu từ mắt kém, chỉ sử dụng mắt khỏe. Nếu sự ức chế này kéo dài, các khớp thần kinh (synapse) từ mắt nhược thị lên não sẽ bị teo nén. Trẻ bị mù chức năng ở một mắt dù cấu trúc nhãn cầu hoàn toàn bình thường.</p>
+        <section class="doc-section">
+            <h2>1. Khởi nguồn từ những dòng code đầu tiên</h2>
+            <p>Bắt nguồn từ thực tế lâm sàng: nhiều trẻ em nhược thị không được luyện tập đầy đủ, việc điều trị gặp nhiều khó khăn khi phương pháp bịt mắt truyền thống bộc lộ nhiều hạn chế, trong khi các giải pháp công nghệ anaglyph chuyên dụng lại quá đắt đỏ và khó tiếp cận.</p>
+            <p>Chính vì thế, phần mềm này ra đời với mục tiêu ban đầu dành riêng cho trẻ nhược thị. Các bài tập được số hóa theo đúng lộ trình điều trị chuẩn y khoa, giải thích trực quan và thiết kế dưới dạng trò chơi (gamify) để các em tự giác luyện tập mà không cần sự thúc ép từ gia đình.</p>
+        </section>
 
-<h2>2. Lý thuyết Huấn luyện: Đi ngược để tái thiết lập</h2>
-<p>Huấn luyện thị giác (Vision Therapy) được thiết kế mô phỏng chính xác trình tự phát triển sinh lý tự nhiên của mắt, nhưng dưới dạng kích thích cưỡng bức có chủ đích. Lộ trình điều trị đi từ thô sơ đến tinh tế qua 4 giai đoạn, phản ánh đúng tiến trình phục hồi chức năng:</p>
-<ul>
-    <li><strong>Giai đoạn 1: Đánh thức Hoàng điểm (Monocular Pleoptics):</strong> Tương đương với thị giác trẻ sơ sinh. Tập trung hoàn toàn vào mắt yếu, loại bỏ sự ảnh hưởng của mắt khỏe (bằng cách bịt mắt). Đưa điểm nhìn từ lệch tâm về đúng tâm (Hoàng điểm).</li>
-    <li><strong>Giai đoạn 2: Phá vỡ ức chế hợp thị cảm giác (Dichoptic Anti-suppression):</strong> Tương đương thị giác trẻ 1-2 tuổi. Dạy não bộ cách mở cửa đón nhận tín hiệu từ cả hai mắt cùng lúc thông qua các trò chơi phân thị.</li>
-    <li><strong>Giai đoạn 3: Hợp thị Vận động & Theo vết (Oculomotor & Vergence):</strong> Tương đương trẻ bắt đầu biết bò, đi và cầm nắm. Dạy các cơ nhãn cầu phối hợp co/giãn để giữ hai hình ảnh chập làm một bất chấp sự dịch chuyển của mục tiêu.</li>
-    <li><strong>Giai đoạn 4: Thị giác 3D & Phản xạ cấp cao (Sensory Fusion):</strong> Tương đương trẻ lớn, hoàn thiện kỹ năng chiều sâu, phối hợp tay - mắt tinh gọn, đọc sách không nhảy chữ.</li>
-</ul>
-<p><em>Việc tuân thủ nghiêm ngặt lộ trình này là chìa khóa để chữa khỏi nhược thị vĩnh viễn, tránh tái phát. Phụ huynh, bác sĩ và kỹ thuật viên cần nắm rõ: Không thể đốt cháy giai đoạn, không thể bắt não bộ nhìn 3D khi hoàng điểm vẫn còn đang ngủ say.</em></p>
+        <section class="doc-section">
+            <h2>2. Bước ngoặt công nghệ và mở rộng tầm nhìn</h2>
+            <p>Sự phát triển của phần mềm đánh dấu một bước vượt rào kỹ thuật quan trọng: xây dựng thành công thuật toán tinh chỉnh màu sắc (xanh - đỏ) và độ tương phản nền. Điều này cho phép tách biệt hoàn hảo hình ảnh giữa hai mắt ngay trên các màn hình thông thường và những cặp kính giá rẻ.</p>
+            <p>Từ nền tảng đó, ứng dụng được nâng cấp lên khả năng dựng hình 3D và các trò chơi sắc độ chuyên sâu, biến mô hình điều trị nhược thị trở nên toàn diện.</p>
+            <p>Bước ngoặt này cũng định hướng tác giả mở rộng sang một đối tượng đặc biệt quan trọng: <strong>Trẻ em sau phẫu thuật chỉnh lác</strong>. Yếu tố quyết định sự thành bại để mắt không bị lác trở lại chính là khả năng hợp thị (hai mắt cùng làm việc). Do đó, hệ thống tiếp tục được tích hợp hai phác đồ (protocol) cốt lõi: điều trị nhược thị và củng cố thị giác hai mắt hậu phẫu lác.</p>
+        </section>
+
+        <section class="doc-section">
+            <h2>3. Chặng đường tiếp theo và tiềm năng ứng dụng</h2>
+            <p>Không dừng lại ở đó, các module chuyên sâu và thuật toán tách màu độc quyền còn mở ra tiềm năng ứng dụng rộng lớn trong nhiều lĩnh vực nhãn khoa nâng cao:</p>
+            <ul>
+                <li>Hội chứng thị giác sau chấn thương sọ não (Post-Trauma Vision Syndrome - PTVS)</li>
+                <li>Bất thường thị giác hai mắt không lác (Non-Strabismic Binocular Vision Anomalies - NSBVA)</li>
+                <li>Thể thao thị giác &amp; tối ưu hóa thần kinh nhận thức (Sports Vision &amp; Neuro-Cognitive Enhancement)</li>
+            </ul>
+            <p>Phần mềm sẽ tiếp tục được mở rộng và phát triển tùy theo nhu cầu thực tế của công tác lâm sàng.</p>
+        </section>
+
+        <section class="doc-section">
+            <h2>4. Giải pháp toàn diện cho Bác sĩ nhãn khoa và Kỹ thuật viên khúc xạ</h2>
+            <p>Bên cạnh các bài tập trị liệu, phần mềm tích hợp sẵn bộ công cụ chẩn đoán đa năng: đo thị lực, Amsler grid, đo bão hòa màu đỏ, test OKN, đo chỉ số AC/A, mô phỏng loạn thị và đo thị lực tự động.</p>
+            <p>Hệ thống này làm giàu thêm các công cụ chẩn đoán, theo dõi tiến triển, đồng thời có ứng dụng thiết thực trong các chuyên ngành thần kinh nhãn khoa, võng mạc và chẩn đoán mỏi thị giác. Với cấu hình báo cáo trực quan có thể tích hợp mượt mà vào bất kỳ phòng khám nào, đây không chỉ là sự thay thế cho bảng thị lực truyền thống mà còn là một bộ công cụ lâm sàng đa năng.</p>
+        </section>
+
+        <section class="doc-section">
+            <h2>5. Lời ngỏ và Chia sẻ cộng đồng</h2>
+            <p>Phần mềm được chia sẻ hoàn toàn miễn phí cho các bác sĩ, kỹ thuật viên khúc xạ và người bệnh. Mọi ý kiến đóng góp, phản hồi để hoàn thiện phần mềm xin vui lòng gửi về:</p>
+            <ul>
+                <li><strong>Bác sĩ Ngô Hữu Thế</strong></li>
+                <li>Email: <a href="mailto:thengohuu@gmail.com">thengohuu@gmail.com</a></li>
+            </ul>
+        </section>
+
+        <section class="doc-section">
+            <h2>6. Đồng hành cùng dự án</h2>
+            <p>Nếu quý vị trân trọng tâm huyết và muốn chung tay duy trì sự phát triển miễn phí của phần mềm, mọi sự đóng góp xin gửi về:</p>
+            <ul>
+                <li>Ngân hàng: <strong>VPBank</strong></li>
+                <li>Số tài khoản: <strong>112204091</strong></li>
+                <li>Chủ tài khoản: <strong>Ngô Hữu Thế</strong></li>
+            </ul>
+            <p><em>Xin chân thành cảm ơn sự đồng hành của quý vị!</em></p>
+        </section>
     </main>
 
 </div>
+<script src="js/sidebar.js"></script>
 </body>
 </html>

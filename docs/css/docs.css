@@ -142,6 +142,12 @@ html, body {
     color: var(--doc-accent);
 }
 
+.menu-group a.active {
+    background: var(--doc-accent);
+    color: #ffffff;
+    font-weight: 600;
+}
+
 .docs-nav-group { margin-bottom: 22px; }
 
 .docs-nav-group > h3 {

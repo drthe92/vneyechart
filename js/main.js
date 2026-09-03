@@ -412,9 +412,25 @@ function setupSidebar() {
 
   // ---- Menu keyboard navigation state ----
   let menuFocusIndex = -1;
-  const getMenuItems = () => Array.from(document.querySelectorAll('.menu-item, .nav-btn'));
+  // Mọi nút trên topmenu (sidebar-header) phải nằm trong danh sách này thì mới
+  // chọn được bằng 4 phím điều hướng. querySelectorAll không trả phần tử trùng,
+  // nên thêm [data-nav] làm lưới an toàn cho các nút tạo động chưa có .nav-btn.
+  const getMenuItems = () => Array.from(
+    document.querySelectorAll('.menu-item, .module-card, .nav-btn, [data-nav]')
+  );
 
   function updateMenuFocus() {
+    // Guard Clause: nếu có Modal đang mở (exam-modal hiển thị hoặc nội dung modal
+    // đã được tối ưu hóa đang hiện trên màn hình), cấm hệ thống menu nền tự động
+    // cập nhật hoặc giành lại focus.
+    const openExamModal = document.querySelector(
+      '.exam-modal[style*="display: flex"], .exam-modal[style*="display: block"]'
+    );
+    if (openExamModal) return;
+    const openOptimizedModal = Array.from(document.querySelectorAll('.modal-optimized'))
+      .find((el) => el.isConnected && el.offsetParent !== null);
+    if (openOptimizedModal) return;
+
     const items = getMenuItems();
     items.forEach((el, i) => {
       el.classList.toggle('menu-focus', i === menuFocusIndex);
@@ -462,6 +478,9 @@ function setupSidebar() {
 
       // Directional filter: element must lie strictly in the pressed direction
       let inDirection = false;
+      // Left/Right chỉ được phép di chuyển trong cùng một dải hàng (row).
+      // Chặn việc chọn nhảy lên topmenu (sidebar-header) khi đang ở dòng 1.
+      const verticalOverlap = (a, b) => a.top < b.bottom && a.bottom > b.top;
       switch (direction) {
         case 'up':
           inDirection = rect.bottom <= currentRect.top + EPSILON;
@@ -470,10 +489,10 @@ function setupSidebar() {
           inDirection = rect.top >= currentRect.bottom - EPSILON;
           break;
         case 'left':
-          inDirection = rect.right <= currentRect.left + EPSILON;
+          inDirection = rect.right <= currentRect.left + EPSILON && verticalOverlap(rect, currentRect);
           break;
         case 'right':
-          inDirection = rect.left >= currentRect.right - EPSILON;
+          inDirection = rect.left >= currentRect.right - EPSILON && verticalOverlap(rect, currentRect);
           break;
       }
       if (!inDirection) return;
@@ -529,20 +548,75 @@ function setupSidebar() {
     }
   }
 
-  // Selectors that identify every popup/modal used across the project:
-  //  - .exam-modal            → exam session modals (start/end/manual/report/history/clinic settings)
-  //  - .settings-modal-overlay→ DisplayManager preset modal (js/settings.js)
-  //  - .calib-modal-overlay   → distance-selection dialog (js/calibration.js)
-  //  - .custom-modal / .modal → legacy fallbacks
-  // NOTE: .cc-modal-overlay is intentionally EXCLUDED — js/credit_card_calibration.js
-  // already implements its own dedicated arrow-key handling for its slider.
+  // Selectors that identify every popup/modal used across the project.
+  // Fullscreen overlays created by game modules are also detected below from
+  // their inline position/inset styles, so they receive the same keyboard UX.
   const MODAL_SELECTOR = [
     '.exam-modal',
     '.settings-modal-overlay',
     '.calib-modal-overlay',
+    '.cc-modal-overlay',
+    '.okn-warning-overlay',
     '.custom-modal',
-    '.modal'
+    '.modal',
+    '[id$="-modal"]',
+    '#global-result-modal'
   ].join(', ');
+
+  /**
+   * Modal visibility check. Focusable children use the stricter layout check
+   * below; the modal itself may be a zero-size test double in unit tests.
+   */
+  function isModalVisible(modal) {
+    if (!modal || !modal.isConnected) return false;
+    const style = window.getComputedStyle(modal);
+    return style.display !== 'none' &&
+      style.visibility !== 'hidden' &&
+      style.opacity !== '0';
+  }
+
+  /** Detect fullscreen overlays that do not carry a modal class or id. */
+  function isFullscreenOverlay(element) {
+    if (!element || !element.getAttribute) return false;
+    const inlineStyle = element.getAttribute('style') || '';
+    const style = window.getComputedStyle(element);
+    const position = style.position || '';
+    const hasInset = /\binset\s*:\s*0(?:px)?\b/i.test(inlineStyle);
+    const hasViewportSize =
+      /\bwidth\s*:\s*100vw\b/i.test(inlineStyle) &&
+      /\bheight\s*:\s*100vh\b/i.test(inlineStyle);
+
+    if (position === 'fixed' && (hasInset || hasViewportSize)) return true;
+
+    // Dynamic fixation uses an absolute 100% overlay inside the test board.
+    const isAbsoluteBoardOverlay =
+      position === 'absolute' &&
+      /\btop\s*:\s*0(?:px)?\b/i.test(inlineStyle) &&
+      /\bleft\s*:\s*0(?:px)?\b/i.test(inlineStyle) &&
+      /\bwidth\s*:\s*100%\b/i.test(inlineStyle) &&
+      /\bheight\s*:\s*100%\b/i.test(inlineStyle) &&
+      Number.parseInt(style.zIndex, 10) >= 1000;
+
+    return isAbsoluteBoardOverlay;
+  }
+
+  /** Return modal roots, including dynamically-created fullscreen overlays. */
+  function getModalCandidates() {
+    const candidates = [];
+    const seen = new Set();
+    const add = (element) => {
+      if (element && !seen.has(element)) {
+        seen.add(element);
+        candidates.push(element);
+      }
+    };
+
+    document.querySelectorAll(MODAL_SELECTOR).forEach(add);
+    document.querySelectorAll('[style*="position"]').forEach((element) => {
+      if (isFullscreenOverlay(element)) add(element);
+    });
+    return candidates;
+  }
 
   /**
    * Quét DOM tìm Modal đang hiển thị.
@@ -551,16 +625,71 @@ function setupSidebar() {
    * @returns {HTMLElement|null}
    */
   function getActiveModal() {
-    const candidates = document.querySelectorAll(MODAL_SELECTOR);
-    for (const el of candidates) {
-      if (!el.isConnected) continue;
-      if (el.classList.contains('active')) return el;
-      const style = window.getComputedStyle(el);
-      if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
-        return el;
+    let activeModal = null;
+    let activeZIndex = -Infinity;
+
+    getModalCandidates().forEach((el) => {
+      if (!isModalVisible(el)) return;
+      const zIndex = Number.parseInt(window.getComputedStyle(el).zIndex, 10);
+      const normalizedZIndex = Number.isFinite(zIndex) ? zIndex : 0;
+      if (!activeModal || normalizedZIndex >= activeZIndex) {
+        activeModal = el;
+        activeZIndex = normalizedZIndex;
       }
+    });
+
+    return activeModal;
+  }
+
+  /**
+   * Find the scrollable panel without ever putting the optimization class on
+   * a fullscreen backdrop. A single anonymous child is the common structure
+   * used by dynamically-created game result overlays.
+   */
+  function getModalContentElement(modal) {
+    if (!modal) return null;
+
+    const contentSelector =
+      '.exam-modal-content, .settings-modal-box, .calib-modal-box, ' +
+      '.cc-modal-box, .okn-warning-box, .modal-content, .custom-modal-content';
+    if (typeof modal.matches === 'function' && modal.matches(contentSelector)) {
+      return modal;
     }
-    return null;
+
+    const knownContent = modal.querySelector(contentSelector);
+    if (knownContent) return knownContent;
+
+    const isOverlayRoot = typeof modal.matches === 'function' && modal.matches(
+      '.exam-modal, .settings-modal-overlay, .calib-modal-overlay, ' +
+      '.cc-modal-overlay, .okn-warning-overlay, .custom-modal, .modal'
+    );
+    if (!isOverlayRoot && !isFullscreenOverlay(modal)) return modal;
+
+    const directChildren = Array.from(modal.children);
+    if (directChildren.length === 1) return directChildren[0];
+
+    // An overlay without a panel still needs a bounded scrolling surface.
+    // Wrap only its children, leaving the overlay itself fullscreen.
+    if (isFullscreenOverlay(modal) && directChildren.length > 1) {
+      if (modal.__modalUxContent && modal.__modalUxContent.isConnected) {
+        return modal.__modalUxContent;
+      }
+
+      const content = document.createElement('div');
+      content.className = 'modal-optimized';
+      directChildren.forEach((child) => content.appendChild(child));
+      modal.appendChild(content);
+      modal.__modalUxContent = content;
+      return content;
+    }
+
+    return modal;
+  }
+
+  /** A visible element must have layout before it can participate in Tab order. */
+  function isVisibleFocusableElement(element) {
+    if (!element || !isModalVisible(element)) return false;
+    return element.offsetWidth > 0 || element.offsetHeight > 0;
   }
 
   /**
@@ -580,15 +709,11 @@ function setupSidebar() {
   function getFocusableItems(modal) {
     if (!modal) return [];
     const selector =
+      'button:not([disabled]), a, ' +
       'input:not([type="hidden"]):not([disabled]), ' +
       'select:not([disabled]), textarea:not([disabled]), ' +
-      'button:not([disabled]), [tabindex]:not([tabindex="-1"])';
-    return Array.from(modal.querySelectorAll(selector)).filter((el) => {
-      // Loại bỏ phần tử không hiển thị (rect 0x0 hoặc display:none)
-      const rect = el.getBoundingClientRect();
-      if (rect.width === 0 && rect.height === 0) return false;
-      return true;
-    });
+      '[tabindex]:not([tabindex="-1"])';
+    return Array.from(modal.querySelectorAll(selector)).filter(isVisibleFocusableElement);
   }
 
   /** Focus vào một item trong modal + cuộn nhẹ để đảm bảo nhìn thấy. */
@@ -596,7 +721,9 @@ function setupSidebar() {
     const el = items[index];
     if (!el) return;
     el.focus({ preventScroll: true });
-    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
     // Đặt caret về cuối chuỗi với ô nhập văn bản (trải nghiệm remote tốt hơn)
     if (isTextInput(el) && typeof el.setSelectionRange === 'function') {
       try {
@@ -614,22 +741,23 @@ function setupSidebar() {
   function closeActiveModal(modal) {
     if (!modal) return;
     const closeSelectors = [
+      '.close-btn',
       '.exam-modal-close',
       '.settings-modal-close',
+      '.calib-modal-close',
+      '.cc-modal-close',
       '[data-dismiss="modal"]',
       '.modal-close',
       '.cancel-btn',
-      '.cc-modal-close',
-      // Định danh nút đóng phổ biến bổ sung
       '.close',
-      '.close-btn',
       '.btn-close',
       '.btn-secondary',
-      '[aria-label="Close"]'
+      '[aria-label="Close"]',
+      '[aria-label="Đóng"]'
     ];
     for (const sel of closeSelectors) {
       const btn = modal.querySelector(sel);
-      if (btn && btn.offsetParent !== null) {
+      if (btn && isVisibleFocusableElement(btn)) {
         btn.click();
         // Modal đã được đóng thành công qua nút đóng/hủy của chính nó
         // → trả focus về phần tử trên menu trước khi modal mở ra
@@ -655,10 +783,162 @@ function setupSidebar() {
     restoreFocusAfterModalClose();
   }
 
+  /** Locate the real close action for a modal, including inline legacy buttons. */
+  function getModalCloseButton(modal) {
+    if (!modal) return null;
+    const selectors = [
+      '.close-btn',
+      '.exam-modal-close',
+      '.settings-modal-close',
+      '.calib-modal-close',
+      '.cc-modal-close',
+      '[data-dismiss="modal"]',
+      '.modal-close',
+      '.cancel-btn',
+      '.close',
+      '.btn-close',
+      '.btn-secondary',
+      '[aria-label="Close"]',
+      '[aria-label="Đóng"]',
+      '[data-close]'
+    ];
+
+    for (const selector of selectors) {
+      const button = modal.querySelector(selector);
+      if (button && isModalVisible(button)) return button;
+    }
+
+    const legacyClose = Array.from(modal.querySelectorAll('button, [role="button"]'))
+      .find((button) => {
+        if (!isModalVisible(button)) return false;
+        const text = `${button.textContent || ''} ${button.getAttribute('aria-label') || ''} ${button.getAttribute('onclick') || ''}`;
+        return /close|đóng|hủy|huỷ|cancel/i.test(text);
+      });
+    if (legacyClose) return legacyClose;
+
+    // The global result dialog has one confirmation button which closes it.
+    if (modal.id === 'global-result-modal') {
+      return Array.from(modal.querySelectorAll('button')).find(isModalVisible) || null;
+    }
+    return null;
+  }
+
+  /**
+   * Shared modal keyboard behavior. Return immediately for text editing so
+   * Enter keeps textarea newlines and native form submission intact.
+   */
+  function handleModalUXKeydown(e, modal) {
+    if (!modal || !isModalVisible(modal)) return;
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      const closeButton = getModalCloseButton(modal);
+      if (closeButton) {
+        closeButton.click();
+      } else {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+      }
+      restoreFocusAfterModalClose();
+      return;
+    }
+
+    if (e.key === 'Tab') {
+      const items = getFocusableItems(modal);
+      if (items.length === 0) return;
+
+      const currentIndex = items.indexOf(document.activeElement);
+      const shouldWrapForward = !e.shiftKey && currentIndex === items.length - 1;
+      const shouldWrapBackward = e.shiftKey && (currentIndex === 0 || currentIndex === -1);
+      const focusIndex = e.shiftKey ? items.length - 1 : 0;
+
+      if (currentIndex === -1 || shouldWrapForward || shouldWrapBackward) {
+        e.preventDefault();
+        e.stopPropagation();
+        items[shouldWrapBackward ? items.length - 1 : focusIndex].focus();
+      }
+      return;
+    }
+
+    if (e.key !== 'Enter') return;
+
+    const target = e.target;
+    // Guard must stay before any click/preventDefault logic.
+    if (
+      target &&
+      (target.tagName === 'TEXTAREA' ||
+        (target.tagName === 'INPUT' && ['text', 'number'].includes(target.type)) ||
+        isTextInput(target))
+    ) return;
+
+    const action = target && typeof target.closest === 'function'
+      ? target.closest('button, a, input[type="checkbox"], input[type="radio"], input[type="button"], input[type="submit"], input[type="reset"]')
+      : null;
+    if (!action || !modal.contains(action) || action.disabled) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    action.click();
+  }
+
+  /**
+   * Public modal enhancement utility. It is intentionally idempotent so a
+   * modal can call it every time it is shown without stacking listeners.
+   * @param {HTMLElement} modalElement
+   * @returns {HTMLElement|null}
+   */
+  window.enhanceModalUX = function enhanceModalUX(modalElement) {
+    if (!modalElement || typeof modalElement.querySelectorAll !== 'function') return null;
+
+    const modalContent = getModalContentElement(modalElement);
+    if (modalContent) modalContent.classList.add('modal-optimized');
+
+    if (!modalElement.__modalUxKeydownHandler) {
+      modalElement.__modalUxKeydownHandler = (e) => handleModalUXKeydown(e, modalElement);
+      modalElement.addEventListener('keydown', modalElement.__modalUxKeydownHandler, true);
+    }
+
+    if (modalElement.__modalUxFocusTimer) {
+      window.clearTimeout(modalElement.__modalUxFocusTimer);
+      modalElement.__modalUxFocusTimer = null;
+    }
+    if (modalElement.__modalUxFocusPoller) {
+      window.clearInterval(modalElement.__modalUxFocusPoller);
+      modalElement.__modalUxFocusPoller = null;
+    }
+
+    const firstInput = Array.from(modalElement.querySelectorAll(
+      'input:not([type="hidden"]):not([disabled]):not([type="checkbox"]):not([type="radio"]), ' +
+      'textarea:not([disabled])'
+    )).find(isVisibleFocusableElement);
+    console.log("Mục tiêu Focus tìm thấy:", firstInput);
+
+    if (firstInput) {
+      const currentActive = document.activeElement;
+      if (
+        currentActive &&
+        currentActive !== document.body &&
+        currentActive !== document.documentElement &&
+        !modalElement.contains(currentActive) &&
+        typeof currentActive.focus === 'function'
+      ) {
+        lastFocusedElementBeforeModal = currentActive;
+      }
+    }
+
+    // Tracer: bắt quả tang kẻ cướp focus 1 giây sau khi modal được nâng cấp
+    setTimeout(() => {
+      console.log("Cảnh sát Focus. Phần tử đang sáng là:", document.activeElement);
+    }, 1000);
+
+    return modalElement;
+  };
+
   /**
    * Xử lý phím khi một Modal đang mở (Hybrid algorithm):
    *  - Escape / Backspace (nút Back trên remote) → đóng modal.
-   *  - Enter / OK → trả lại trình duyệt (click nút đang focus / submit form).
+   *  - Enter / OK → do enhanceModalUX xử lý click nút hoặc submit native.
    *  - Nếu đang focus <input type="text|number|password">:
    *      + ArrowLeft / ArrowRight → bỏ qua (trình duyệt di chuyển caret).
    *      + ArrowUp / ArrowDown    → nhảy tới item liền trước / liền sau (1D).
@@ -732,34 +1012,21 @@ function setupSidebar() {
    */
   function initModalAutoFocus() {
     let scheduled = false;
-    const focusIntoActiveModal = () => {
+    const enhanceActiveModal = () => {
       scheduled = false;
       const modal = getActiveModal();
-      if (!modal) return;
-      // Đã có phần tử bên trong modal được focus → không can thiệp
-      if (modal.contains(document.activeElement)) return;
-      const items = getFocusableItems(modal);
-      if (items.length === 0) return;
-      // BẮT BUỘC lưu lại phần tử đang focus (nút trên menu chính) NGAY TRƯỚC
-      // khi chuyển focus vào các ô nhập liệu bên trong modal,
-      // phục vụ Focus Restoration khi modal đóng.
-      const currentActive = document.activeElement;
-      if (
-        currentActive &&
-        currentActive !== document.body &&
-        currentActive !== document.documentElement &&
-        !modal.contains(currentActive) &&
-        typeof currentActive.focus === 'function'
-      ) {
-        lastFocusedElementBeforeModal = currentActive;
+      if (modal && typeof window.enhanceModalUX === 'function') {
+        window.enhanceModalUX(modal);
       }
-      const target = items.find(isTextInput) || items[0];
-      focusModalItem(items, items.indexOf(target));
     };
     const schedule = () => {
       if (scheduled) return;
       scheduled = true;
-      requestAnimationFrame(focusIntoActiveModal);
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(enhanceActiveModal);
+      } else {
+        setTimeout(enhanceActiveModal, 0);
+      }
     };
     const observer = new MutationObserver(schedule);
     observer.observe(document.body, {
@@ -768,10 +1035,18 @@ function setupSidebar() {
       attributes: true,
       attributeFilter: ['style', 'class']
     });
+    schedule();
+
+    // Run before document-level remote/menu handlers, including for overlays
+    // whose focused element is not covered by the legacy modal selectors.
+    document.addEventListener('keydown', (e) => {
+      const modal = getActiveModal();
+      if (modal) handleModalUXKeydown(e, modal);
+    }, true);
   }
 
   // Keyboard: Backquote (`) / Tilde (~) / Home / ContextMenu to toggle menu.
-  // Tab is left entirely to the browser's native focus navigation (tab order).
+  // Tab, Enter and Escape are handled by enhanceModalUX while a modal is open.
   // When menu is visible: Arrow keys navigate, Enter/OK selects
   initModalAutoFocus();
 
@@ -842,6 +1117,20 @@ function setupSidebar() {
             if (fsBtn) fsBtn.click();
           }
         }
+        return;
+      }
+
+      // ---- Tab / Shift+Tab: move to next / previous item in DOM order ----
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        if (menuFocusIndex === -1) {
+          menuFocusIndex = 0;
+          updateMenuFocus();
+          return;
+        }
+        const step = e.shiftKey ? -1 : 1;
+        menuFocusIndex = (menuFocusIndex + step + items.length) % items.length;
+        updateMenuFocus();
         return;
       }
 
@@ -1071,9 +1360,12 @@ function toggleWorkspace() {
     // Switch sidebar menu
     if (menuDiag) menuDiag.style.display = 'none';
     if (menuTher) {
-      menuTher.style.display = 'flex';
-      menuTher.style.alignItems = 'center';
-      menuTher.style.justifyContent = 'center';
+      // Render lại đúng bố cục theo Phác đồ hiện tại mỗi lần chuyển sang Luyện tập
+      if (typeof window.refreshTherapeuticMenu === 'function') {
+        window.refreshTherapeuticMenu();
+      } else {
+        menuTher.style.display = 'block';
+      }
     }
 
     // Update toggle button icon → clinic-medical (return to diagnostic)

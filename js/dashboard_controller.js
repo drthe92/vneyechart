@@ -86,6 +86,10 @@ window.addEventListener('DOMContentLoaded', () => {
         topBtn = document.createElement('button');
         topBtn.innerHTML = '📊';
         topBtn.id = 'top-dashboard-btn';
+        // nav-btn: đăng ký với thuật toán điều hướng bàn phím 2D trong main.js
+        // (getMenuItems lọc .menu-item, .nav-btn) — nếu thiếu, icon này không
+        // thể chọn được bằng 4 phím mũi tên trên topmenu.
+        topBtn.className = 'nav-btn';
         topBtn.title = 'Biểu đồ Tiến triển';
         
         topBtn.style.cssText = `
@@ -116,9 +120,48 @@ window.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // 3. Sắp xếp đúng trật tự: Căn chỉnh thẻ tín dụng -> Toàn màn hình -> Nhóm quản lý phòng khám & Biểu đồ
-    if (fullscreenBtn && fullscreenBtn.parentNode) {
-        fullscreenBtn.parentNode.insertBefore(topBtn, fullscreenBtn.nextSibling);
+    // 3. Sắp xếp đúng trật tự: Hiệu chuẩn thẻ tín dụng -> Toàn màn hình -> Cụm phòng khám & Biểu đồ.
+    //    Nút Biểu đồ nằm CUỐI cụm chức năng phòng khám (sau khám/cài đặt/lịch sử),
+    //    neo vào #sidebar-title để không nhảy lên trước cụm.
+    const navbarHeader = document.getElementById('sidebar-header');
+    if (navbarHeader) {
+        navbarHeader.insertBefore(topBtn, navbarHeader.querySelector('#sidebar-title'));
+    }
+
+    // 3b. Nút Documents — mở trang chính của Docs, đặt NGAY SAU nút Biểu đồ.
+    //     Mang class .nav-btn để tham gia điều hướng bàn phím 2D như các icon khác.
+    let docsBtn = document.getElementById('docs-btn');
+    if (!docsBtn) {
+        docsBtn = document.createElement('button');
+        docsBtn.innerHTML = '📄';
+        docsBtn.id = 'docs-btn';
+        docsBtn.className = 'nav-btn';
+        docsBtn.title = 'Tài liệu hướng dẫn (Docs)';
+        docsBtn.setAttribute('aria-label', 'Tài liệu hướng dẫn (Docs)');
+        docsBtn.style.cssText = `
+            background: rgba(77, 166, 255, 0.1);
+            color: #4da6ff;
+            border: 1px solid #4da6ff;
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            border-radius: 8px;
+            font-size: 20px;
+            cursor: pointer;
+            margin-left: 10px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.2s;
+        `;
+        docsBtn.onmouseover = () => docsBtn.style.background = 'rgba(77, 166, 255, 0.2)';
+        docsBtn.onmouseout = () => docsBtn.style.background = 'rgba(77, 166, 255, 0.1)';
+        docsBtn.onclick = () => {
+            window.open('https://dev.matcauvong.com/docs/index.html', '_blank', 'noopener');
+        };
+    }
+    if (navbarHeader) {
+        navbarHeader.insertBefore(docsBtn, navbarHeader.querySelector('#sidebar-title'));
     }
 });
 
