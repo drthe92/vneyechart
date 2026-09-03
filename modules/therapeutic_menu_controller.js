@@ -480,6 +480,16 @@ class TherapeuticMenuController {
     launchGame(module) {
         // A. Stop any running game and clean workspace
         this.stopCurrentGame();
+
+        // Đảm bảo workspace container đã sẵn sàng (auto-mount có thể chưa chạy init)
+        if (!this.workspaceContainer) {
+            this.workspaceContainer = document.getElementById('workspace-therapeutic');
+        }
+        if (!this.workspaceContainer) {
+            console.warn('[Therapeutic] Không tìm thấy workspace-therapeutic, hủy launch.');
+            return;
+        }
+
         this.workspaceContainer.innerHTML = '';
 
         console.log("[Therapeutic] Request launch module:", module.name);
@@ -915,7 +925,7 @@ window.renderTherapeuticLobby = function(container) {
                 ? `onclick="startTherapyModule('${mod.id}')"`
                 : `title="Chống chỉ định: Cần hiệu chuẩn kính"`;
             const disabledStyle = isCalibrated ? '' : 'opacity: 0.5; cursor: not-allowed;';
-            html += `<div class="module-card" style="${disabledStyle}" ${clickAttr}>
+            html += `<div class="module-card" role="button" tabindex="0" style="${disabledStyle}" ${clickAttr}>
                         <div class="module-icon">${mod.icon}</div>
                         <div class="module-name">${mod.id}: ${mod.name}</div>
                      </div>`;
@@ -931,6 +941,42 @@ window.renderTherapeuticLobby = function(container) {
     container.style.padding = '0';
     container.style.overflowY = 'auto';
     container.style.maxHeight = 'calc(100vh - 120px)';
+};
+
+/**
+ * Render LẠI toàn bộ menu Luyện tập (Lobby) theo đúng bố cục của Phác đồ hiện tại.
+ * - Đặt lại mọi style inline của #menu-therapeutic có thể gây lệch bố cục
+ *   (VD: display:flex + center do toggleWorkspace để lại ở lần chuyển trước).
+ * - Gọi an toàn nhiều lần (idempotent), dùng chung cho cả 2 luồng:
+ *   1) Khi người bệnh đăng nhập / đổi Phác đồ (exam_session_manager).
+ *   2) Khi nhấn nút toggle chuyển Khám → Luyện tập (main.js toggleWorkspace).
+ * @returns {HTMLElement|null} Container menu đã render, hoặc null nếu chưa có DOM.
+ */
+window.refreshTherapeuticMenu = function() {
+    const container = document.getElementById('menu-therapeutic');
+    if (!container) return null;
+
+    // Đảm bảo controller đã khởi tạo (gắn menuContainer/workspaceContainer +
+    // bind fullscreenchange). Auto-mount có thể bỏ cuộc nếu workspace-therapeutic
+    // chưa hiển thị (offsetParent === null), khiến workspaceContainer = null và
+    // launchGame() ném lỗi khi nhấn Enter — nên phải init lại tại đây.
+    if (window.therapeuticMenu && typeof window.therapeuticMenu.init === 'function') {
+        window.therapeuticMenu.init();
+    }
+
+    // Reset mọi style inline để bố cục luôn theo đúng CSS/renderTherapeuticLobby
+    container.style.alignItems = '';
+    container.style.justifyContent = '';
+    container.style.display = 'block';
+    container.style.padding = '0';
+    container.style.overflowY = 'auto';
+    container.style.maxHeight = 'calc(100vh - 120px)';
+
+    // Render lại đúng bố cục theo Phác đồ đang lưu trong localStorage
+    if (typeof window.renderTherapeuticLobby === 'function') {
+        window.renderTherapeuticLobby(container);
+    }
+    return container;
 };
 
 // Active Polling: Kiểm tra DOM mỗi 200ms, tối đa 25 chu kỳ (5 giây)
@@ -1039,7 +1085,12 @@ window.syncM12ProgressFromFirebase = async function(patientId, moduleKey = 'M12'
 // SPA Event Listener: Xử lý chuyển đổi workspace qua lại
 document.addEventListener('onWorkspaceChanged', (e) => {
     if (e.detail.toWorkspace === 'therapeutic') {
-        window.therapeuticMenu.init();
+        // Render lại đúng bố cục Phác đồ + reset style inline có thể gây lệch
+        if (typeof window.refreshTherapeuticMenu === 'function') {
+            window.refreshTherapeuticMenu();
+        } else {
+            window.therapeuticMenu.init();
+        }
     } else {
         window.therapeuticMenu.stopCurrentGame();
     }

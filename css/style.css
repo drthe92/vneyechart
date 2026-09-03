@@ -73,6 +73,14 @@ button {
   font-family: inherit;
 }
 
+/* ---------- Shared modal content behavior ---------- */
+/* Keep scrolling on the dialog panel; fullscreen overlays retain their backdrop. */
+.modal-optimized {
+  max-height: 85vh !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+
 /* ---------- App Container ---------- */
 #app {
   display: flex;
@@ -269,6 +277,14 @@ button {
   background: var(--sidebar-hover);
   color: var(--sidebar-text-active);
   box-shadow: 0 0 0 2px var(--sidebar-accent);
+}
+
+/* Keyboard-focus highlight for therapeutic lobby module cards */
+.module-card.menu-focus {
+  border-color: var(--sidebar-accent) !important;
+  background: var(--sidebar-hover) !important;
+  box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.5), 0 4px 12px rgba(74, 144, 217, 0.3);
+  transform: translateY(-3px);
 }
 
 /* Label inline (no tooltip) */

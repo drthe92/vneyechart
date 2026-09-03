@@ -276,13 +276,9 @@
 
         examContainer.appendChild(statusContainer);
 
-        // Insert before fullscreen button
-        const fullscreenBtn = document.getElementById('fullscreen-btn');
-        if (fullscreenBtn) {
-            navbarHeader.insertBefore(examContainer, fullscreenBtn);
-        } else {
-            navbarHeader.appendChild(examContainer);
-        }
+        // Cụm chức năng phòng khám nằm SAU nút toàn màn hình (về phía cuối header).
+        // Neo vào #sidebar-title để giữ đúng thứ tự: khám → cài đặt → lịch sử → biểu đồ.
+        navbarHeader.insertBefore(examContainer, navbarHeader.querySelector('#sidebar-title'));
 
         // Create Start Exam Modal
         createStartExamModal();
@@ -336,15 +332,15 @@
                     <form id="start-exam-form" novalidate>
                         <div class="form-group">
                             <label for="patient-name">Họ và Tên:</label>
-                            <input type="text" id="patient-name" name="patient-name" placeholder="VD: Nguyễn Văn B" tabindex="1">
+                            <input type="text" id="patient-name" name="patient-name" placeholder="VD: Nguyễn Văn B" autofocus>
                         </div>
                         <div class="form-group">
                             <label for="input_phone">Số điện thoại:</label>
-                            <input type="text" id="input_phone" name="input_phone" placeholder="Nhập số điện thoại" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;" tabindex="1_5">
+                            <input type="text" id="input_phone" name="input_phone" placeholder="Nhập số điện thoại" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;">
                         </div>
                         <div class="form-group">
                             <label for="patient-yob">Năm sinh:</label>
-                            <input type="number" id="patient-yob" name="patient-yob" min="1900" max="2099" placeholder="VD: 1990" tabindex="2">
+                            <input type="number" id="patient-yob" name="patient-yob" min="1900" max="2099" placeholder="VD: 1990">
                         </div>
                         <div class="form-group" style="margin-top: 10px;">
                             <label for="input_protocol">Phác đồ điều trị:</label>
@@ -355,7 +351,7 @@
                         </div>
                         <div class="form-group checkbox-group">
                             <label>
-                                <input type="checkbox" id="anonymous-check" tabindex="3">
+                                <input type="checkbox" id="anonymous-check">
                                 <span>Khám ẩn danh</span>
                             </label>
                         </div>
@@ -399,38 +395,6 @@
                 yobInput.disabled = false;
             }
         });
-
-        // Enter key listener for quick submit on inputs AND submit button
-        const handleEnterSubmit = function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                e.stopPropagation();
-                // Trigger form submit programmatically
-                form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-            }
-        };
-        
-        // Add modal-level keydown handler for Enter key on ANY element (including submit button)
-        // This uses capture phase to intercept BEFORE UniversalInput catches it
-        const modalKeydownHandler = function(e) {
-            // Allow Tab to pass through naturally for focus management
-            if (e.key === 'Tab') {
-                return; // Let browser handle tab order naturally
-            }
-            
-            // Handle Enter key on any element - trigger form submit
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                e.stopPropagation();
-                // Trigger form submit programmatically
-                form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-            }
-        };
-        startExamModal.addEventListener('keydown', modalKeydownHandler, true);
-
-        nameInput.addEventListener('keydown', handleEnterSubmit);
-        phoneInput.addEventListener('keydown', handleEnterSubmit);
-        yobInput.addEventListener('keydown', handleEnterSubmit);
 
         form.addEventListener('submit', handleSessionStart);
 
@@ -940,21 +904,6 @@
 
         form.addEventListener('submit', handleManualEntrySubmit);
 
-        // Prevent modal backdrop from capturing keyboard events
-        manualEntryModal.addEventListener('keydown', function(e) {
-            // Allow Tab to pass through naturally for focus management
-            if (e.key === 'Tab') {
-                // Do nothing - let browser handle tab order naturally
-                return;
-            }
-            // Close on Escape key
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                hideModal(manualEntryModal);
-                resetManualEntryForm();
-            }
-        });
-
         // Close on backdrop click (only when clicking the overlay, not content)
         manualEntryModal.addEventListener('click', function(e) {
             if (e.target === manualEntryModal) {
@@ -962,23 +911,6 @@
                 resetManualEntryForm();
             }
         });
-
-        // Focus first input when modal opens
-        const originalShowModal = showModal;
-        const _showManualEntry = function(modal) {
-            if (modal === manualEntryModal) {
-                originalShowModal(modal);
-                // Focus first input after modal is visible
-                setTimeout(() => {
-                    const firstInput = document.getElementById('manual-test-name');
-                    if (firstInput) firstInput.focus();
-                }, 100);
-            } else {
-                originalShowModal(modal);
-            }
-        };
-        // Override showModal temporarily for this modal
-        window._showManualEntry = _showManualEntry;
 
         // Protect form inputs from global hotkey listeners
         allowTypingInModal(manualEntryModal);
@@ -994,12 +926,8 @@
         // Try to auto-detect module and save
         const autoSaved = tryAutoDetectAndSave();
         if (!autoSaved) {
-            // Open manual entry modal with focus on first input
-            if (window._showManualEntry) {
-                window._showManualEntry(manualEntryModal);
-            } else {
-                showModal(manualEntryModal);
-            }
+            // The shared modal utility handles focus after opening.
+            showModal(manualEntryModal);
         }
     }
 
@@ -1108,20 +1036,17 @@
     // Bind event listeners
     function bindEvents() {
         if (startExamBtn) {
-            startExamBtn.addEventListener('click', () => {
+            startExamBtn.addEventListener('click', (e) => {
+                e.preventDefault();
                 showModal(startExamModal);
-                // Auto-focus into patient name input after modal opens
-                setTimeout(() => {
-                    const nameInput = document.getElementById('patient-name');
-                    if (nameInput) {
-                        nameInput.focus();
-                    }
-                }, 100);
             });
         }
 
         if (endExamBtn) {
-            endExamBtn.addEventListener('click', () => showModal(endExamModal));
+            endExamBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                showModal(endExamModal);
+            });
         }
     }
 
@@ -1173,14 +1098,6 @@
 
                 // Call FAB handler which auto-detects or opens modal
                 handleManualSaveFabClick();
-
-                // Auto-focus first input after modal opens
-                setTimeout(() => {
-                    const testNameInput = document.getElementById('manual-test-name');
-                    if (testNameInput && manualEntryModal && manualEntryModal.style.display === 'flex') {
-                        testNameInput.focus();
-                    }
-                }, 100);
             }
         };
 
@@ -1226,15 +1143,13 @@
         updateExamUI();
 
         // [ĐỒNG BỘ GIAO DIỆN PHÁC ĐỒ]
-        // Nếu đang đứng ở màn hình Phòng tập, tự động render lại Lobby để cập nhật đúng Phác đồ vừa chọn
-        const therapeuticWorkspace = document.getElementById('workspace-therapeutic');
-        if (therapeuticWorkspace && therapeuticWorkspace.style.display !== 'none') {
-            if (typeof window.autoMountTherapeutic === 'function') {
-                window.autoMountTherapeutic();
-            } else if (typeof window.renderTherapeuticLobby === 'function') {
-                const container = document.getElementById('therapeutic-content');
-                if (container) window.renderTherapeuticLobby(container);
-            }
+        // Mỗi lần người bệnh đăng nhập (đã lưu currentProtocol), render lại Lobby
+        // để menu Luyện tập luôn đúng bố cục theo Phác đồ vừa chọn.
+        if (typeof window.refreshTherapeuticMenu === 'function') {
+            window.refreshTherapeuticMenu();
+        } else if (typeof window.renderTherapeuticLobby === 'function') {
+            const container = document.getElementById('menu-therapeutic');
+            if (container) window.renderTherapeuticLobby(container);
         }
 
         // Enter fullscreen
@@ -1492,6 +1407,10 @@
     function showModal(modal) {
         if (modal) {
             modal.style.display = 'flex';
+            if (typeof window.enhanceModalUX === 'function') {
+                window.enhanceModalUX(modal);
+            }
+            setTimeout(() => { const el = document.getElementById('patient-name'); if(el) el.focus(); }, 300);
         }
     }
 
@@ -1562,12 +1481,9 @@
         historyBtn.setAttribute('title', 'Kho bệnh án');
         historyBtn.innerHTML = '\uD83D\uDDC2\uFE0F';
 
-        const fullscreenBtn = document.getElementById('fullscreen-btn');
-        if (fullscreenBtn) {
-            navbarHeader.insertBefore(historyBtn, fullscreenBtn);
-        } else {
-            navbarHeader.appendChild(historyBtn);
-        }
+        // Cụm chức năng phòng khám nằm SAU nút toàn màn hình; neo vào #sidebar-title
+        // để nút Lịch sử đứng sau cụm khám + cài đặt hiện có.
+        navbarHeader.insertBefore(historyBtn, navbarHeader.querySelector('#sidebar-title'));
 
         historyBtn.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -2231,13 +2147,9 @@
         settingsBtn.setAttribute('title', 'Cài đặt phòng khám');
         settingsBtn.innerHTML = '⚙️';
 
-        // Insert before fullscreen button to preserve existing events
-        const fullscreenBtn = document.getElementById('fullscreen-btn');
-        if (fullscreenBtn) {
-            navbarHeader.insertBefore(settingsBtn, fullscreenBtn);
-        } else {
-            navbarHeader.appendChild(settingsBtn);
-        }
+        // Cụm chức năng phòng khám nằm SAU nút toàn màn hình; neo vào #sidebar-title
+        // để nút Cài đặt phòng khám đứng sau cụm khám hiện có.
+        navbarHeader.insertBefore(settingsBtn, navbarHeader.querySelector('#sidebar-title'));
 
         // Note: Settings button click is now handled by Global Event Delegation (see bottom of file)
 
@@ -2658,6 +2570,9 @@ function openClinicSettingsModal() {
 
     // 3. Ép hiển thị
     modal.style.display = 'flex';
+    if (typeof window.enhanceModalUX === 'function') {
+        window.enhanceModalUX(modal);
+    }
     console.log('[System] Modal set to display: flex successfully!');
 
     // Làm mới trạng thái active của các nút Chế độ hiển thị theo preset hiện tại
@@ -3004,7 +2919,9 @@ document.addEventListener('click', function(e) {
         }
 
         modal.style.display = 'flex';
+        if (typeof window.enhanceModalUX === 'function') {
+            window.enhanceModalUX(modal);
+        }
     });
 
 })();
-
