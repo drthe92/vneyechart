@@ -19,6 +19,9 @@ import leaModule          from '../modules/lea_symbols.js';
 import landoltCModule     from '../modules/landolt_c.js';
 import tumblingEModule    from '../modules/tumbling_e.js';
 import autoBcvaCrowdingModule from '../modules/auto_BCVA_tumbling_e_for_amblyopia.js';
+import autoDistanceVaModule from '../modules/auto_distance_va.js';
+import autoNearVaModule from '../modules/auto_near_va.js';
+import autoContrastEModule from '../modules/auto_contrast_e.js';
 import numberChartModule  from '../modules/number_chart.js';
 import hotvModule         from '../modules/hotv.js';
 import aucklandLogmar     from '../modules/auckland_logmar.js';
@@ -39,6 +42,7 @@ import redDesatModule from '../modules/red_desat.js';
 import duochromeModule from '../modules/duochrome_test.js';
 import jccSimulationModule from '../modules/astigmatism_jcc.js';
 import stereoAnaglyphModule from '../modules/stereo_anaglyph.js';
+import autoStereoRandomDotModule from '../modules/auto_stereo_random_dot.js';
 import schoberTestModule from '../modules/schober_test.js';
 import dynamicFixationModule from '../modules/dynamic_fixation.js';
 import hidingHeidiModule from '../modules/hiding_heidi.js';
@@ -189,6 +193,8 @@ registerTestModule(leaModule);             // id: 'far-vision-lea'
 registerTestModule(landoltCModule);        // id: 'far-vision-landolt'
 registerTestModule(tumblingEModule);       // id: 'far-vision-tumbling-e'
 registerTestModule(autoBcvaCrowdingModule); // id: 'far-vision-auto-bcva-crowding'
+registerTestModule(autoDistanceVaModule);    // id: 'far-vision-auto-distance-va'
+registerTestModule(autoNearVaModule);        // id: 'near-vision-auto-near-va'
 registerTestModule(numberChartModule);      // id: 'far-vision-numbers'
 registerTestModule(aucklandLogmar);         // id: 'far-vision-auckland'
 
@@ -197,11 +203,13 @@ registerTestModule(hotvModule);            // id: 'far-vision-hotv'
 registerTestModule(worth4dot);             // id: 'binocular'
 registerTestModule(astigmatism);           // id: 'astigmatism'
 registerTestModule(stereoAnaglyphModule);  // id: 'binocular-stereo'
+registerTestModule(autoStereoRandomDotModule); // id: 'binocular-auto-stereo-random-dot'
 
 // ----- Retina sub‑modules -----
 registerTestModule(amslerGrid);            // id: 'retina-amsler'
 registerTestModule(ishiharaTest);          // id: 'retina-ishihara'
 registerTestModule(pelliRobson);           // id: 'retina-pelli-robson'
+registerTestModule(autoContrastEModule);   // id: 'retina-auto-contrast-e'
 
 // ----- Near‑vision sub‑modules (accordion) -----
 registerTestModule(nearLogmarModule);      // id: 'near-vision-logmar'
