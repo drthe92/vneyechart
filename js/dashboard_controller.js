@@ -70,7 +70,9 @@ const MODULE_GROUPS = {
     8: { type: 'score', primary: 'accuracy', label: 'Chính xác (%)' },
     9: { type: 'score', primary: 'accuracy', label: 'Chính xác (%)' },
     10: { type: 'score', primary: 'avgReactionTimeMs', label: 'Phản xạ trung bình (ms)' },
-    11: { type: 'score', primary: 'finalLogCS', label: 'LogCS' }
+    11: { type: 'score', primary: 'finalLogCS', label: 'LogCS' },
+    // Combo Đánh Giá Nhược Thị — biểu đồ đa trục 3 Y (Thị lực / Tương phản / Hình nổi)
+    'Combo Đánh Giá Nhược Thị': { type: 'combo' }
 };
 
 const CHART_COLORS = ['#00e676', '#ff7043', '#4da6ff', '#fbbf24', '#c084fc', '#22d3ee'];
@@ -181,6 +183,34 @@ window.renderChart = function() {
     window.renderDashboard();
 };
 
+/**
+ * Ép kiểu giá trị EMR sang số thập phân (type casting) trước khi đẩy vào Chart.js.
+ * - number        → giữ nguyên (nếu hữu hạn)
+ * - '1.0 (10/10)' → 1.0  (lấy số đầu tiên)
+ * - '< 1/10' / '> 1.0' → 0 (dưới ngưỡng đo lường)
+ * - 'Có (100 giây cung)' → 100 ; 'Không đạt (Trượt 800 arcsec)' → 800
+ * - 'N/A' / rỗng  → null (bỏ điểm, Chart.js tạo gap)
+ */
+function _coerceNumeric(val) {
+    if (typeof val === 'number') return isFinite(val) ? val : null;
+    if (typeof val !== 'string') return null;
+    const s = String(val).trim();
+    if (!s) return null;
+    const upper = s.toUpperCase();
+    if (upper === 'N/A' || upper === 'NA') return null;
+    if (upper.includes('TRƯỢT')) return 800;
+    if (s.includes('giây cung')) {
+        const m = s.match(/(\d+)\s*giây cung/);
+        return m ? parseInt(m[1], 10) : 800;
+    }
+    // Dưới/trên ngưỡng đo lường ('< 1/10', '> 1.0') → quy về 0
+    if (s.startsWith('<') || s.startsWith('>')) return 0;
+    const m = s.match(/-?\d+(\.\d+)?/);
+    if (!m) return null;
+    const n = parseFloat(m[0]);
+    return isFinite(n) ? n : null;
+}
+
 async function fetchFirebaseData() {
     const patientId = localStorage.getItem("currentPatientId");
     if (!patientId || !window.db) return;
@@ -210,8 +240,10 @@ async function fetchFirebaseData() {
             const metricSource = (data.metrics && typeof data.metrics === 'object') ? data.metrics : {};
             const sessionMetrics = {};
             for (const [key, val] of Object.entries(metricSource)) {
-                if (typeof val === 'number') {
-                    sessionMetrics[key] = val;
+                // Ép kiểu chuỗi (VD: '1.0 (10/10)', '< 1/10', 'N/A') sang số thập phân
+                const num = _coerceNumeric(val);
+                if (num !== null) {
+                    sessionMetrics[key] = num;
                 }
             }
 
@@ -324,6 +356,8 @@ window.renderDashboard = function(moduleKey) {
         _renderPrismChart(cfg, seriesList, groupLabel);
     } else if (cfg.type === 'level') {
         _renderLevelChart(cfg, seriesList, groupLabel);
+    } else if (cfg.type === 'combo') {
+        _renderComboChart(cfg, seriesList, groupLabel);
     } else {
         _renderScoreChart(cfg, seriesList, groupLabel);
     }
@@ -492,6 +526,135 @@ function _renderScoreChart(cfg, seriesList, groupLabel) {
         type: 'line',
         data: { labels, datasets: [dataset] },
         options: options
+    });
+    chartInstances.push(chart);
+}
+
+/**
+ * Biểu đồ đa trục 3 Y cho Combo Đánh Giá Nhược Thị — 7 đường:
+ * - y-va     (Trái):     Thị lực Thập phân (Xa + Gần, OD/OS), min 0, max 1.0
+ * - y-cs     (Phải):     Tương phản %, min 0, max 100, reverse (đồ thị đi lên khi % giảm)
+ * - y-stereo (Phải ngoài): Arcsec, min 40, max 800, reverse
+ * Quy ước: OD nét liền, OS nét đứt (borderDash). Tooltip quy đổi kép Decimal↔LogMAR, %↔LogCS.
+ */
+function _renderComboChart(cfg, seriesList, groupLabel) {
+    const defs = [
+        { key: 'distance_OD', kind: 'va', axis: 'y-va', color: '#00e676', dash: [], label: 'Thị lực Xa OD (Decimal)' },
+        { key: 'distance_OS', kind: 'va', axis: 'y-va', color: '#00e676', dash: [5, 5], label: 'Thị lực Xa OS (Decimal)' },
+        { key: 'near_OD', kind: 'va', axis: 'y-va', color: '#4da6ff', dash: [], label: 'Thị lực Gần OD (Decimal)' },
+        { key: 'near_OS', kind: 'va', axis: 'y-va', color: '#4da6ff', dash: [5, 5], label: 'Thị lực Gần OS (Decimal)' },
+        { key: 'contrast_OD', kind: 'cs', axis: 'y-cs', color: '#ff7043', dash: [], label: 'Tương phản OD (%)' },
+        { key: 'contrast_OS', kind: 'cs', axis: 'y-cs', color: '#ff7043', dash: [5, 5], label: 'Tương phản OS (%)' },
+        { key: 'stereo', kind: 'stereo', axis: 'y-stereo', color: '#fbbf24', dash: [], label: 'Hình nổi (Arcsec)' }
+    ];
+
+    const usable = defs
+        .map(d => ({ def: d, series: seriesList.find(s => s.metricKey === d.key) }))
+        .filter(x => x.series);
+
+    if (usable.length === 0) {
+        _showEmpty('Combo Đánh Giá Nhược Thị: Chưa đủ dữ liệu chỉ số để vẽ biểu đồ.');
+        return;
+    }
+
+    const canvas = _createChartCard(`${groupLabel} — Thị lực / Tương phản / Hình nổi (Multi-axis)`);
+    const { labels, aligned } = _buildTimeline(usable.map(x => x.series));
+
+    const datasets = usable.map((x, i) => {
+        let data = aligned[i];
+        // CS: dữ liệu gốc là LogCS → map sang % (đường đi lên khi % giảm nhờ reverse)
+        if (x.def.kind === 'cs') {
+            data = data.map(v => (v === null ? null : Math.round(100 * Math.pow(10, -v) * 10) / 10));
+        }
+        return {
+            kind: x.def.kind,
+            label: x.def.label,
+            data: data,
+            yAxisID: x.def.axis,
+            borderColor: x.def.color,
+            backgroundColor: x.def.color + '22',
+            borderWidth: 3,
+            borderDash: x.def.dash,
+            pointRadius: 6,
+            pointBackgroundColor: '#fff',
+            pointBorderColor: x.def.color,
+            pointBorderWidth: 2,
+            pointBorderDash: x.def.dash,
+            tension: 0.3,
+            spanGaps: false
+        };
+    });
+
+    const chart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                'y-va': {
+                    position: 'left',
+                    min: 0,
+                    max: 1.0,
+                    title: { display: true, text: 'Thị lực (Decimal)', color: CHART_COLORS[0] },
+                    grid: { color: 'rgba(255, 255, 255, 0.06)' },
+                    ticks: { color: CHART_COLORS[0] }
+                },
+                'y-cs': {
+                    position: 'right',
+                    min: 0,
+                    max: 100,
+                    reverse: true,
+                    title: { display: true, text: 'Tương phản (%)', color: '#ff7043' },
+                    grid: { color: 'rgba(255, 255, 255, 0.06)' },
+                    ticks: { color: '#ff7043', callback: (v) => v + '%' }
+                },
+                'y-stereo': {
+                    position: 'right',
+                    min: 40,
+                    max: 800,
+                    reverse: true,
+                    offset: true,
+                    title: { display: true, text: 'Hình nổi (Arcsec)', color: '#fbbf24' },
+                    grid: { drawOnChartArea: false },
+                    ticks: { color: '#fbbf24' }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#cbd5e1' }
+                }
+            },
+            plugins: {
+                legend: { labels: { color: 'white', font: { size: 13 } } },
+                tooltip: {
+                    backgroundColor: '#0f172a',
+                    titleColor: '#e2e8f0',
+                    bodyColor: '#cbd5e1',
+                    borderColor: '#334155',
+                    borderWidth: 1,
+                    padding: 10,
+                    callbacks: {
+                        title: (items) => items.length ? items[0].label : '',
+                        label: (item) => {
+                            const ds = item.chart.data.datasets[item.datasetIndex];
+                            const v = item.parsed.y;
+                            if (v === null || v === undefined) return '';
+                            if (ds.kind === 'va') {
+                                if (v <= 0) return ` ${ds.label}: < 0.1 ( > 1.0 LogMAR )`;
+                                const logmar = -Math.log10(v);
+                                return ` ${ds.label}: ${v.toFixed(1)} (${logmar.toFixed(2)} LogMAR)`;
+                            }
+                            if (ds.kind === 'cs') {
+                                if (v <= 0) return ` ${ds.label}: 0% ( N/A LogCS )`;
+                                const logcs = -Math.log10(v / 100);
+                                return ` ${ds.label}: ${v.toFixed(1)}% (${logcs.toFixed(2)} LogCS)`;
+                            }
+                            return ` ${ds.label}: ${Math.round(v)} arcsec`;
+                        }
+                    }
+                }
+            }
+        }
     });
     chartInstances.push(chart);
 }

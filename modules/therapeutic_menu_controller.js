@@ -937,6 +937,11 @@ window.renderTherapeuticLobby = function(container) {
     html += `</div></div>`;
     container.innerHTML = html;
 
+    // Combo Banner: chèn lại vào đầu menu Luyện tập sau khi lobby render (innerHTML bị xóa)
+    if (typeof window.updateComboBanner === 'function') {
+        window.updateComboBanner();
+    }
+
     // Dọn dẹp style container: Grid nằm trong luồng cuộn dọc của menu
     container.style.display = 'block';
     container.style.padding = '0';

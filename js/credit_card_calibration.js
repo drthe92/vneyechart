@@ -157,6 +157,11 @@ class CreditCardCalibrator {
     this._pxPerMm = pxWidth / CREDIT_CARD_WIDTH_MM;
     try { localStorage.setItem(CC_STORAGE_KEY, String(this._pxPerMm)); } catch (e) {}
 
+    // Đồng bộ ngay vào global __calibrator (kể cả khi chưa truyền instance calibrator)
+    if (!window.__calibrator) window.__calibrator = {};
+    window.__calibrator.ppi = this._pxPerMm * 25.4;
+    window.__calibrator.pxPerMm = this._pxPerMm;
+
     if (this.calibrator) {
       this.calibrator.ppi = this.ppi;
       this.calibrator.pxPerMm = this._pxPerMm;
