@@ -157,6 +157,187 @@ function back() {
 }
 
 // ================================================================
+//  Combo Test Engine — Chuỗi 4 bài test định kỳ (Nhược thị)
+// ================================================================
+
+const COMBO_TEST_IDS = [
+  'far-vision-auto-distance-va',
+  'near-vision-auto-near-va',
+  'retina-auto-contrast-e',
+  'binocular-auto-stereo-random-dot'
+];
+
+window.__comboQueue = null;
+window.__comboResults = {};
+
+/**
+ * Bóc tách giá trị số (parseFloat) từ clinical_metrics theo danh sách key.
+ */
+function _parseFloatMetric(metrics, keys) {
+  for (const k of keys) {
+    if (metrics && metrics[k] !== undefined && metrics[k] !== null) {
+      const v = parseFloat(String(metrics[k]));
+      if (!isNaN(v)) return v;
+    }
+  }
+  return null;
+}
+
+/**
+ * Thu thập chỉ số số học từ từng bài test vào __comboResults (7 thông số OD/OS + Stereo).
+ */
+function collectComboResult(detail) {
+  if (!window.__comboResults) window.__comboResults = {};
+  const metrics = detail.clinical_metrics || {};
+  const type = detail.test_type;
+
+  if (type === 'Auto Distance VA') {
+    const od = _parseFloatMetric(metrics, ['OD (Mắt phải)']);
+    const os = _parseFloatMetric(metrics, ['OS (Mắt trái)']);
+    if (od !== null) window.__comboResults.distance_OD = od;
+    if (os !== null) window.__comboResults.distance_OS = os;
+  } else if (type === 'Auto Near VA') {
+    const od = _parseFloatMetric(metrics, ['OD (Thị lực nhìn gần mắt phải)']);
+    const os = _parseFloatMetric(metrics, ['OS (Thị lực nhìn gần mắt trái)']);
+    if (od !== null) window.__comboResults.near_OD = od;
+    if (os !== null) window.__comboResults.near_OS = os;
+  } else if (type === 'Auto Contrast E') {
+    const od = _parseFloatMetric(metrics, ['OD (Mắt phải)']);
+    const os = _parseFloatMetric(metrics, ['OS (Mắt trái)']);
+    if (od !== null) window.__comboResults.contrast_OD = od;
+    if (os !== null) window.__comboResults.contrast_OS = os;
+  } else if (type === 'Auto Stereo Random Dot') {
+    // 'Có (100 giây cung)' → 100 ; 'Không đạt (Trượt 800 arcsec)' → 800
+    const m = String(metrics['Stereo (Hình nổi)'] || '').match(/(\d+)\s*giây cung/);
+    window.__comboResults.stereo = m ? parseInt(m[1], 10) : 800;
+  }
+}
+
+/**
+ * Đóng gói record EMR tập trung "Combo Đánh Giá Nhược Thị"
+ * khi bài cuối (Stereo) hoàn thành & queue rỗng.
+ */
+function persistComboRecord() {
+  if (!window.__comboResults) return;
+  const durationSeconds = Math.round((Date.now() - (window.__comboStartTime || Date.now())) / 1000) || 0;
+  const comboRecord = {
+    id: Date.now().toString(),
+    timestamp: Date.now(),
+    gameName: 'Combo Đánh Giá Nhược Thị',
+    durationSeconds: durationSeconds,
+    metrics: { customData: window.__comboResults },
+    opticalSettings: 'N/A'
+  };
+  if (window.examSessionManager && typeof window.examSessionManager.addTherapyRecord === 'function') {
+    const ok = window.examSessionManager.addTherapyRecord(comboRecord);
+    if (!ok) {
+      console.warn('[Combo] Chưa có phiên khám đang mở — record Combo chưa được ghi vào EMR.');
+    }
+    // Refresh Notification Banner: chốt chặng đã đổi → chuyển trạng thái "Đánh giá lại sau Y phiên"
+    if (typeof window.examSessionManager.updateComboBanner === 'function') {
+      window.examSessionManager.updateComboBanner();
+    }
+  } else {
+    console.error('[Combo] Không tìm thấy ExamSessionManager.');
+  }
+}
+
+/**
+ * Hủy combo an toàn (khi thoát ngang / chọn menu khác).
+ */
+function cancelCombo() {
+  window.__comboQueue = null;
+}
+
+/**
+ * Bắt đầu Combo: Master Lobby trước khi vào bài đầu tiên.
+ */
+function startCombo() {
+  window.__comboQueue = [...COMBO_TEST_IDS];
+  window.__comboResults = {};
+  window.__comboStartTime = Date.now();
+  renderComboMasterLobby();
+}
+
+/**
+ * Master Lobby UI — danh sách chuẩn bị trước khi vào test đầu tiên.
+ */
+function renderComboMasterLobby() {
+  const board = document.getElementById('display-board');
+  if (!board) return;
+
+  board.innerHTML = `
+    <div style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;padding:32px;box-sizing:border-box;text-align:center;">
+      <h1 style="margin:0 0 8px; font-size:1.6em; color:#111;">🔬 Combo Test — Nhược thị (4 bài)</h1>
+      <p style="max-width:680px; margin:4px 0; color:#333; line-height:1.6;">Trước khi bắt đầu, vui lòng chuẩn bị:</p>
+      <ul style="list-style:none; padding:0; margin:16px 0; text-align:left; max-width:560px; width:100%;">
+        <li style="padding:10px 14px; margin:6px 0; background:#f0f6ff; border:1px solid #cfe0f5; border-radius:8px; color:#333;">
+          <strong>1️⃣ Hiệu chuẩn khoảng cách thẻ tín dụng</strong> — mở Settings → Hiệu chuẩn thẻ tín dụng (85.6mm)
+        </li>
+        <li style="padding:10px 14px; margin:6px 0; background:#f0f6ff; border:1px solid #cfe0f5; border-radius:8px; color:#333;">
+          <strong>2️⃣ Điều khiển TV / Người hỗ trợ</strong> — trả lời bằng phím mũi tên (↑ ↓ ← →)
+        </li>
+        <li style="padding:10px 14px; margin:6px 0; background:#f0f6ff; border:1px solid #cfe0f5; border-radius:8px; color:#333;">
+          <strong>3️⃣ Kính Anaglyph Xanh-Đỏ</strong> — dùng cho bài Stereo Random Dot cuối cùng (Mắt phải kính ĐỎ)
+        </li>
+      </ul>
+      <div style="display:flex; gap:12px; margin-top:16px;">
+        <button id="combo-start-btn" style="padding:12px 32px; font-size:1.05em; cursor:pointer; border:none; border-radius:8px; background:#0056b3; color:#fff;">
+          ▶ Bắt đầu bài 1: Auto Distance VA
+        </button>
+        <button id="combo-cancel-btn" style="padding:12px 24px; font-size:1.05em; cursor:pointer; border:1px solid #999; border-radius:8px; background:#fff; color:#555;">
+          Hủy
+        </button>
+      </div>
+    </div>
+  `;
+
+  const startBtn = board.querySelector('#combo-start-btn');
+  if (startBtn) startBtn.addEventListener('click', () => advanceCombo());
+
+  const cancelBtn = board.querySelector('#combo-cancel-btn');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      cancelCombo();
+      const mod = getTestModule(state.currentTest);
+      state.steps = mod ? mod.steps : [];
+      renderStep();
+    });
+  }
+}
+
+/**
+ * Chuyển sang bài tiếp theo trong queue (tự động sau khi đóng Result Modal).
+ */
+function advanceCombo() {
+  if (!window.__comboQueue || window.__comboQueue.length === 0) {
+    window.__comboQueue = null;
+    return;
+  }
+  const nextId = window.__comboQueue.shift();
+  const mod = getTestModule(nextId);
+  if (!mod) {
+    window.__comboQueue = null;
+    return;
+  }
+
+  // Auto‑switch calibrator distance theo nhóm test
+  if (nextId.startsWith('near-vision-')) {
+    const cal = window.__calibrator;
+    if (cal && cal.distanceM > 0.5) cal.applyNearVisionPreset();
+  } else if (nextId.startsWith('far-vision-')) {
+    const cal = window.__calibrator;
+    if (cal && cal.distanceM < 0.5) cal.applyDistanceVisionPreset();
+  }
+
+  highlightMenuItem(nextId);
+  loadTest(nextId, mod.steps);
+
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar) sidebar.classList.add('sidebar-hidden');
+}
+
+// ================================================================
 //  Test Module Registry
 // ================================================================
 
@@ -344,6 +525,9 @@ function setupSidebar() {
 
       const mod = getTestModule(testId);
       if (!mod) return;
+
+      // Thoát ngang combo → hủy queue an toàn
+      cancelCombo();
 
       // Auto‑switch calibrator distance for near vision tests (40 cm)
       if (testId && (testId.startsWith('near-vision-'))) {
@@ -1306,6 +1490,17 @@ function setupCalibrator() {
 
   window.__calibrator = calibrator;
   window.__ccCal = ccCal;  // Expose for cross-module access (e.g., stereo_anaglyph warning)
+
+  // Tự động khôi phục (hydrate) PPI từ hiệu chuẩn thẻ tín dụng khi tải lại trang
+  const savedCcPxPerMm = localStorage.getItem('vision-therapy-cc-pxpermm');
+  if (savedCcPxPerMm) {
+    const savedPpi = parseFloat(savedCcPxPerMm) * 25.4;
+    if (!isNaN(savedPpi) && savedPpi > 0) {
+      window.__calibrator.ppi = savedPpi;
+      window.__calibrator.pxPerMm = parseFloat(savedCcPxPerMm);
+    }
+  }
+
   return calibrator;
 }
 
@@ -1317,6 +1512,27 @@ function setupCalibrator() {
  * Current workspace: 'diagnostic' | 'therapeutic'
  */
 let currentWorkspace = 'diagnostic';
+
+/**
+ * Ép UI về khu vực Khám (Diagnostic) và đảm bảo #display-board hiển thị.
+ * Dùng trước khi khởi động Combo để tránh màn hình trắng khi đang ở Luyện tập.
+ */
+function ensureDiagnosticWorkspace() {
+  if (currentWorkspace !== 'diagnostic') {
+    toggleWorkspace();
+  }
+  // Đảm bảo DOM sẵn sàng cho việc render test chẩn đoán
+  const diagnosticEl = document.getElementById('workspace-diagnostic');
+  if (diagnosticEl) {
+    diagnosticEl.classList.add('active');
+    diagnosticEl.style.display = 'flex';
+  }
+  const board = document.getElementById('display-board');
+  if (board) {
+    board.style.display = 'block';
+    board.classList.remove('hidden');
+  }
+}
 
 /**
  * Toggle between Diagnostic (Phòng khám) and Therapeutic (Huấn luyện) workspaces.
@@ -1370,6 +1586,9 @@ function toggleWorkspace() {
 
     currentWorkspace = 'therapeutic';
 
+    // Lưu vết workspace để F5 khôi phục đúng tab
+    try { localStorage.setItem('currentWorkspace', currentWorkspace); } catch (e) { /* ignore */ }
+
   } else {
     // Switch TO Diagnostic
     document.dispatchEvent(new CustomEvent('onWorkspaceChanged', {
@@ -1395,6 +1614,9 @@ function toggleWorkspace() {
     toggleBtn.setAttribute('aria-label', 'Chuyển đổi sang Huấn luyện thị giác');
 
     currentWorkspace = 'diagnostic';
+
+    // Lưu vết workspace để F5 khôi phục đúng tab
+    try { localStorage.setItem('currentWorkspace', currentWorkspace); } catch (e) { /* ignore */ }
   }
 }
 
@@ -1429,12 +1651,127 @@ function init() {
   setupCalibrator();
   setupWorkspaceToggle(); // Wire up workspace toggle button
 
+  // ================================================================
+  //  Phục hồi toàn bộ thông số hiệu chuẩn sau khi tải lại trang (F5)
+  // ================================================================
+
+  // 1. Khoảng cách đo (vision-therapy-calibrate-distance-m)
+  const savedDist = localStorage.getItem('vision-therapy-calibrate-distance-m');
+  if (savedDist && parseFloat(savedDist) > 0 && window.__calibrator) {
+    window.__calibrator.distanceM = parseFloat(savedDist);
+  }
+
+  // 2. Màu kính Anaglyph (vision_color_calibration) — dự phòng cho __anaglyphColors
+  try {
+    const savedColors = localStorage.getItem('vision_color_calibration');
+    if (savedColors) {
+      const c = JSON.parse(savedColors);
+      if (c && c.red && c.cyan) {
+        window.__anaglyphColors = { red: c.red, cyan: c.cyan };
+        document.documentElement.style.setProperty('--calibrated-red', c.red);
+        document.documentElement.style.setProperty('--calibrated-cyan', c.cyan);
+      }
+    }
+  } catch (e) { /* ignore */ }
+
+  // 3. Khôi phục Workspace (Khám / Luyện tập) — không văng về mặc định
+  const savedWorkspace = localStorage.getItem('currentWorkspace');
+  if (savedWorkspace === 'therapeutic' && currentWorkspace === 'diagnostic') {
+    toggleWorkspace();
+  }
+
   // Listen for visionTestCompleted event to resume UniversalInput
   document.addEventListener('visionTestCompleted', (e) => {
     if (universalInput) {
       universalInput.resume();
     }
+    // Combo: checkpoint (Auto Stereo Random Dot) có thể đã đổi → cập nhật banner
+    if (typeof window.updateComboBanner === 'function') {
+      window.updateComboBanner();
+    }
+    // Combo: thu thập chỉ số + hiển thị Global Result Modal giữa các bài
+    if (window.__comboQueue) {
+      const detail = e.detail || {};
+      collectComboResult(detail);
+      // Bài cuối cùng (Stereo) hoàn thành & queue rỗng → đóng gói record EMR
+      if (window.__comboQueue.length === 0 && detail.test_type === 'Auto Stereo Random Dot') {
+        persistComboRecord();
+      }
+      showComboResultModal(detail);
+    }
   });
+
+  /**
+   * Hiển thị Global Result Modal cho từng bài trong Combo.
+   */
+  function showComboResultModal(detail) {
+    const modal = document.getElementById('global-result-modal');
+    if (!modal) return;
+    const nameEl = document.getElementById('res-modal-name');
+    const durationEl = document.getElementById('res-modal-duration');
+    const scoreEl = document.getElementById('res-modal-score');
+    if (nameEl) nameEl.innerText = detail.test_type || 'Combo Test';
+    if (durationEl) durationEl.innerText = 'Vừa hoàn thành';
+    if (scoreEl) {
+      const metrics = detail.clinical_metrics || {};
+      const html = Object.entries(metrics)
+        .map(([k, v]) => `<div style="margin:4px 0;"><strong>${k}:</strong> ${v}</div>`)
+        .join('');
+      scoreEl.innerHTML = html || '-';
+    }
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+    modal.style.display = 'flex';
+    if (typeof window.enhanceModalUX === 'function') {
+      window.enhanceModalUX(modal);
+    }
+  }
+
+  // ================================================================
+  //  Combo Test Engine — khởi động & chuyển tiếp tự động
+  // ================================================================
+
+  // Nút [Bắt đầu Combo] trên Notification Banner — delegation vì banner được
+  // tạo động trong #menu-therapeutic bởi updateComboBanner()
+  document.addEventListener('click', (e) => {
+    const btn = e.target && e.target.id === 'amblyopia-combo-start-btn' ? e.target : null;
+    if (!btn) return;
+    // Ngăn chặn chạy combo 2 lần: disable ngay khi bấm
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    btn.style.cursor = 'not-allowed';
+
+    // Ép chuyển workspace về Khám (Diagnostic) trước khi render Master Lobby,
+    // tránh kẹt màn hình trắng nếu đang đứng ở khu vực Luyện tập.
+    ensureDiagnosticWorkspace();
+
+    startCombo();
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.classList.add('sidebar-hidden');
+  });
+
+  // Sau khi người dùng đóng Global Result Modal → tự động chuyển bài tiếp theo
+  const _origCloseGlobalResultModal = window.closeGlobalResultModal;
+  window.closeGlobalResultModal = function() {
+    if (typeof _origCloseGlobalResultModal === 'function') {
+      try {
+        _origCloseGlobalResultModal();
+      } catch (err) {
+        const modal = document.getElementById('global-result-modal');
+        if (modal) modal.style.display = 'none';
+      }
+    }
+    if (window.__comboQueue && window.__comboQueue.length > 0) {
+      setTimeout(advanceCombo, 150);
+    } else {
+      // Hết combo (đã xong bài cuối) → dọn queue an toàn
+      window.__comboQueue = null;
+    }
+    if (typeof window.updateComboBanner === 'function') {
+      window.updateComboBanner();
+    }
+  };
 
   // ================================================================
   //  Mini-EMR localStorage Integration — Therapeutic Session Logger
@@ -1534,6 +1871,26 @@ function formatTherapyClinicalResult(input) {
     // Hỗ trợ truyền cả record (có .metrics) hoặc metrics trực tiếp
     const metrics = (input && input.metrics) ? input.metrics : input;
     const gameName = metrics?.gameName || input?.gameName || '';
+
+    // Combo Đánh Giá Nhược Thị — 7 thông số OD/OS + Stereo (KHÔNG đánh giá ĐẠT/CHƯA ĐẠT)
+    if (gameName === 'Combo Đánh Giá Nhược Thị') {
+        const cd = metrics?.customData || {};
+        const fmtVA = (v) => (v === undefined || v === null || isNaN(v))
+            ? 'N/A'
+            : `${Math.round(v * 10)}/10`;
+        const fmtCS = (v) => (v === undefined || v === null || isNaN(v))
+            ? 'N/A'
+            : v.toFixed(2);
+        const fmtStereo = (v) => {
+            if (v === undefined || v === null || isNaN(v)) return 'N/A';
+            return v >= 800 ? 'Trượt' : `${v} giây cung`;
+        };
+        const duration = input.durationSeconds != null ? `${input.durationSeconds} giây` : 'N/A';
+        return `Xa: OD ${fmtVA(cd.distance_OD)}, OS ${fmtVA(cd.distance_OS)} | ` +
+               `Gần: OD ${fmtVA(cd.near_OD)}, OS ${fmtVA(cd.near_OS)} | ` +
+               `Tương phản: OD ${fmtCS(cd.contrast_OD)}, OS ${fmtCS(cd.contrast_OS)} | ` +
+               `Hình nổi: ${fmtStereo(cd.stereo)} | Thời gian: ${duration}`;
+    }
 
     // Ưu tiên xử lý M11 (chặn rơi vào khối C-Ratio mặc định của M1)
     if (gameName && gameName.includes('M11')) {
@@ -1729,8 +2086,12 @@ function generateTherapyReportHTML(patientId) {
 
         // Tính isPassed (ĐẠT/CHƯA ĐẠT) theo từng module
         const cd = record.metrics?.customData || {};
+        const isComboRecord = record.gameName === 'Combo Đánh Giá Nhược Thị';
         let isPassed = false;
-        if (record.gameName.startsWith('M1:')) {
+        if (isComboRecord) {
+            // Combo là bài đánh giá tổng hợp — không xét ĐẠT/CHƯA ĐẠT
+            isPassed = false;
+        } else if (record.gameName.startsWith('M1:')) {
             isPassed = (cd.finalAlpha ?? 1) <= 0.5;
         } else if (record.gameName.includes('M2')) {
             // M2: QUA MÀN khi khớp khung đủ 5 lần LIÊN TIẾP (passed=true)
@@ -1776,9 +2137,11 @@ function generateTherapyReportHTML(patientId) {
             isPassed = (cd.finalLogCS ?? 0) >= 1.0 && (cd.reversals ?? 0) >= 4;
         }
 
-        const statusHTML = isPassed
-            ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>'
-            : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>';
+        const statusHTML = isComboRecord
+            ? '<span style="color:#2563eb; font-weight:bold;">ĐÃ HOÀN THÀNH</span>'
+            : (isPassed
+                ? '<span style="color:#16a34a; font-weight:bold;">ĐẠT</span>'
+                : '<span style="color:#dc2626; font-weight:bold;">CHƯA ĐẠT</span>');
 
         const resultHTML = `${clinicalResultString}<br>Đánh giá: ${statusHTML}`;
         

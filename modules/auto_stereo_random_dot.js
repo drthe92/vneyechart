@@ -71,6 +71,24 @@ function sampleNoise(gx, gy) {
 }
 
 // ================================================================
+//  Hướng dẫn bằng âm thanh (Tiếng Việt)
+// ================================================================
+
+function speak(text) {
+  if (!('speechSynthesis' in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'vi-VN';
+    utterance.rate = 0.95;
+    utterance.pitch = 1.0;
+    window.speechSynthesis.speak(utterance);
+  } catch (err) {
+    console.warn('[Speak] Lỗi phát âm thanh:', err);
+  }
+}
+
+// ================================================================
 //  Module
 // ================================================================
 
@@ -102,6 +120,9 @@ const autoStereoRandomDotModule = {
   },
 
   cleanup() {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
     if (this._timer) {
       clearTimeout(this._timer);
       this._timer = null;
@@ -134,6 +155,9 @@ const autoStereoRandomDotModule = {
     `;
     const btn = board.querySelector('#bcva-start-btn');
     if (btn) btn.addEventListener('click', () => this._startTest());
+
+    // Đọc hướng dẫn đeo kính bằng giọng nói tiếng Việt
+    speak('Vui lòng đeo kính đỏ cho mắt phải, kính xanh cho mắt trái. Sau đó nhấn bắt đầu.');
   },
 
   _startTest() {
@@ -191,7 +215,15 @@ const autoStereoRandomDotModule = {
     const canvas = board.querySelector('#auto-stereo-canvas');
     if (!canvas) return;
 
-    this._renderRDS(canvas);
+    // Hiển thị text loading tạm thời — tránh block UI
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#666';
+    ctx.font = '20px Arial';
+    ctx.fillText('Đang tạo hình nổi...', 20, 40);
+
+    setTimeout(() => {
+      this._renderRDS(canvas);
+    }, 15);
 
     this._boundClick = (e) => this._onCanvasClick(e);
     this._boundTouchEnd = (e) => this._onCanvasTouchEnd(e);
@@ -212,9 +244,6 @@ const autoStereoRandomDotModule = {
     canvas.width = Math.max(1, Math.round(rect.width));
     canvas.height = Math.max(1, Math.round(rect.height));
 
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     // PPI ưu tiên từ Credit-card calibration
     let ppi = 96;
     const ccPxPerMm = parseFloat(localStorage.getItem('vision-therapy-cc-pxpermm'));
@@ -232,46 +261,66 @@ const autoStereoRandomDotModule = {
     const cellPx = Math.max(1.5, (4 / 60) * (Math.PI / 180) * (NEAR_DISTANCE_M * 1000) * (ppi / 25.4));
     const halfShiftCells = (deltaXPx / 2) / cellPx;
 
-    const red = (window.__anaglyphColors && window.__anaglyphColors.red) || '#FF4D4D';
-    const cyan = (window.__anaglyphColors && window.__anaglyphColors.cyan) || '#4DFFFF';
-
     const cols = Math.ceil(canvas.width / cellPx);
     const rows = Math.ceil(canvas.height / cellPx);
     const shape = SHAPES[this._shapeType].draw;
 
-    // QUAN TRỌNG: Hòa trộn ánh sáng chuẩn Anaglyph (Đỏ + Xanh = Đen)
-    ctx.globalCompositeOperation = 'multiply';
+    // Bộ đệm ImageData — nền trắng, Alpha = 255
+    const imgData = ctx.createImageData(canvas.width, canvas.height);
+    const data = imgData.data;
+    data.fill(255);
+
+    // Bounding Box: chỉ dò hình trong vùng bán kính (+ độ lệch 2 bên)
+    const minX = this._cx - HIT_RADIUS_PX - deltaXPx;
+    const maxX = this._cx + HIT_RADIUS_PX + deltaXPx;
+    const minY = this._cy - HIT_RADIUS_PX;
+    const maxY = this._cy + HIT_RADIUS_PX;
 
     for (let gy = 0; gy < rows; gy++) {
       for (let gx = 0; gx < cols; gx++) {
         const x = gx * cellPx + cellPx / 2;
         const y = gy * cellPx + cellPx / 2;
 
-        // 1. OD (Mắt phải - kính ĐỎ): Phải vẽ bằng mực CYAN để mắt Đỏ nhìn thấy.
-        // Hướng nổi ra ngoài (Crossed): OD cần thấy hình dịch TRÁI -> Ta dò điểm chạm ảnh dịch PHẢI (+).
-        const hitOD = shape(x + deltaXPx / 2, y, this._cx, this._cy, HIT_RADIUS_PX);
+        // 1. Kiểm tra Bounding Box trước khi tính toán Shape
+        // OD (Mắt phải - kính ĐỎ): vẽ bằng mực CYAN (giảm Red).
+        // Hướng nổi ra ngoài (Crossed): OD dò điểm chạm ảnh dịch PHẢI (+).
+        const inBoundsOD = (x + deltaXPx / 2 >= minX && x + deltaXPx / 2 <= maxX && y >= minY && y <= maxY);
+        const hitOD = inBoundsOD ? shape(x + deltaXPx / 2, y, this._cx, this._cy, HIT_RADIUS_PX) : false;
         const odVal = sampleNoise(hitOD ? gx + halfShiftCells : gx, gy);
-        if (odVal > 0.05) {
-          ctx.globalAlpha = odVal; // Giữ sub-pixel anti-aliasing
-          ctx.fillStyle = cyan;
-          ctx.fillRect(Math.floor(x - cellPx / 2), Math.floor(y - cellPx / 2), Math.ceil(cellPx), Math.ceil(cellPx));
-        }
 
-        // 2. OS (Mắt trái - kính XANH): Phải vẽ bằng mực ĐỎ để mắt Xanh nhìn thấy.
-        // Hướng nổi ra ngoài (Crossed): OS cần thấy hình dịch PHẢI -> Ta dò điểm chạm ảnh dịch TRÁI (-).
-        const hitOS = shape(x - deltaXPx / 2, y, this._cx, this._cy, HIT_RADIUS_PX);
+        // OS (Mắt trái - kính XANH): vẽ bằng mực ĐỎ (giảm Green, Blue).
+        // Hướng nổi ra ngoài (Crossed): OS dò điểm chạm ảnh dịch TRÁI (-).
+        const inBoundsOS = (x - deltaXPx / 2 >= minX && x - deltaXPx / 2 <= maxX && y >= minY && y <= maxY);
+        const hitOS = inBoundsOS ? shape(x - deltaXPx / 2, y, this._cx, this._cy, HIT_RADIUS_PX) : false;
         const osVal = sampleNoise(hitOS ? gx - halfShiftCells : gx, gy);
-        if (osVal > 0.05) {
-          ctx.globalAlpha = osVal; // Giữ sub-pixel anti-aliasing
-          ctx.fillStyle = red;
-          ctx.fillRect(Math.floor(x - cellPx / 2), Math.floor(y - cellPx / 2), Math.ceil(cellPx), Math.ceil(cellPx));
+
+        if (odVal < 0.05 && osVal < 0.05) continue;
+
+        // 2. Tính toán pixel vùng hiển thị
+        const pxStart = Math.floor(gx * cellPx);
+        const pyStart = Math.floor(gy * cellPx);
+        const pxEnd = Math.min(canvas.width, Math.ceil((gx + 1) * cellPx));
+        const pyEnd = Math.min(canvas.height, Math.ceil((gy + 1) * cellPx));
+
+        // 3. Giả lập Multiply Blending trực tiếp trên kênh RGB
+        // OD (Mực Cyan): Giảm Red. OS (Mực Red): Giảm Green, Blue.
+        const r = Math.max(0, Math.min(255, Math.round(255 * (1 - odVal))));
+        const gb = Math.max(0, Math.min(255, Math.round(255 * (1 - osVal))));
+
+        // 4. Ghi trực tiếp vào mảng 1D (Cực nhanh)
+        for (let py = pyStart; py < pyEnd; py++) {
+          for (let px = pxStart; px < pxEnd; px++) {
+            const idx = (py * canvas.width + px) * 4;
+            // data[idx + 3] (Alpha) đã là 255
+            data[idx] = Math.min(data[idx], r);         // R
+            data[idx + 1] = Math.min(data[idx + 1], gb); // G
+            data[idx + 2] = Math.min(data[idx + 2], gb); // B
+          }
         }
       }
     }
 
-    // Reset lại context
-    ctx.globalAlpha = 1.0;
-    ctx.globalCompositeOperation = 'source-over';
+    ctx.putImageData(imgData, 0, 0);
   },
 
   _getPointerPos(e) {

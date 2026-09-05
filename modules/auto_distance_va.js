@@ -73,6 +73,38 @@ function formatDecimal(val) {
 }
 
 // ================================================================
+//  Hướng dẫn bằng âm thanh (Tiếng Việt) & Hình ảnh che mắt
+// ================================================================
+
+function speak(text) {
+  if (!('speechSynthesis' in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'vi-VN';
+    utterance.rate = 0.95;
+    utterance.pitch = 1.0;
+    window.speechSynthesis.speak(utterance);
+  } catch (err) {
+    console.warn('[Speak] Lỗi phát âm thanh:', err);
+  }
+}
+
+function eyeCoverSvg(coverSide) {
+  const coverX = coverSide === 'left' ? 30 : 70;
+  const openEyeX = coverSide === 'left' ? 68 : 32;
+  return `
+    <svg viewBox="0 0 100 100" style="width:45vmin; max-width:400px; margin-bottom:20px;" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="46" fill="#FFD9A0" stroke="#C9A26A" stroke-width="3"/>
+      <circle cx="${openEyeX}" cy="42" r="9" fill="#FFFFFF" stroke="#8A6A3A" stroke-width="2"/>
+      <circle cx="${openEyeX}" cy="42" r="4" fill="#333333"/>
+      <path d="M34 72 Q50 84 66 72" stroke="#C96A5A" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <ellipse cx="${coverX}" cy="42" rx="18" ry="22" fill="#FFC48A" stroke="#C9A26A" stroke-width="3" transform="rotate(18 ${coverX} 42)"/>
+      <path d="M${coverX - 12} 28 Q${coverX} 20 ${coverX + 12} 28" stroke="#C9A26A" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </svg>`;
+}
+
+// ================================================================
 //  Module
 // ================================================================
 
@@ -105,6 +137,9 @@ const autoDistanceVaModule = {
   },
 
   cleanup() {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
     if (this._boundKeydown) {
       document.removeEventListener('keydown', this._boundKeydown);
       this._boundKeydown = null;
@@ -136,12 +171,14 @@ const autoDistanceVaModule = {
     if (!board) return;
 
     const eyeLabel = eye === 'OD' ? 'Mắt Phải (OD)' : 'Mắt Trái (OS)';
-    const message = eye === 'OD' ? 'Vui lòng che mắt Trái. Chuẩn bị đo Mắt Phải (OD).' : 'Vui lòng che mắt Phải. Chuẩn bị đo Mắt Trái (OS).';
+    const coverSide = eye === 'OD' ? 'left' : 'right';
+    const message = eye === 'OD' ? 'Vui lòng che mắt trái. Chuẩn bị đo mắt phải.' : 'Vui lòng che mắt phải. Chuẩn bị đo mắt trái.';
 
     board.innerHTML = `
       <div class="bcva-prep" style="display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; height:100%; padding:32px; box-sizing:border-box;">
-        <h1 style="margin:0 0 16px; font-size:1.6em; color:#111;">👁️ ${eyeLabel}</h1>
-        <p style="max-width:640px; margin:0 0 24px; font-size:1.2em; color:#333; line-height:1.6;">${message}</p>
+        ${eyeCoverSvg(coverSide)}
+        <h1 style="margin:0 0 16px; font-size:5vmin; color:#111;">👁️ ${eyeLabel}</h1>
+        <p style="max-width:640px; margin:0 0 24px; font-size:3.5vmin; color:#333; line-height:1.6;">${message}</p>
         <button id="bcva-prep-start-btn" style="padding:12px 36px; font-size:1.05em; cursor:pointer; border:none; border-radius:8px; background:#0056b3; color:#fff;">
           ▶ Bắt đầu đo
         </button>
@@ -149,6 +186,9 @@ const autoDistanceVaModule = {
     `;
     const btn = board.querySelector('#bcva-prep-start-btn');
     if (btn) btn.addEventListener('click', () => this._startTest());
+
+    // Đọc hướng dẫn bằng giọng nói tiếng Việt ngay khi màn hình xuất hiện
+    speak(message);
   },
 
   _resetStaircase() {

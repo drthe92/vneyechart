@@ -223,6 +223,11 @@ if (nmEl) nmEl.disabled = false;
         setupVisionTestListener();
         setupGlobalHotkey();
         restoreSession();
+
+        // Combo Test Banner: render ngay khi khởi động (nếu đã có bệnh nhân)
+        if (document.getElementById('amblyopia-combo-banner')) {
+            updateComboBanner();
+        }
     }
 
     /**
@@ -806,6 +811,9 @@ if (nmEl) nmEl.disabled = false;
                     
                     // Show warning toast
                     showToast(`Đã khôi phục phiên khám: ${exam.patientName}`);
+
+                    // Combo Banner: kích hoạt sau khi khôi phục session thành công
+                    updateComboBanner();
                 }
             }
 
@@ -1156,6 +1164,9 @@ if (nmEl) nmEl.disabled = false;
 
         // Update UI
         updateExamUI();
+
+        // Combo Banner: kích hoạt ngay sau khi tạo phiên khám (đã có currentPatientId)
+        updateComboBanner();
 
         // [ĐỒNG BỘ GIAO DIỆN PHÁC ĐỒ]
         // Mỗi lần người bệnh đăng nhập (đã lưu currentProtocol), render lại Lobby
@@ -2692,6 +2703,127 @@ document.addEventListener('click', function(e) {
     }
 
     // ================================================================
+    //  Combo Test Banner — Chuỗi 4 bài test định kỳ (Nhược thị)
+    // ================================================================
+    const COMBO_GAME_NAME = 'Combo Đánh Giá Nhược Thị';
+    const COMBO_TARGET_DAYS = 10;
+
+    /**
+     * Lấy ngày (YYYY-MM-DD) từ timestamp (ms) hoặc chuỗi ISO.
+     */
+    function dayKey(timestamp) {
+        if (!timestamp) return null;
+        const d = new Date(timestamp);
+        if (isNaN(d.getTime())) return null;
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    /**
+     * Quét EMR của currentPatientId:
+     * - Chốt chặng = ngày hoàn thành "Auto Stereo Random Dot" gần nhất.
+     * - X = số ngày duy nhất có therapy_records kể từ chốt chặng đến nay.
+     * Render banner theo 3 trạng thái BA.
+     */
+    function updateComboBanner() {
+        // Đảm bảo banner luôn nằm trong #menu-therapeutic (chỉ hiển thị ở Luyện tập).
+        // #menu-therapeutic tự ẩn/hiện theo Workspace nên không cần event listener riêng.
+        const therapeuticMenu = document.getElementById('menu-therapeutic');
+        let banner = document.getElementById('amblyopia-combo-banner');
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'amblyopia-combo-banner';
+            banner.style.cssText = 'display:none; margin:10px 10px 0; padding:12px; border-radius:10px; background:linear-gradient(135deg,#1e3a5f,#0d2137); border:1px solid #4da6ff; color:#fff; font-size:13px; line-height:1.55; box-sizing:border-box;';
+            banner.innerHTML = `
+                <div id="amblyopia-combo-banner-text" style="font-weight:600;"></div>
+                <div id="amblyopia-combo-banner-sub" style="color:#bcd3ee; margin-top:4px;"></div>
+                <button id="amblyopia-combo-start-btn" style="display:none; margin-top:10px; width:100%; padding:10px 16px; font-size:14px; font-weight:700; cursor:pointer; border:none; border-radius:8px; background:linear-gradient(135deg,#4da6ff,#2f7fd0); color:#fff;">▶ Bắt đầu Combo</button>`;
+        }
+        if (therapeuticMenu && banner.parentElement !== therapeuticMenu) {
+            therapeuticMenu.prepend(banner);
+        }
+
+        const textEl = document.getElementById('amblyopia-combo-banner-text');
+        const subEl = document.getElementById('amblyopia-combo-banner-sub');
+        const btn = document.getElementById('amblyopia-combo-start-btn');
+        if (!textEl || !subEl || !btn) return;
+
+        // Guard Clause: chưa đăng nhập bệnh nhân hoặc chưa mở phiên khám → ẩn banner
+        const patientId = localStorage.getItem('currentPatientId');
+        if (!patientId || !window.__currentExam) {
+            banner.style.display = 'none';
+            return;
+        }
+
+        // Bước 1: Lấy toàn bộ therapy_records của bệnh nhân từ Hard-Write DB
+        let allRecords = [];
+        try {
+            const sessions = JSON.parse(localStorage.getItem('emr_patient_sessions')) || [];
+            for (const s of sessions) {
+                if (s && s.patientId === patientId && Array.isArray(s.therapy_records)) {
+                    allRecords.push(...s.therapy_records);
+                }
+            }
+        } catch (e) { allRecords = []; }
+
+        // Bước 2: Tìm mốc chốt — record "Combo Đánh Giá Nhược Thị" gần nhất
+        let lastTestTime = null;
+        for (const rec of allRecords) {
+            if (rec && rec.gameName === COMBO_GAME_NAME && rec.timestamp) {
+                const ts = Number(rec.timestamp);
+                if (!isNaN(ts) && (lastTestTime === null || ts > lastTestTime)) {
+                    lastTestTime = ts;
+                }
+            }
+        }
+
+        banner.style.display = 'block';
+        btn.style.display = 'none';
+
+        // Bước 3: Bệnh nhân mới / chưa từng làm Combo → trạng thái 1, KHÔNG đếm ngày
+        if (lastTestTime === null) {
+            textEl.textContent = '🧩 Đề nghị thực hiện chuỗi 4 bài test để có số liệu theo dõi tiến trình điều trị.';
+            subEl.textContent = 'Chưa có mốc đánh giá. Sau khi hoàn thành lần đầu, hệ thống sẽ theo dõi 10 ngày tập luyện.';
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
+            btn.style.display = 'block';
+            return;
+        }
+
+        // Bước 4: Bệnh nhân cũ — đếm ngày tập duy nhất từ các game huấn luyện (M-game) sau mốc chốt
+        const uniqueDays = new Set();
+        for (const rec of allRecords) {
+            if (!rec || !rec.timestamp) continue;
+            const ts = Number(rec.timestamp);
+            if (isNaN(ts) || ts <= lastTestTime) continue;
+
+            // Chỉ tính game huấn luyện (gameName chứa 'M' hoặc khớp M<digit>:)
+            const gName = String(rec.gameName || '');
+            if (!(gName.includes('M') || /M\d+:/.test(gName))) continue;
+
+            const key = dayKey(ts);
+            if (key) uniqueDays.add(key);
+        }
+
+        const trainedDays = uniqueDays.size;
+
+        if (trainedDays < COMBO_TARGET_DAYS) {
+            // Trạng thái 2: Đang trong 10 ngày tập
+            const remaining = COMBO_TARGET_DAYS - trainedDays;
+            textEl.textContent = `📅 Bạn đang ở ngày ${trainedDays}/${COMBO_TARGET_DAYS} tập luyện.`;
+            subEl.textContent = `Đánh giá lại sau ${remaining} phiên nữa để đạt đủ mốc ${COMBO_TARGET_DAYS} ngày.`;
+        } else {
+            // Trạng thái 3: Đủ 10 ngày tập
+            textEl.textContent = `✅ Người bệnh đã có ${trainedDays} ngày tham gia luyện tập. Đề nghị thực hiện lại chuỗi 4 bài test.`;
+            subEl.textContent = 'Chuỗi 4 bài: Distance VA → Near VA → Contrast → Stereo Random Dot.';
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
+            btn.style.display = 'block';
+        }
+    }
+
+    // ================================================================
     //  Public API — Expose ExamSessionManager methods globally
     // ================================================================
     window.examSessionManager = {
@@ -2757,7 +2889,10 @@ document.addEventListener('click', function(e) {
                      }
                  }
                  // KẾT THÚC: ĐỒNG BỘ LÊN FIREBASE
-                 
+
+                 // Cập nhật Combo Banner ngay sau khi có phiên tập mới
+                 updateComboBanner();
+
                  return true;
             } catch (err) {
                 console.error('[Manager] Loi khi ghi cung vao Database:', err);
@@ -2771,8 +2906,18 @@ document.addEventListener('click', function(e) {
          */
         getCurrentExam() {
             return window.__currentExam;
+        },
+
+        /**
+         * Cập nhật Notification Banner Combo Test định kỳ (Nhược thị).
+         */
+        updateComboBanner() {
+            updateComboBanner();
         }
     };
+
+    // Alias global cho Combo Banner (dùng từ main.js / module khác)
+    window.updateComboBanner = updateComboBanner;
 
     // ================================================================
     //  GLOBAL CLINICAL RESULT MODAL — Bắt sự kiện kết thúc bài tập
