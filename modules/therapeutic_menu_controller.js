@@ -269,11 +269,11 @@ class TherapeuticMenuController {
                         ]
                     },
                     {
-                        id: 'cam-stim-speed', key: 'rotationSpeed', label: 'Tốc độ xoay', numeric: true,
+                        id: 'cam-stim-speed', key: 'rotationSpeed', label: 'Tốc độ xoay (vòng/phút)', numeric: true,
                         options: [
-                            { value: '0.5', label: 'Chậm', selected: false },
-                            { value: '1', label: 'Bình thường', selected: true },
-                            { value: '2', label: 'Nhanh', selected: false }
+                            { value: '1.5', label: 'Chậm (1.5 vòng/phút)', selected: false },
+                            { value: '2', label: 'Chuẩn lâm sàng (2 vòng/phút)', selected: true },
+                            { value: '2.5', label: 'Nhanh (2.5 vòng/phút)', selected: false }
                         ]
                     },
                     {
@@ -437,12 +437,56 @@ class TherapeuticMenuController {
 
     /**
      * Handle fullscreen exit event: stop game, cleanup DOM, restore SPA UI
+     * [SỬA LỖI TRẮNG MÀN HÌNH] Sau khi dọn dẹp, lập tức vẽ lại Sảnh game
+     * (Lobby) vào vùng hiển thị chính — không để lại vùng trắng trơn.
      */
     _handleFullscreenExit() {
         if (!document.fullscreenElement) {
             this.stopCurrentGame();
             this.workspaceContainer.style = '';
             this.workspaceContainer.innerHTML = '';
+            this._restoreTherapeuticLobby();
+        }
+    }
+
+    /**
+     * [SỬA LỖI TRẮNG MÀN HÌNH] Khôi phục Sảnh game (Lobby) vào vùng hiển thị
+     * chính (#therapeutic-content bên trong #workspace-therapeutic).
+     * - Dọn dẹp canvas / nút thoát còn sót (nếu có)
+     * - Tái tạo #therapeutic-content (game đã xóa bằng innerHTML='')
+     * - Gọi window.renderTherapeuticLobby() để vẽ lại danh sách game
+     * Idempotent: gọi nhiều lần (fullscreenchange + closeTherapyModule)
+     * không gây lỗi — nội dung chỉ được thay thế toàn bộ.
+     */
+    _restoreTherapeuticLobby() {
+        const ws = this.workspaceContainer || document.getElementById('workspace-therapeutic');
+        if (!ws) return;
+
+        // Chỉ vẽ lại khi workspace Huấn luyện đang thực sự hiển thị
+        // (tránh render vào vùng đang ẩn khi đang ở workspace Khám)
+        try {
+            if (ws.offsetParent === null && getComputedStyle(ws).display === 'none') return;
+        } catch (e) { /* tiếp tục render — phòng hờ */ }
+
+        // 1. Dọn canvas / nút thoát còn sót
+        ws.querySelectorAll('canvas, button[aria-label="Thoát bài tập"]').forEach((el) => {
+            if (el.parentNode) el.parentNode.removeChild(el);
+        });
+
+        // 2. Đảm bảo #therapeutic-content tồn tại
+        let content = document.getElementById('therapeutic-content');
+        if (!content) {
+            content = document.createElement('div');
+            content.id = 'therapeutic-content';
+            ws.appendChild(content);
+        } else {
+            content.innerHTML = '';
+        }
+        content.style.cssText = 'width: 100%; height: 100%; overflow-y: auto;';
+
+        // 3. Vẽ lại danh sách menu game (Sảnh Lobby)
+        if (typeof window.renderTherapeuticLobby === 'function') {
+            window.renderTherapeuticLobby(content);
         }
     }
 
@@ -792,6 +836,13 @@ class TherapeuticMenuController {
         // Remove Lobby
         this.workspaceContainer.innerHTML = '';
 
+        // [SỬA LỖI CỰ LY KHÁM] Chốt lại mốc Nhìn Gần NGAY TRƯỚC khi khởi tạo
+        // game (new classRef()) — bảo hiểm cho mọi đường khởi chạy
+        // (custom launcher M6/M13, deep-link, v.v.) chứ không chỉ startTherapyModule.
+        if (window.__calibrator) {
+            window.__calibrator.distanceM = window.__calibrator.distanceNearM || 0.4;
+        }
+
         // Initialize and start game
         try {
             const GameClass = (typeof module.classRef === 'string') ? window[module.classRef] : module.classRef;
@@ -822,6 +873,14 @@ window.therapeuticMenu = new TherapeuticMenuController();
  * @param {string} id - Mã hiệu module (vd: 'M7')
  */
 window.startTherapyModule = function(id) {
+    // [SỬA LỖI CỰ LY KHÁM] Ép buộc mốc Nhìn Gần trước khi khởi tạo game:
+    // Phác đồ huấn luyện (M1-M13) diễn ra ở cự ly gần (đọc sách/thiết bị) nên
+    // mọi tính toán Góc thị giác, kích thước px và Lăng kính (Δ) phải dựa trên
+    // distanceNearM (VD 40cm) — không phải cự ly Nhìn Xa (VD 4m = 400cm).
+    if (window.__calibrator) {
+        window.__calibrator.distanceM = window.__calibrator.distanceNearM || 0.4;
+    }
+
     const mod = window.therapeuticMenu ? window.therapeuticMenu._getModuleByMId(id) : null;
     if (mod) {
         window.therapeuticMenu.launchGame(mod);
@@ -1106,12 +1165,45 @@ document.addEventListener('onWorkspaceChanged', (e) => {
 });
 
 /**
- * Đóng Module trị liệu sau khi người dùng xác nhận kết quả trên Global Result Modal:
- * Dọn dẹp workspace fullscreen và trả về màn hình Dashboard.
+ * Đóng Module trị liệu sau khi người dùng xác nhận kết quả trên Global Result Modal.
+ * [SỬA LỖI TRẮNG MÀN HÌNH] Không điều hướng đi nơi khác (dashboard) nữa —
+ * thay vào đó: dọn dẹp canvas còn sót rồi vẽ lại Sảnh game (Lobby) ngay
+ * trong vùng hiển thị chính, đưa bác sĩ về sảnh ngay lập tức.
  */
 window.closeTherapyModule = function() {
+    // 1. Dừng game đang chạy + reset overlay fullscreen của workspace
     if (window.therapeuticMenu) {
+        window.therapeuticMenu.stopCurrentGame();
         window.therapeuticMenu._handleFullscreenExit();
     }
-    if (typeof window.loadTest === 'function') window.loadTest('dashboard');
+
+    // Thoát fullscreen nếu vẫn còn (fullscreenchange sẽ tự dọn + vẽ lại Lobby)
+    if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+    }
+
+    // 2. Dọn dẹp thẻ canvas còn sót (nếu có) trong workspace Huấn luyện
+    const ws = document.getElementById('workspace-therapeutic');
+    if (!ws) return;
+
+    ws.style = '';
+    ws.querySelectorAll('canvas, button[aria-label="Thoát bài tập"]').forEach((el) => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+    });
+
+    // 3. Đảm bảo #therapeutic-content tồn tại (game đã xóa bằng innerHTML='')
+    let content = document.getElementById('therapeutic-content');
+    if (!content) {
+        content = document.createElement('div');
+        content.id = 'therapeutic-content';
+        ws.appendChild(content);
+    } else {
+        content.innerHTML = '';
+    }
+    content.style.cssText = 'width: 100%; height: 100%; overflow-y: auto;';
+
+    // 4. BẮT BUỘC vẽ lại danh sách menu game vào vùng hiển thị chính
+    if (typeof window.renderTherapeuticLobby === 'function') {
+        window.renderTherapeuticLobby(content);
+    }
 };

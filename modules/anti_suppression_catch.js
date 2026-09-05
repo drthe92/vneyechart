@@ -40,7 +40,7 @@ class CatchGame extends BinocularGameEngine {
 
         // --- Cấu hình Level (gamify) ---
         this.level = 1;                    // Cấp độ hiện tại (1..10)
-        this.fallSpeedPx = 3;              // Tốc độ rơi (px/frame) — set theo Level
+        this.fallSpeedPxPerSec = 180;      // Vận tốc rơi (px/s) — set theo Level [A1]
         this.spawnIntervalMs = 1000;       // Khoảng sinh hạt (ms) — set theo Level
         this.dropSizePx = 30;              // Kích thước hạt (px) — set theo Level
 
@@ -78,6 +78,22 @@ class CatchGame extends BinocularGameEngine {
     }
 
     /**
+     * [AUTO-CENTER] Ghi đè hook onResize của Engine:
+     * khi cửa sổ đổi kích thước, giữ thanh hứng luôn sát đáy màn hình mới
+     * và kẹp vị trí ngang trong giới hạn canvas.
+     * @param {number} w  - Chiều rộng canvas mới
+     * @param {number} h  - Chiều cao canvas mới
+     * @param {number} cx - Tâm ngang mới
+     * @param {number} cy - Tâm dọc mới
+     */
+    onResize(w, h, cx, cy) {
+        if (!this.paddle) return;
+        this.paddle.y = Math.max(0, h - 40);
+        this.paddle.x = Math.max(0, Math.min(this.paddle.x, w - this.paddle.width));
+        this._mouseX = Math.max(0, Math.min(this._mouseX, w));
+    }
+
+    /**
      * Ánh xạ Level (1..10) → Thông số vật lý nội bộ.
      * Level càng cao: hạt rơi nhanh hơn, thanh hứng hẹp hơn, hạt nhỏ hơn, sinh hạt dày hơn.
      * @param {number|string} level - Cấp độ người dùng chọn (mặc định 1)
@@ -85,8 +101,11 @@ class CatchGame extends BinocularGameEngine {
      */
     _applyLevel(level) {
         const lvl = Math.max(1, Math.min(10, parseInt(level, 10) || 1));
-        // Tốc độ rơi: L1 = 3 px/frame → L10 = 7 px/frame
-        this.fallSpeedPx = Math.min(7, Math.round((3 + (lvl - 1) * 0.45) * 10) / 10);
+        // Tốc độ rơi: L1 = 3 px/frame (@60fps) → L10 = 7 px/frame
+        // [A1] Chuẩn hóa Delta-time: chuyển sang vận tốc px/s (×60) để
+        // tốc độ rơi đồng nhất trên mọi refresh rate (60Hz / 144Hz).
+        const pxPerFrame = Math.min(7, Math.round((3 + (lvl - 1) * 0.45) * 10) / 10);
+        this.fallSpeedPxPerSec = pxPerFrame * 60;
         // Thanh hứng: L1 = 120px → L10 = 60px
         this.paddle.width = Math.max(60, Math.round(120 - (lvl - 1) * 6.67));
         // Kích thước hạt: L1 = 34px → L10 = 20px
@@ -109,8 +128,9 @@ class CatchGame extends BinocularGameEngine {
     /**
      * Cập nhật logic vật lý, điểm số và thuật toán Cầu thang Thích ứng
      * Bao gồm: sinh hạt theo thời gian, cập nhật paddle theo chuột, va chạm AABB
+     * @param {number} dt - Delta-time (giây) từ Engine [A1]
      */
-    update() {
+    update(dt = 0) {
         if (this.gameOver) return;
 
         // 1. Kiểm tra điều kiện kết thúc: Đạt điểm mục tiêu
@@ -142,7 +162,8 @@ class CatchGame extends BinocularGameEngine {
             const d = this.drops[i];
 
             // --- Động học: Cho hạt rơi xuống (tăng trục y) ---
-            d.y += this.fallSpeedPx; // Tốc độ rơi theo Level (@ 60fps)
+            // [A1] Vận tốc px/s × dt(giây) — tốc độ rơi đồng nhất 60Hz/144Hz
+            d.y += this.fallSpeedPxPerSec * dt;
 
             // --- AABB Collision Detection: Va chạm drop ↔ paddle ---
             // Kiểm tra giao cắt giữa hình chữ nhật drop và hình chữ nhật paddle

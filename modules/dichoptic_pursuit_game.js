@@ -84,9 +84,27 @@ class DichopticPursuitGame extends BinocularGameEngine {
         this._lastErrorSound = 0;
 
         // --- Thời gian ---
-        this._lastFrameTime = 0;
         this._timeOffset = 0;
         this._endTime = 0;
+    }
+
+    /**
+     * [AUTO-CENTER] Khi cửa sổ đổi kích thước: neo lại Tàu ở nửa dưới
+     * màn hình mới và cấp lại bộ đệm đường ray theo chiều cao mới.
+     * @param {number} w  - Chiều rộng canvas mới
+     * @param {number} h  - Chiều cao canvas mới
+     * @param {number} cx - Tâm ngang mới
+     * @param {number} cy - Tâm dọc mới
+     */
+    onResize(w, h, cx, cy) {
+        if (this.canvas) {
+            this.targetY = h * 0.75;
+            this.targetX = Math.max(0, Math.min(this.targetX, w));
+        }
+        // [C10] Cấp lại bộ đệm đúng kích thước mới (chỉ khi thực sự thay đổi)
+        if (!this.pathXArray || this.pathXArray.length !== h + 1) {
+            this.pathXArray = new Array(h + 1).fill(cx);
+        }
     }
 
     /**
@@ -130,7 +148,6 @@ class DichopticPursuitGame extends BinocularGameEngine {
         this.inBoundsFrames = 0;
         this.outOfBoundsHits = 0;
         this._timeOffset = 0;
-        this._lastFrameTime = performance.now();
         this._endTime = Date.now() + this.durationMs;
 
         // --- Khởi tạo AudioContext sớm (sau cử chỉ người dùng) ---
@@ -215,25 +232,24 @@ class DichopticPursuitGame extends BinocularGameEngine {
 
     /**
      * Cập nhật logic mỗi frame:
-     * - Tăng timeOffset (trôi đường ray)
-     * - Cập nhật mảng pathXArray
+     * - Tăng timeOffset (trôi đường ray) theo Delta-time [A1]
+     * - Cập nhật mảng pathXArray [C10: Buffer reuse — chỉ cấp lại khi resize]
      * - Đánh giá va chạm Tàu ↔ băng đường ray tại Y
      * - Kiểm tra hết thời lượng
+     * @param {number} dt - Delta-time (giây) từ Engine
      */
-    update() {
+    update(dt = 0) {
         const now = performance.now();
-        let dt = (now - this._lastFrameTime) / 1000;
-        if (dt <= 0) dt = 1 / 60;
-        if (dt > 0.1) dt = 0.1; // Chống nhảy khung khi tab ẩn
-        this._lastFrameTime = now;
 
-        // Trôi timeOffset
+        // Trôi timeOffset: speedFactor (rad/s) × dt
         this._timeOffset += this.speedFactor * dt;
 
         // Cập nhật mảng tọa độ X dọc trục Y
+        // [C10] Tái sử dụng bộ đệm — không cấp phát new Array() mỗi frame,
+        // chỉ cấp lại khi chiều cao canvas thay đổi (resize).
         const h = this.canvas.height;
-        if (this.pathXArray.length <= h) {
-            this.pathXArray = new Array(h + 1).fill(this.canvas.width / 2);
+        if (!this.pathXArray || this.pathXArray.length !== h + 1) {
+            this.pathXArray = new Array(h + 1);
         }
         for (let y = 0; y <= h; y++) {
             this.pathXArray[y] = this._pathXAt(y);

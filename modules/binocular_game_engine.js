@@ -62,6 +62,7 @@ class BinocularGameEngine {
         this.canvas = document.createElement('canvas');
 
         // --- Tiêm CSS nội tuyến ép buộc hiển thị ---
+        // Responsive 100% Container: canvas luôn tràn khít #workspace-therapeutic
         this.workspaceContainer.style.position = 'relative';
 
         this.canvas.style.position = 'absolute';
@@ -69,33 +70,107 @@ class BinocularGameEngine {
         this.canvas.style.left = '0';
         this.canvas.style.width = '100%';
         this.canvas.style.height = '100%';
+        this.canvas.style.display = 'block';
         this.canvas.style.zIndex = '999';
 
         this.workspaceContainer.appendChild(this.canvas);
 
-        // --- Cập nhật độ phân giải nội tại (Resolution) ---
-        this.canvas.width = this.workspaceContainer.clientWidth || window.innerWidth;
-        this.canvas.height = this.workspaceContainer.clientHeight || window.innerHeight;
-
         this.ctx = this.canvas.getContext('2d');
 
-        // --- Resize handler để đồng bộ canvas khi đổi kích thước màn hình/Fullscreen ---
+        // --- [B5] Nút thoát ảo cho thiết bị cảm ứng (Touch) ---
+        // Nằm đè lên Canvas góc trên-phải, z-index cao hơn canvas (999).
+        // Gọi stop() → Engine tự đóng gói dữ liệu EMR dở dang (cờ interrupted).
+        this._createExitButton();
+
+        // --- RESPONSIVE 100% CONTAINER ---
+        // Gán giá trị THỰC từ container (không còn kích thước cứng 1920x1080/16:9).
+        // Scale Lock 1:1 (không DPR, không kéo giãn) → vật thể hình tròn luôn tròn.
+        this.width = 0;
+        this.height = 0;
+        this.cx = 0;
+        this.cy = 0;
+        this._engineReady = false;   // Chặn hook onResize() chạy khi subclass chưa khởi tạo xong
+        this._resizeCanvas();
+        this._engineReady = true;
+
+        // --- Lắng nghe Resize (Auto-center) ---
+        // Debounce bằng requestAnimationFrame; khi cửa sổ đổi kích thước,
+        // cập nhật lại canvas + tâm màn hình (cx, cy) cho toàn bộ subclass.
+        this._resizeQueued = false;
         this.resizeHandler = () => {
-            if (this.canvas && this.workspaceContainer) {
-                this.canvas.width = this.workspaceContainer.clientWidth;
-                this.canvas.height = this.workspaceContainer.clientHeight;
-                this.ctx = this.canvas.getContext('2d');
-            }
+            if (this._resizeQueued) return;
+            this._resizeQueued = true;
+            requestAnimationFrame(() => {
+                this._resizeQueued = false;
+                this._resizeCanvas();
+            });
         };
         window.addEventListener('resize', this.resizeHandler);
 
         // --- Render loop ---
         this._running = false;
         this._boundUpdate = this._updateLoop.bind(this);
+
+        // --- [A2] Chống thất thoát EMR: đánh dấu phiên đã báo cáo chưa ---
+        this._sessionFinished = false;
+
+        // --- [A1] Delta-time: mốc timestamp frame trước (ms) ---
+        this._lastFrameTs = 0;
+        this.dt = 0;
+    }
+
+    /**
+     * [B5] Tạo nút "✖ Thoát" ảo đè lên Canvas (góc trên-phải).
+     * Phục vụ thiết bị Touch không có bàn phím (ESC). Kích thước 48x48px
+     * đủ lớn cho ngón tay, z-index 1100 > canvas (999).
+     * @private
+     */
+    _createExitButton() {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.setAttribute('aria-label', 'Thoát bài tập');
+        btn.textContent = '✖';
+        btn.style.cssText = [
+            'position:absolute', 'top:10px', 'right:10px',
+            'width:48px', 'height:48px',
+            'z-index:1100',
+            'background:rgba(15,23,42,0.55)', 'color:#ffffff',
+            'border:2px solid rgba(255,255,255,0.4)', 'border-radius:50%',
+            'font-size:22px', 'line-height:1',
+            'cursor:pointer', 'touch-action:manipulation',
+            '-webkit-user-select:none', 'user-select:none'
+        ].join(';');
+
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this._requestExit();
+        });
+
+        this.workspaceContainer.appendChild(btn);
+        this.exitButton = btn;
+    }
+
+    /**
+     * [B5] Yêu cầu thoát sớm từ nút ảo:
+     * stop() sẽ tự dispatch bản ghi EMR dở dang (cờ interrupted),
+     * sau đó rời fullscreen để Controller dọn workspace.
+     * @private
+     */
+    _requestExit() {
+        if (this._running) {
+            this.stop();
+        }
+        if (document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+        }
     }
 
     /**
      * Đọc dữ liệu hiệu chuẩn từ localStorage
+     * [SCALE LOCK] Ưu tiên Credit-Card Calibration (localStorage);
+     * nếu chưa có, fallback về nguồn PPI y khoa toàn cục window.__calibrator
+     * (DisplayCalibrator) — KHÔNG tạo kích thước cứng riêng cho game.
      * @returns {{ pixelsPerMm: number, viewingDistanceCm: number }}
      * @private
      */
@@ -105,7 +180,43 @@ class BinocularGameEngine {
         if (ccPxPerMm && parseFloat(ccPxPerMm) > 0) result.pixelsPerMm = parseFloat(ccPxPerMm);
         const distanceM = localStorage.getItem('vision-therapy-calibrate-distance-m');
         if (distanceM && parseFloat(distanceM) > 0) result.viewingDistanceCm = parseFloat(distanceM) * 100;
+
+        // Fallback: hiệu chuẩn toàn cục (khớp thứ tự ưu tiên trong main.js)
+        if (typeof window !== 'undefined' && window.__calibrator) {
+            const cal = window.__calibrator;
+            // [CỰ LY KHÁM] distanceM "đang hoạt động" trên window.__calibrator
+            // LUÔN được ưu tiên hơn giá trị localStorage: main.js /
+            // startTherapyModule() tự chuyển đổi cự ly theo nhóm bài, đảm bảo
+            // game huấn luyện (M1-M13) dùng mốc Nhìn Gần (40cm), không phải 4m.
+            if (cal.distanceM > 0) {
+                result.viewingDistanceCm = cal.distanceM * 100;
+            }
+            if (!result.pixelsPerMm && cal.pxPerMm > 0) {
+                result.pixelsPerMm = cal.pxPerMm;
+            }
+            if (!result.pixelsPerMm && cal.ppi > 0) {
+                result.pixelsPerMm = cal.ppi / 25.4; // PPI → px/mm (MM_PER_INCH)
+            }
+            if (!result.viewingDistanceCm && cal.distanceNearM > 0) {
+                result.viewingDistanceCm = cal.distanceNearM * 100;
+            }
+        }
         return result;
+    }
+
+    /**
+     * [SCALE LOCK] Hệ số co giãn CSS của canvas (pixel vật lý / pixel nội tại).
+     * Canvas được khóa tỷ lệ 1:1 với container (canvas.width == clientWidth)
+     * nên hệ số luôn == 1 — đảm bảo các hệ số vật lý (pixelsPerMm / ppi)
+     * không bị bóp méo theo trục khi màn hình đổi kích thước/tỷ lệ.
+     * @returns {{ x: number, y: number }}
+     */
+    _canvasScale() {
+        if (!this.canvas || !this.canvas.clientWidth || !this.canvas.width) return { x: 1, y: 1 };
+        return {
+            x: this.canvas.clientWidth / this.canvas.width,
+            y: this.canvas.clientHeight / this.canvas.height
+        };
     }
 
     /**
@@ -127,7 +238,7 @@ class BinocularGameEngine {
     // 1. Chuyển Lăng kính thành Pixel nội tại (Dùng để set logic)
     diopterToPixels(prismDiopter) {
         if (!this.calibration || !this.calibration.pixelsPerMm) return 0;
-        const scaleX = this.canvas ? (this.canvas.clientWidth / this.canvas.width) : 1;
+        const scaleX = this._canvasScale().x; // Scale Lock: khử co giãn CSS (== 1 khi canvas khớp container)
         const targetPhysicalPx = prismDiopter * (this.calibration.viewingDistanceCm / 100) * 10 * this.calibration.pixelsPerMm;
         return targetPhysicalPx / scaleX;
     }
@@ -144,7 +255,7 @@ class BinocularGameEngine {
     // 2. Chuyển Pixel nội tại thành Lăng kính thực tế (Dùng để báo cáo kết quả M3)
     pixelsToDiopter(pixels) {
         if (!this.calibration || !this.calibration.pixelsPerMm) return 0;
-        const scaleX = this.canvas ? (this.canvas.clientWidth / this.canvas.width) : 1;
+        const scaleX = this._canvasScale().x; // Scale Lock
         const physicalPixels = pixels * scaleX;
         return physicalPixels / ((this.calibration.viewingDistanceCm / 100) * 10 * this.calibration.pixelsPerMm);
     }
@@ -164,7 +275,7 @@ class BinocularGameEngine {
     // 3. Chuyển Pixel nội tại thành Góc thị giác thực tế (Dùng để báo cáo kết quả M2)
     pixelsToVisualAngle(pixels) {
         if (!this.calibration || !this.calibration.pixelsPerMm || !this.calibration.viewingDistanceCm) return 0;
-        const scaleX = this.canvas ? (this.canvas.clientWidth / this.canvas.width) : 1;
+        const scaleX = this._canvasScale().x; // Scale Lock
         const physicalSizeMm = (pixels * scaleX) / this.calibration.pixelsPerMm;
         const viewingDistanceMm = this.calibration.viewingDistanceCm * 10;
         const angleRadian = 2 * Math.atan(physicalSizeMm / (2 * viewingDistanceMm));
@@ -184,7 +295,7 @@ class BinocularGameEngine {
      */
     pixelsToArcsec(pixels) {
         if (!this.calibration || !this.calibration.pixelsPerMm || !this.calibration.viewingDistanceCm) return 0;
-        const scaleX = this.canvas ? (this.canvas.clientWidth / this.canvas.width) : 1;
+        const scaleX = this._canvasScale().x; // Scale Lock
         const physicalSizeMm = (pixels * scaleX) / this.calibration.pixelsPerMm;
         const viewingDistanceMm = this.calibration.viewingDistanceCm * 10;
         return (physicalSizeMm / viewingDistanceMm) * (180 / Math.PI) * 3600;
@@ -202,7 +313,7 @@ class BinocularGameEngine {
      */
     arcsecToPixels(arcsec) {
         if (!this.calibration || !this.calibration.pixelsPerMm || !this.calibration.viewingDistanceCm) return 0;
-        const scaleX = this.canvas ? (this.canvas.clientWidth / this.canvas.width) : 1;
+        const scaleX = this._canvasScale().x; // Scale Lock
         const viewingDistanceMm = this.calibration.viewingDistanceCm * 10;
         const physicalSizeMm = (arcsec * viewingDistanceMm) / ((180 / Math.PI) * 3600);
         return (physicalSizeMm * this.calibration.pixelsPerMm) / scaleX;
@@ -242,6 +353,11 @@ class BinocularGameEngine {
     start() {
         this.sessionMetrics.startTime = Date.now();
         this._running = true;
+
+        // [A1] Reset đồng hồ Delta-time + cờ báo cáo EMR cho phiên mới
+        this._lastFrameTs = 0;
+        this._sessionFinished = false;
+
         this._boundUpdate();
 
         // Lắng nghe SPA workspace change event
@@ -252,8 +368,10 @@ class BinocularGameEngine {
     /**
      * Phát ra CustomEvent để EMR system tự lưu trữ dữ liệu
      * Không gọi this.stop() hoặc render UI tại đây
+     * [A2] Đánh dấu _sessionFinished để stop() không ghi đè bản ghi hoàn chỉnh
      */
     finishSession() {
+        this._sessionFinished = true;
         const duration = Date.now() - (this.sessionMetrics.startTime || Date.now());
         document.dispatchEvent(new CustomEvent('onTherapeuticSessionEnd', {
             detail: {
@@ -267,15 +385,35 @@ class BinocularGameEngine {
     }
 
     /**
+     * [A2] Đóng gói dữ liệu dở dang khi phiên bị ngắt giữa chừng
+     * (nút ✖, ESC/fullscreen exit, chuyển workspace) — đảm bảo EMR
+     * luôn nhận được bản ghi với cờ metrics.interrupted = true.
+     * @private
+     */
+    _finishInterrupted() {
+        this.sessionMetrics.interrupted = true;
+        this.sessionMetrics.endReason = 'interrupted';
+        this.finishSession();
+    }
+
+    /**
      * Dừng render loop và dọn dẹp
      */
     stop() {
+        // [A2] Chống thất thoát dữ liệu EMR:
+        // Nếu phiên đang chạy mà chưa từng finishSession() → tự đóng gói
+        // dữ liệu dở dang với cờ interrupted = true trước khi hủy.
+        if (this._running && !this._sessionFinished) {
+            this._finishInterrupted();
+        }
+
         this._running = false;
         if (this._animationFrameId) {
             cancelAnimationFrame(this._animationFrameId);
         }
 
-        // Dọn dẹp resize listener
+        // Dọn dẹp resize listener (debounce rAF sẽ tự bỏ qua vì canvas đã rời DOM)
+        this._resizeQueued = false;
         if (this.resizeHandler) {
             window.removeEventListener('resize', this.resizeHandler);
         }
@@ -288,6 +426,11 @@ class BinocularGameEngine {
         // Xóa canvas khỏi DOM
         if (this.canvas && this.canvas.parentNode) {
             this.canvas.parentNode.removeChild(this.canvas);
+        }
+
+        // [B5] Xóa nút thoát ảo khỏi DOM
+        if (this.exitButton && this.exitButton.parentNode) {
+            this.exitButton.parentNode.removeChild(this.exitButton);
         }
     }
 
@@ -302,30 +445,73 @@ class BinocularGameEngine {
     }
 
     /**
-     * Resize canvas theo kích thước container
+     * [RESPONSIVE 100% CONTAINER + AUTO-CENTER]
+     * Đồng bộ canvas với kích thước THỰC của #workspace-therapeutic:
+     * - canvas.width  = container.clientWidth
+     * - canvas.height = container.clientHeight
+     * - Cập nhật tâm màn hình this.cx / this.cy → mọi subclass tự căn giữa lại
+     * - Gọi hook onResize() để subclass di dời vật thể đang cache tọa độ
+     *
+     * [SCALE LOCK]: Không nhân DPR, không ép tỷ lệ cố định → canvas luôn khớp
+     * 1:1 với CSS box. Nhờ đó các hệ số vật lý (pixelsPerMm / __calibrator.ppi)
+     * không bị bóp méo (distortion) khi màn hình đổi tỷ lệ.
      */
     _resizeCanvas() {
-        const rect = this.workspaceContainer.getBoundingClientRect();
-        const dpr = window.devicePixelRatio || 1;
-        this.canvas.width = rect.width * dpr;
-        this.canvas.height = rect.height * dpr;
-        this.canvas.style.width = `${rect.width}px`;
-        this.canvas.style.height = `${rect.height}px`;
-        this.ctx.scale(dpr, dpr);
+        if (!this.canvas || !this.workspaceContainer) return;
 
-        // Lưu kích thước logic (không DPR)
-        this.width = rect.width;
-        this.height = rect.height;
+        const rect = this.workspaceContainer.getBoundingClientRect();
+        const w = Math.max(1, this.workspaceContainer.clientWidth
+            || Math.round(rect.width) || window.innerWidth || 0);
+        const h = Math.max(1, this.workspaceContainer.clientHeight
+            || Math.round(rect.height) || window.innerHeight || 0);
+
+        if (this.canvas.width !== w) this.canvas.width = w;
+        if (this.canvas.height !== h) this.canvas.height = h;
+
+        // Kích thước logic (không DPR) + tâm màn hình dùng chung cho 13 module
+        this.width = w;
+        this.height = h;
+        this.cx = w / 2;
+        this.cy = h / 2;
+
+        // Auto-center: thông báo subclass có vật thể cache tọa độ tuyệt đối
+        if (this._engineReady && typeof this.onResize === 'function') {
+            this.onResize(w, h, this.cx, this.cy);
+        }
+    }
+
+    /**
+     * [AUTO-CENTER] Hook được gọi sau mỗi lần canvas đổi kích thước.
+     * Subclass ghi đè để di dời vật thể đã cache (VD: thanh hứng M1 sát đáy).
+     * @param {number} w  - Chiều rộng canvas mới (px)
+     * @param {number} h  - Chiều cao canvas mới (px)
+     * @param {number} cx - Tâm ngang mới (px)
+     * @param {number} cy - Tâm dọc mới (px)
+     */
+    onResize(w, h, cx, cy) {
+        // Mặc định không làm gì (subclass override)
     }
 
     /**
      * Render loop nội bộ
-     * Gọi update() → render() mỗi frame
+     * Gọi update(dt) → render() mỗi frame
+     *
+     * [A1] VẬT LÝ THỜI GIAN THỰC (Delta-time):
+     * - dt = (timestamp - lastTimestamp) / 1000 (giây) từ rAF
+     * - Clamp tối đa 0.1s: chống nhảy khung khi tab ẩn / máy giật lag
+     * - Frame đầu tiên: mặc định 1/60s
+     * → Tốc độ vật tiêu đồng nhất trên mọi refresh rate (60Hz/144Hz)
      */
-    _updateLoop() {
+    _updateLoop(timestamp) {
         if (!this._running) return;
 
-        this.update();
+        let dt = this._lastFrameTs ? (timestamp - this._lastFrameTs) / 1000 : 0;
+        this._lastFrameTs = timestamp;
+        if (!(dt > 0)) dt = 1 / 60;
+        if (dt > 0.1) dt = 0.1;
+        this.dt = dt;
+
+        this.update(dt);
         this.render();
 
         this._animationFrameId = requestAnimationFrame(this._boundUpdate);
@@ -334,8 +520,9 @@ class BinocularGameEngine {
     /**
      * Phương thức con ghi đè: Cập nhật logic game mỗi frame
      * Mặc định: không làm gì (subclass override)
+     * @param {number} dt - Delta-time (giây) từ vòng lặp Engine [A1]
      */
-    update() {
+    update(dt = 0) {
         // Override trong subclass
     }
 

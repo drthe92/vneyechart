@@ -16,7 +16,9 @@ import BinocularGameEngine from './binocular_game_engine.js';
 
 // ============================================================
 // BẢNG ĐỘ KHÓ 10 MỨC (M4) — nguồn chân lý cấu hình độ khó
-// sizePx   : Đường kính mục tiêu (px trên màn hình)
+// [A4] sizeDeg : Đường kính mục tiêu theo GÓC THỊ GIÁC tuyệt đối (°)
+//   — quy đổi sang px thực tế bằng this.arcsecToPixels() của Engine
+//   theo hiệu chuẩn màn hình (kích thước vật lý không đổi giữa các máy).
 // distance : 'short' = mọc gần chấm cũ (quanh trung tâm)
 //            'medium' = bán kính mở rộng nửa màn hình
 //            'full'   = ngẫu nhiên toàn màn hình (nhảy chéo góc)
@@ -25,16 +27,16 @@ import BinocularGameEngine from './binocular_game_engine.js';
 //              Infinity = chờ vô hạn (Chặng 1 — chưa tạo áp lực thời gian)
 // ============================================================
 const M4_LEVELS = [
-    { level: 1,  sizePx: 150, distance: 'short',  timeLimitMs: Infinity },
-    { level: 2,  sizePx: 120, distance: 'medium', timeLimitMs: Infinity },
-    { level: 3,  sizePx: 90,  distance: 'full',   timeLimitMs: Infinity },
-    { level: 4,  sizePx: 90,  distance: 'full',   timeLimitMs: 3000 },
-    { level: 5,  sizePx: 90,  distance: 'full',   timeLimitMs: 2000 },
-    { level: 6,  sizePx: 60,  distance: 'full',   timeLimitMs: 2000 },
-    { level: 7,  sizePx: 60,  distance: 'cross',  timeLimitMs: 1500 },
-    { level: 8,  sizePx: 40,  distance: 'cross',  timeLimitMs: 1200 },
-    { level: 9,  sizePx: 30,  distance: 'full',   timeLimitMs: 1000 },
-    { level: 10, sizePx: 30,  distance: 'cross',  timeLimitMs: 800 }
+    { level: 1,  sizeDeg: 4.5, distance: 'short',  timeLimitMs: Infinity },
+    { level: 2,  sizeDeg: 3.6, distance: 'medium', timeLimitMs: Infinity },
+    { level: 3,  sizeDeg: 2.7, distance: 'full',   timeLimitMs: Infinity },
+    { level: 4,  sizeDeg: 2.7, distance: 'full',   timeLimitMs: 3000 },
+    { level: 5,  sizeDeg: 2.7, distance: 'full',   timeLimitMs: 2000 },
+    { level: 6,  sizeDeg: 1.8, distance: 'full',   timeLimitMs: 2000 },
+    { level: 7,  sizeDeg: 1.8, distance: 'cross',  timeLimitMs: 1500 },
+    { level: 8,  sizeDeg: 1.2, distance: 'cross',  timeLimitMs: 1200 },
+    { level: 9,  sizeDeg: 0.9, distance: 'full',   timeLimitMs: 1000 },
+    { level: 10, sizeDeg: 0.9, distance: 'cross',  timeLimitMs: 800 }
 ];
 
 const M4_DISTANCE_LABELS = {
@@ -65,8 +67,10 @@ class SaccadicTrackingGame extends BinocularGameEngine {
         this.level = 1;               // Cấp độ hiện tại (1..10) — gamify
         this.targetLifetimeMs = Infinity; // Thời gian chờ mỗi mục tiêu (ms); Infinity = vô hạn — set theo bảng M4_LEVELS
 
-        // --- Kích thước mục tiêu vật lý: 5mm trên màn hình ---
-        const pixelsPerMm = this.calibration?.pixelsPerMm || 3.78;
+        // --- Kích thước mục tiêu vật lý: 5mm trên màn hình (trước khi áp Level) ---
+        // [A4] Dùng hệ số hiệu chuẩn của Engine (pixelsPerMm) + Scale Lock,
+        // không còn hardcode 3.78.
+        const pixelsPerMm = this.calibration.pixelsPerMm;
         const cssScaleFactor = this.canvas ? this.canvas.width / this.canvas.clientWidth : 1;
         this.targetRadius = 5 * pixelsPerMm * cssScaleFactor;
 
@@ -76,7 +80,8 @@ class SaccadicTrackingGame extends BinocularGameEngine {
 
     /**
      * Ánh xạ Level (1..10) → Cấu hình độ khó theo bảng M4_LEVELS.
-     * Cấu hình gồm: kích thước (đường kính px), biên độ xuất hiện, thời gian chờ.
+     * Cấu hình gồm: kích thước (góc thị giác → px thực tế), biên độ xuất hiện,
+     * thời gian chờ.
      * @param {number|string} level - Cấp độ người dùng chọn (mặc định 1)
      * @returns {number} Level hợp lệ (clamp 1..10)
      */
@@ -86,8 +91,10 @@ class SaccadicTrackingGame extends BinocularGameEngine {
         this.level = lvl;
         // Số lượng mục tiêu: L1 = 20 → L10 = 60 (độ dài phiên)
         this.maxHits = Math.min(60, Math.max(20, Math.round(20 + (lvl - 1) * 4.44)));
-        // Kích thước mục tiêu (bán kính = đường kính / 2) theo bảng
-        this.targetRadius = Math.max(15, cfg.sizePx / 2);
+        // [A4] Kích thước mục tiêu: đường kính theo góc thị giác (°) →
+        // px thực tế qua arcsecToPixels (bán kính = đường kính / 2)
+        const diameterPx = Math.max(20, Math.round(this.arcsecToPixels(cfg.sizeDeg * 3600)));
+        this.targetRadius = diameterPx / 2;
         this.distanceMode = cfg.distance;
         this.targetLifetimeMs = cfg.timeLimitMs; // Infinity = chờ vô hạn (Chặng 1)
         // Padding an toàn để mục tiêu nằm gọn trong viền canvas

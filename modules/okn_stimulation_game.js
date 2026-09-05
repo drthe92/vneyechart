@@ -64,7 +64,6 @@ class OKNStimulationGame extends BinocularGameEngine {
 
         // --- Trạng thái đồ họa ---
         this.offsetX = 0;                 // Dịch chuyển sọc tích lũy (px)
-        this._lastTime = 0;
 
         // --- Trạng thái đốm sáng ---
         this._target = null;              // { x, y, r, bornAt, expiresAt, vx }
@@ -117,7 +116,6 @@ class OKNStimulationGame extends BinocularGameEngine {
         this.targetsHit = 0;
         this._reactionTimes = [];
         this.offsetX = 0;
-        this._lastTime = 0;
         this._target = null;
 
         // Khởi tạo AudioContext sớm (sau cử chỉ click của người dùng)
@@ -196,21 +194,22 @@ class OKNStimulationGame extends BinocularGameEngine {
 
     /**
      * Cập nhật logic mỗi frame
+     * [A1] Dùng Delta-time (giây) do Engine cung cấp — tốc độ trôi sọc
+     * (stripeSpeed: px/s) và đốm sáng (vx: px/s) đồng nhất mọi refresh rate.
+     * @param {number} dt - Delta-time (giây)
      */
-    update() {
+    update(dt = 0) {
         if (!this._running) return;
 
         const now = performance.now();
-        const dt = this._lastTime ? (now - this._lastTime) : 16;
-        this._lastTime = now;
 
-        // A. Dịch chuyển sọc (trôi vô tận)
-        this.offsetX += this.stripeSpeed * (dt / 1000);
+        // A. Dịch chuyển sọc (trôi vô tận) — px/s × dt
+        this.offsetX += this.stripeSpeed * dt;
 
-        // B. Cập nhật vị trí đốm sáng (trôi ngược chiều)
+        // B. Cập nhật vị trí đốm sáng (trôi ngược chiều) — px/s × dt
         if (this._target) {
             const cw = this.canvas.width;
-            this._target.x += this._target.vx * (dt / 1000);
+            this._target.x += this._target.vx * dt;
             // Giữ đốm nằm trong màn hình
             if (this._target.x < this._target.r) {
                 this._target.x = this._target.r;
