@@ -211,9 +211,114 @@ function _coerceNumeric(val) {
     return isFinite(n) ? n : null;
 }
 
+/**
+ * Thêm 1 điểm dữ liệu vào dynamicSeries.
+ * @param {string} gName - tên game/module
+ * @param {string} metricKey - khóa chỉ số lâm sàng
+ * @param {number} num - giá trị đã ép kiểu số
+ * @param {number} dateMs - timestamp (ms)
+ * @param {number} durationSec - thời lượng phiên (giây)
+ * @param {Object} fullSessionMetrics - toàn bộ chỉ số của phiên (cho tooltip)
+ */
+function _appendPoint(gName, metricKey, num, dateMs, durationSec, fullSessionMetrics) {
+    const seriesKey = `${gName}_${metricKey}`;
+    if (!dynamicSeries[seriesKey]) {
+        const mNo = _moduleNumberFromGameName(gName);
+        dynamicSeries[seriesKey] = {
+            gameName: gName,
+            metricKey: metricKey,
+            groupKey: mNo !== null ? String(mNo) : gName,
+            groupLabel: mNo !== null ? (MODULE_LABELS[mNo] || `Module ${mNo}`) : gName,
+            labels: [],
+            dataPoints: [],
+            timestamps: [],
+            durations: [],
+            sessionMetrics: []
+        };
+    }
+    const s = dynamicSeries[seriesKey];
+    s.labels.push(new Date(dateMs).toLocaleDateString('vi-VN'));
+    s.dataPoints.push(num);
+    s.timestamps.push(dateMs);
+    s.durations.push(durationSec);
+    s.sessionMetrics.push({ ...fullSessionMetrics });
+}
+
+/** Loại bỏ series chưa đủ 2 phiên (không vẽ được đường biểu đồ) */
+function _pruneShortSeries() {
+    for (const key in dynamicSeries) {
+        if (dynamicSeries[key].dataPoints.length < 2) {
+            delete dynamicSeries[key];
+        }
+    }
+}
+
+/**
+ * PWA OFFline-FIRST: đọc EMR từ localStorage (emr_patient_sessions) trước.
+ * - Lọc session thuộc currentPatientId.
+ * - Ghi nhận timestamp local theo từng series để chống trùng lặp khi merge Firebase.
+ */
+function _loadLocalEmr(patientId, localTimestampsBySeries) {
+    let sessions = [];
+    try {
+        sessions = JSON.parse(localStorage.getItem('emr_patient_sessions') || '[]');
+    } catch (e) {
+        sessions = [];
+    }
+
+    for (const s of sessions) {
+        if (!s || s.patientId !== patientId) continue;
+        const records = Array.isArray(s.therapy_records) ? s.therapy_records : [];
+
+        for (const rec of records) {
+            if (!rec || !rec.timestamp) continue;
+            const dateMs = typeof rec.timestamp === 'number'
+                ? rec.timestamp
+                : new Date(rec.timestamp).getTime();
+            if (isNaN(dateMs)) continue;
+
+            const gName = rec.gameName || 'Bài tập';
+            const durationSec = Number(rec.durationSeconds) || 0;
+
+            // Bản ghi local lưu metrics dạng { customData: {...} } — bóc lớp customData
+            const rawMetrics = (rec.metrics && typeof rec.metrics === 'object') ? rec.metrics : {};
+            const metricSource = (rawMetrics.customData && typeof rawMetrics.customData === 'object')
+                ? rawMetrics.customData
+                : rawMetrics;
+
+            const sessionMetrics = {};
+            for (const [key, val] of Object.entries(metricSource)) {
+                const num = _coerceNumeric(val);
+                if (num !== null) sessionMetrics[key] = num;
+            }
+
+            for (const [key, num] of Object.entries(sessionMetrics)) {
+                const seriesKey = `${gName}_${key}`;
+                if (!localTimestampsBySeries.has(seriesKey)) {
+                    localTimestampsBySeries.set(seriesKey, []);
+                }
+                localTimestampsBySeries.get(seriesKey).push(dateMs);
+                _appendPoint(gName, key, num, dateMs, durationSec, sessionMetrics);
+            }
+        }
+    }
+}
+
 async function fetchFirebaseData() {
     const patientId = localStorage.getItem("currentPatientId");
-    if (!patientId || !window.db) return;
+    if (!patientId) return;
+
+    dynamicSeries = {};
+    const localTimestampsBySeries = new Map();
+
+    // 1. LOCAL-FIRST: nạp dữ liệu lưu trên máy — hoạt động cả khi mất mạng
+    _loadLocalEmr(patientId, localTimestampsBySeries);
+
+    // 2. FIREBASE: merge nếu có kết nối; offline → giữ nguyên dữ liệu local
+    if (!window.db) {
+        _pruneShortSeries();
+        return;
+    }
 
     try {
         const snapshot = await window.db.collection("Patients")
@@ -221,8 +326,6 @@ async function fetchFirebaseData() {
                                         .collection("Sessions")
                                         .orderBy("timestamp", "asc")
                                         .get();
-        
-        dynamicSeries = {};
 
         snapshot.forEach(doc => {
             const data = doc.data();
@@ -233,53 +336,36 @@ async function fetchFirebaseData() {
                 : new Date(data.timestamp).getTime();
             if (isNaN(dateMs)) return;
 
-            const dateStr = new Date(dateMs).toLocaleDateString('vi-VN');
             const gName = data.gameName || "Bài tập";
             const durationSec = Number(data.durationSeconds) || 0;
-
             const metricSource = (data.metrics && typeof data.metrics === 'object') ? data.metrics : {};
+
             const sessionMetrics = {};
             for (const [key, val] of Object.entries(metricSource)) {
-                // Ép kiểu chuỗi (VD: '1.0 (10/10)', '< 1/10', 'N/A') sang số thập phân
                 const num = _coerceNumeric(val);
-                if (num !== null) {
-                    sessionMetrics[key] = num;
-                }
+                if (num === null) continue;
+
+                // Chống trùng: bỏ qua điểm đã có ở local (cùng series, lệch ≤ 5 giây)
+                const seriesKey = `${gName}_${key}`;
+                const localTs = localTimestampsBySeries.get(seriesKey) || [];
+                if (localTs.some(t => Math.abs(t - dateMs) <= 5000)) continue;
+
+                sessionMetrics[key] = num;
             }
 
-            for (const [key, val] of Object.entries(sessionMetrics)) {
-                const seriesKey = `${gName}_${key}`;
-                if (!dynamicSeries[seriesKey]) {
-                    const mNo = _moduleNumberFromGameName(gName);
-                    dynamicSeries[seriesKey] = {
-                        gameName: gName,
-                        metricKey: key,
-                        groupKey: mNo !== null ? String(mNo) : gName,
-                        groupLabel: mNo !== null ? (MODULE_LABELS[mNo] || `Module ${mNo}`) : gName,
-                        labels: [],
-                        dataPoints: [],
-                        timestamps: [],
-                        durations: [],
-                        sessionMetrics: []
-                    };
-                }
-                const s = dynamicSeries[seriesKey];
-                s.labels.push(dateStr);
-                s.dataPoints.push(val);
-                s.timestamps.push(dateMs);
-                s.durations.push(durationSec);
-                s.sessionMetrics.push({ ...sessionMetrics });
+            for (const [key, num] of Object.entries(sessionMetrics)) {
+                _appendPoint(gName, key, num, dateMs, durationSec, sessionMetrics);
             }
         });
-
-        for (const key in dynamicSeries) {
-            if (dynamicSeries[key].dataPoints.length < 2) {
-                delete dynamicSeries[key];
-            }
-        }
     } catch (error) {
-        console.error("Lỗi tải dữ liệu biểu đồ:", error);
+        // Offline / mất mạng → vẫn vẽ biểu đồ từ dữ liệu local
+        console.warn("[Dashboard] Firebase không khả dụng — hiển thị dữ liệu lưu trên máy:", error);
+        if (typeof window.showGlobalToast === 'function') {
+            window.showGlobalToast('Đang hiển thị dữ liệu lưu trên máy (Offline)', 'info');
+        }
     }
+
+    _pruneShortSeries();
 }
 
 function buildModuleDropdown() {

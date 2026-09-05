@@ -454,6 +454,8 @@ if (nmEl) nmEl.disabled = false;
         endExamModal = document.createElement('div');
         endExamModal.id = 'end-exam-modal';
         endExamModal.className = 'exam-modal';
+        endExamModal.setAttribute('role', 'dialog');
+        endExamModal.setAttribute('aria-modal', 'true');
         endExamModal.innerHTML = `
             <div class="exam-modal-content">
                 <div class="exam-modal-header">
@@ -462,6 +464,7 @@ if (nmEl) nmEl.disabled = false;
                 </div>
                 <div class="exam-modal-body">
                     <p>Bạn muốn thực hiện hành động nào?</p>
+                    <div id="end-exam-vision-summary"></div>
                     <div class="form-actions">
                         <button type="button" class="exam-btn print-btn" id="print-report-btn">In Hồ Sơ</button>
                         <button type="button" class="exam-btn export-pdf-btn" id="btn-export-pdf">Xuất PDF</button>
@@ -506,11 +509,27 @@ if (nmEl) nmEl.disabled = false;
         });
     }
 
+    /**
+     * Nạp tổng hợp Thị lực Nhìn Xa / Nhìn Gần (2 hàng OD/OS/OU riêng biệt)
+     * vào Modal Kết thúc phiên khám trước khi hiển thị.
+     */
+    function populateEndExamVisionSummary() {
+        const container = document.getElementById('end-exam-vision-summary');
+        if (!container) return;
+        if (!window.__currentExam) {
+            container.innerHTML = '';
+            return;
+        }
+        container.innerHTML = buildVisionSummaryHTML(window.__currentExam, false);
+    }
+
     // Create Report Modal
     function createReportModal() {
         reportModal = document.createElement('div');
         reportModal.id = 'report-modal';
         reportModal.className = 'exam-modal';
+        reportModal.setAttribute('role', 'dialog');
+        reportModal.setAttribute('aria-modal', 'true');
         reportModal.innerHTML = `
             <div class="exam-modal-content report-modal-content">
                 <div class="exam-modal-header">
@@ -568,10 +587,151 @@ if (nmEl) nmEl.disabled = false;
         if (!metrics || metrics === 'N/A') return 'N/A';
         if (typeof metrics === 'object') {
             return Object.entries(metrics)
-                .map(([key, value]) => `${key}: ${value}`)
+                .map(([key, value]) => `${escapeHtml(key)}: ${escapeHtml(value)}`)
                 .join('<br>');
         }
-        return String(metrics);
+        return escapeHtml(metrics);
+    }
+
+    // ================================================================
+    //  PHÂN LOẠI THỊ LỰC NHÌN XA / NHÌN GẦN — tách riêng trong Báo cáo
+    // ================================================================
+
+    // Ánh xạ tên bài test (test_type trong exam.results) về nhóm khoảng cách.
+    const VISION_TEST_GROUPS = {
+        FAR: [
+            'LogMAR Distance VA',
+            'ETDRS Distance VA',
+            'Snellen Chart',
+            'Number Chart',
+            'Landolt C',
+            'HOTV Letters',
+            'Tumbling E',
+            'Sloan Letters',
+            'Lea Symbols Circle',
+            'Lea Symbols Heart',
+            'Lea Symbols House',
+            'Lea Symbols Square',
+            'Auckland LogMAR',
+            'Auto Distance VA',
+            'Auto BCVA (Crowding Eval)'
+        ],
+        NEAR: [
+            'Near LogMAR',
+            'Near Lea Symbols',
+            'Near N-Point',
+            'Auto Near VA'
+        ]
+    };
+
+    /**
+     * Phân loại 1 kết quả lâm sàng (exam.results) theo nhóm Nhìn Xa / Nhìn Gần
+     * dựa vào ID/tên bài test, đồng thời trích OD / OS / OU từ clinical_metrics.
+     * @param {Object} result - phần tử trong exam.results
+     * @returns {Object|null} { group: 'FAR'|'NEAR', od, os, ou, timestamp }
+     */
+    function classifyVisionResult(result) {
+        if (!result || !result.test_type) return null;
+        const type = String(result.test_type).trim().toLowerCase();
+
+        let group = null;
+        if (VISION_TEST_GROUPS.FAR.some(n => n.toLowerCase() === type)) {
+            group = 'FAR';
+        } else if (VISION_TEST_GROUPS.NEAR.some(n => n.toLowerCase() === type)) {
+            group = 'NEAR';
+        }
+        if (!group) return null;
+
+        const metrics = result.clinical_metrics || {};
+        let od = null, os = null, ou = null;
+        Object.entries(metrics).forEach(([key, value]) => {
+            const k = String(key).toUpperCase();
+            if (k.startsWith('OU') || k.includes('HAI MẮT') || k.includes('CẢ HAI') || k.includes('CẢ 2 MẮT')) {
+                ou = value;
+            } else if (k.startsWith('OD') || k.includes('MẮT PHẢI')) {
+                od = value;
+            } else if (k.startsWith('OS') || k.includes('MẮT TRÁI')) {
+                os = value;
+            }
+        });
+
+        return { group, od, os, ou, test_type: result.test_type, timestamp: result.timestamp || 0 };
+    }
+
+    /**
+     * Gộp toàn bộ exam.results thành 2 mục: Thị lực Nhìn Xa và Nhìn Gần.
+     * Mỗi mắt (OD/OS/OU) gắn kèm NGUỒN dữ liệu (tên bài test + timestamp),
+     * ưu tiên bản ghi có timestamp MỚI NHẤT cho từng mắt của từng nhóm.
+     * @param {Object} exam
+     * @returns {{ FAR: {od,os,ou}, NEAR: {od,os,ou} }}
+     *          od/os/ou = { value, test_type, timestamp } | null
+     */
+    function buildVisionSummary(exam) {
+        const summary = {
+            FAR: { od: null, os: null, ou: null },
+            NEAR: { od: null, os: null, ou: null }
+        };
+        const results = (exam && Array.isArray(exam.results)) ? exam.results : [];
+
+        const applyLatest = (slot, key, value, c) => {
+            if (value === null || value === undefined || value === '') return;
+            if (!slot[key] || (c.timestamp || 0) >= (slot[key].timestamp || 0)) {
+                slot[key] = {
+                    value: value,
+                    test_type: c.test_type || '',
+                    timestamp: c.timestamp || 0
+                };
+            }
+        };
+
+        for (const r of results) {
+            const c = classifyVisionResult(r);
+            if (!c) continue;
+            const slot = summary[c.group];
+            applyLatest(slot, 'od', c.od, c);
+            applyLatest(slot, 'os', c.os, c);
+            applyLatest(slot, 'ou', c.ou, c);
+        }
+        return summary;
+    }
+
+    /**
+     * Sinh HTML khối "Thị lực Nhìn Xa / Nhìn Gần" — 2 hàng thông tin riêng biệt,
+     * kèm nguồn dữ liệu (tên bài test + giờ đo).
+     * @param {Object} exam
+     * @param {boolean} isPrintMode
+     * @returns {string} HTML (rỗng nếu không có dữ liệu thị lực)
+     */
+    function buildVisionSummaryHTML(exam, isPrintMode) {
+        const summary = buildVisionSummary(exam);
+
+        const formatRow = (label, data) => {
+            const parts = [];
+            if (data.od) parts.push(`OD: ${escapeHtml(data.od.value)}`);
+            if (data.os) parts.push(`OS: ${escapeHtml(data.os.value)}`);
+            if (data.ou) parts.push(`OU: ${escapeHtml(data.ou.value)}`);
+            if (!parts.length) return null;
+
+            // Nguồn: lấy từ mắt có timestamp mới nhất trong hàng
+            const latest = [data.od, data.os, data.ou]
+                .filter(Boolean)
+                .sort((a, b) => b.timestamp - a.timestamp)[0];
+            let source = '';
+            if (latest && latest.test_type) {
+                const srcTime = latest.timestamp
+                    ? new Date(latest.timestamp).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+                    : '';
+                source = `<span class="vision-src">(Nguồn: ${escapeHtml(latest.test_type)}${srcTime ? ' — ' + srcTime : ''})</span>`;
+            }
+            return `<strong>${label}:</strong> ${parts.join(', ')} ${source}`;
+        };
+
+        const farRow = formatRow('Thị lực Nhìn Xa', summary.FAR);
+        const nearRow = formatRow('Thị lực Nhìn Gần', summary.NEAR);
+        if (!farRow && !nearRow) return '';
+
+        const cls = isPrintMode ? 'print-vision-summary' : 'report-vision-summary';
+        return `<div class="${cls}">${[farRow, nearRow].filter(Boolean).join('<br>')}</div>`;
     }
 
     /**
@@ -646,25 +806,35 @@ if (nmEl) nmEl.disabled = false;
         }
 
         // Build patient info rows (supports both old format with patientYOB and legacy format without)
+        // [XSS] Mọi chuỗi nhập tay (họ tên, năm sinh) được escape trước khi chèn vào HTML
         const patientYOB = exam.patientYOB || 'N/A';
         const patientAge = exam.patientAge || 'N/A';
+        const safePatientName = escapeHtml(exam.patientName);
+        const safePatientYOB = escapeHtml(patientYOB);
+        const safePatientAge = escapeHtml(patientAge);
+        const ageSuffix = (patientYOB !== 'N/A' && patientAge !== 'N/A')
+            ? ` (${safePatientAge} tuổi)`
+            : '';
         let patientInfoRows = '';
-        
+
         if (isPrintMode) {
             patientInfoRows = `
-                <tr><td class="label">Họ và tên:</td><td>${exam.patientName}</td></tr>
-                <tr><td class="label">Năm sinh:</td><td>${patientYOB}${patientYOB !== 'N/A' && patientAge !== 'N/A' ? ' (' + patientAge + ' tuổi)' : ''}</td></tr>
+                <tr><td class="label">Họ và tên:</td><td>${safePatientName}</td></tr>
+                <tr><td class="label">Năm sinh:</td><td>${safePatientYOB}${ageSuffix}</td></tr>
                 <tr><td class="label">Ngày khám:</td><td>${formattedDate}</td></tr>
             `;
         } else {
             patientInfoRows = `
-                <tr><td class="label">Họ và tên:</td><td>${exam.patientName}</td></tr>
-                <tr><td class="label">Năm sinh:</td><td>${patientYOB}${patientYOB !== 'N/A' && patientAge !== 'N/A' ? ' (' + patientAge + ' tuổi)' : ''}</td></tr>
+                <tr><td class="label">Họ và tên:</td><td>${safePatientName}</td></tr>
+                <tr><td class="label">Năm sinh:</td><td>${safePatientYOB}${ageSuffix}</td></tr>
                 <tr><td class="label">Ngày khám:</td><td>${formattedDate} ${formattedTime || ''}</td></tr>
             `;
         }
 
         let html = '';
+
+        // Tổng hợp Thị lực Nhìn Xa / Nhìn Gần (2 hàng riêng biệt) từ exam.results
+        const visionSummaryHTML = buildVisionSummaryHTML(exam, isPrintMode);
 
         if (isPrintMode) {
             // Print mode HTML structure
@@ -690,6 +860,7 @@ if (nmEl) nmEl.disabled = false;
                 <div class="print-results">
                     <!-- PHẦN I: KHÁM & CHẨN ĐOÁN -->
                     <h3 style="font-size: 18px; font-weight: bold; color: #1e293b; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #10b981;">PHẦN I: KHÁM & CHẨN ĐOÁN</h3>
+                    ${visionSummaryHTML}
             `;
         } else {
             // Modal view HTML structure
@@ -709,10 +880,14 @@ if (nmEl) nmEl.disabled = false;
                 <div class="report-results">
                     <!-- PHẦN I: KHÁM & CHẨN ĐOÁN -->
                     <h4 style="font-size: 16px; font-weight: bold; color: #1e293b; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #10b981;">PHẦN I: KHÁM & CHẨN ĐOÁN</h4>
+                    ${visionSummaryHTML}
             `;
         }
 
-        if (exam.results.length === 0) {
+        // [FIX] Guard legacy: phiên khám cũ có thể không có mảng results
+        const examResults = Array.isArray(exam.results) ? exam.results : [];
+
+        if (examResults.length === 0) {
             html += '<p>Chưa có kết quả bài test nào.</p>';
         } else {
             if (isPrintMode) {
@@ -733,7 +908,7 @@ if (nmEl) nmEl.disabled = false;
                 `;
             }
 
-            exam.results.forEach((result, index) => {
+            examResults.forEach((result, index) => {
                 const resultTime = new Date(result.timestamp);
                 const timeStr = resultTime.toLocaleTimeString('vi-VN', {
                     hour: '2-digit',
@@ -741,12 +916,13 @@ if (nmEl) nmEl.disabled = false;
                     second: '2-digit'
                 });
                 const metricsStr = formatClinicalMetrics(result.clinical_metrics);
+                const safeTestType = escapeHtml(result.test_type);
 
                 if (isPrintMode) {
                     html += `
                         <tr>
                             <td>${index + 1}</td>
-                            <td>${result.test_type}</td>
+                            <td>${safeTestType}</td>
                             <td>${metricsStr}</td>
                         </tr>
                     `;
@@ -754,7 +930,7 @@ if (nmEl) nmEl.disabled = false;
                     html += `
                         <tr>
                             <td>${index + 1}</td>
-                            <td>${result.test_type}</td>
+                            <td>${safeTestType}</td>
                             <td>${metricsStr}</td>
                             <td>${timeStr}</td>
                         </tr>
@@ -778,7 +954,7 @@ if (nmEl) nmEl.disabled = false;
                 <!-- PHẦN II: HUẤN LUYỆN PHÂN THỊ (DICHOPTIC THERAPY) -->
                 <div class="therapy-report-section" style="margin-top: 30px; page-break-inside: avoid;">
                     <h3 style="font-size: 18px; font-weight: bold; color: #1e293b; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">PHẦN II: HUẤN LUYỆN PHÂN THỊ (DICHOPTIC THERAPY)</h3>
-                    ${window.generateTherapyReportHTML ? window.generateTherapyReportHTML(exam.patientId || '') : '<p style="font-style: italic; color: #64748b;">Không có dữ liệu huấn luyện.</p>'}
+                    ${window.generateTherapyReportHTML ? window.generateTherapyReportHTML(exam.patientId || '', exam.therapy_records) : '<p style="font-style: italic; color: #64748b;">Không có dữ liệu huấn luyện.</p>'}
                 </div>
                 
                 <div class="print-footer">
@@ -795,7 +971,7 @@ if (nmEl) nmEl.disabled = false;
                 <!-- PHẦN II: HUẤN LUYỆN PHÂN THỊ (DICHOPTIC THERAPY) -->
                 <div class="therapy-report-section" style="margin-top: 30px;">
                     <h4 style="font-size: 16px; font-weight: bold; color: #1e293b; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">PHẦN II: HUẤN LUYỆN PHÂN THỊ (DICHOPTIC THERAPY)</h4>
-                    ${window.generateTherapyReportHTML ? window.generateTherapyReportHTML(exam.patientId || '') : '<p style="font-style: italic; color: #64748b;">Không có dữ liệu huấn luyện.</p>'}
+                    ${window.generateTherapyReportHTML ? window.generateTherapyReportHTML(exam.patientId || '', exam.therapy_records) : '<p style="font-style: italic; color: #64748b;">Không có dữ liệu huấn luyện.</p>'}
                 </div>
             </div>
             `;
@@ -866,6 +1042,9 @@ if (nmEl) nmEl.disabled = false;
         toastContainer = document.createElement('div');
         toastContainer.id = 'toast-container';
         toastContainer.className = 'toast-container';
+        // A11y: công bố nội dung toast cho screen reader
+        toastContainer.setAttribute('aria-live', 'polite');
+        toastContainer.setAttribute('role', 'status');
         document.body.appendChild(toastContainer);
     }
 
@@ -1094,6 +1273,8 @@ if (nmEl) nmEl.disabled = false;
         if (endExamBtn) {
             endExamBtn.addEventListener('click', (e) => {
                 e.preventDefault();
+                // Nạp tổng hợp Thị lực Nhìn Xa / Nhìn Gần (2 hàng riêng biệt)
+                populateEndExamVisionSummary();
                 showModal(endExamModal);
             });
         }
@@ -1301,9 +1482,10 @@ if (nmEl) nmEl.disabled = false;
         }, 300);
     }
 
-    // Hook into window.onafterprint for cleanup after print dialog closes
-    if (typeof window !== 'undefined') {
-        window.onafterprint = function() {
+    // Hook afterprint để dọn dẹp sau khi hộp thoại in đóng.
+    // Dùng addEventListener thay vì gán window.onafterprint (tránh ghi đè handler khác).
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+        const _handleAfterPrint = function() {
             // Remove print container from DOM
             if (printContainer && printContainer.parentNode) {
                 printContainer.parentNode.removeChild(printContainer);
@@ -1311,6 +1493,10 @@ if (nmEl) nmEl.disabled = false;
             // Reset session after print completes
             resetSession();
         };
+        if (window.__examAfterPrintBound !== true) {
+            window.__examAfterPrintBound = true;
+            window.addEventListener('afterprint', _handleAfterPrint);
+        }
     }
 
     /**
@@ -1334,11 +1520,13 @@ if (nmEl) nmEl.disabled = false;
 
         // Generate report HTML using shared helper (print mode)
         const element = document.createElement('div');
+        element.className = 'print-report-container';
         element.innerHTML = generateReportHTML(true, exam);
-        element.style.padding = '20px';
-        element.style.color = '#000';
-        element.style.fontFamily = "'Times New Roman', serif";
-        element.style.backgroundColor = '#fff';
+
+        // [FIX] Phải gắn element vào DOM off-screen — html2canvas cần layout thực
+        // để đo kích thước; element rời sẽ cho ra PDF trắng/hỏng.
+        element.style.cssText = 'position: fixed; top: 0; left: -9999px; width: 794px; padding: 24px; color: #000; background: #fff; font-family: "Times New Roman", serif; z-index: -1; box-sizing: border-box;';
+        document.body.appendChild(element);
 
         // Create safe filename from patient name and date
         const date = new Date(exam.startTime);
@@ -1366,6 +1554,11 @@ if (nmEl) nmEl.disabled = false;
         }).catch((err) => {
             console.error('[ExamSessionManager] PDF export failed:', err);
             showToast('Lỗi: Không thể tạo file PDF');
+        }).finally(() => {
+            // Dọn DOM sau khi xong (kể cả lỗi) — chống rò rỉ phần tử
+            if (element.parentNode) {
+                element.parentNode.removeChild(element);
+            }
         });
     }
 
@@ -1476,21 +1669,65 @@ if (nmEl) nmEl.disabled = false;
         }
     }
 
+    // ===== QUẢN LÝ FOCUS MODAL (Accessibility) =====
+    // Phần tử được focus trước khi modal mở — khôi phục khi modal đóng.
+    let _lastFocusBeforeModal = null;
+
+    /**
+     * Tìm phần tử focus đầu tiên BÊN TRONG modal đang mở.
+     * Ưu tiên: [autofocus] → input/select/textarea → button/liên kết → chính modal.
+     * @param {HTMLElement} modal
+     * @returns {HTMLElement|null}
+     */
+    function getFirstFocusable(modal) {
+        if (!modal || typeof modal.querySelectorAll !== 'function') return null;
+        const selector = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+        const list = Array.from(modal.querySelectorAll(selector));
+        if (!list.length) return null;
+        const auto = list.find(el => el.hasAttribute && el.hasAttribute('autofocus'));
+        if (auto) return auto;
+        const input = list.find(el => el.tagName && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName.toUpperCase()));
+        return input || list[0];
+    }
+
     // Show modal
     function showModal(modal) {
-        if (modal) {
-            modal.style.display = 'flex';
-            if (typeof window.enhanceModalUX === 'function') {
-                window.enhanceModalUX(modal);
-            }
-            setTimeout(() => { const el = document.getElementById('patient-name'); if(el) el.focus(); }, 300);
+        if (!modal) return;
+
+        // Lưu lại nút/ô vừa được focus (nút vừa bấm) để khôi phục sau khi đóng
+        _lastFocusBeforeModal = document.activeElement || null;
+
+        modal.style.display = 'flex';
+        if (typeof window.enhanceModalUX === 'function') {
+            window.enhanceModalUX(modal);
         }
+
+        // Focus vào phần tử đầu tiên BÊN TRONG modal (không còn hút về
+        // #patient-name ẩn của Modal Bắt đầu khám như trước đây)
+        setTimeout(() => {
+            const target = getFirstFocusable(modal);
+            if (target) {
+                target.focus();
+            } else {
+                // Fallback: cho phép focus vào chính modal
+                modal.setAttribute('tabindex', '-1');
+                modal.focus();
+            }
+        }, 300);
     }
 
     // Hide modal
     function hideModal(modal) {
-        if (modal) {
-            modal.style.display = 'none';
+        if (!modal) return;
+        modal.style.display = 'none';
+
+        // Khôi phục focus về phần tử đã focus trước khi modal mở
+        const prev = _lastFocusBeforeModal;
+        _lastFocusBeforeModal = null;
+        if (prev && typeof document.contains === 'function' && document.contains(prev)) {
+            setTimeout(() => {
+                try { prev.focus(); } catch (e) { /* ignore */ }
+            }, 0);
         }
     }
 
@@ -2738,7 +2975,7 @@ document.addEventListener('click', function(e) {
         let html = '<div class="clinic-report-header">';
         html += '<div class="clinic-header-left">';
         if (settings.logo) {
-            html += `<img src="${settings.logo}" alt="Logo" class="clinic-logo-img">`;
+            html += `<img src="${escapeHtml(settings.logo)}" alt="Logo" class="clinic-logo-img">`;
         }
         html += '</div>';
         html += '<div class="clinic-header-right">';
@@ -2758,14 +2995,20 @@ document.addEventListener('click', function(e) {
     }
 
     /**
-     * Escape HTML to prevent XSS
-     * @param {string} text
+     * Escape HTML entities để chống XSS khi chèn dữ liệu nhập tay (Manual Entry),
+     * tên bài test, thông tin bệnh nhân và cài đặt phòng khám vào báo cáo (innerHTML).
+     * Dùng thay thế chuỗi thuần — không phụ thuộc DOM, an toàn cho cả chế độ Print.
+     * @param {*} value
      * @returns {string}
      */
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.appendChild(document.createTextNode(text));
-        return div.innerHTML;
+    function escapeHtml(value) {
+        if (value === null || value === undefined) return '';
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     // Initialize when DOM is ready
@@ -2780,6 +3023,30 @@ document.addEventListener('click', function(e) {
     // ================================================================
     const COMBO_GAME_NAME = 'Combo Đánh Giá Nhược Thị';
     const COMBO_TARGET_DAYS = 10;
+
+    // Cache JSON.parse của 'emr_patient_sessions': chỉ parse lại khi raw string
+    // trong localStorage thay đổi — tránh parse toàn bộ DB mỗi lần gọi banner.
+    let _emrSessionsCache = { raw: null, data: null };
+
+    function getEmrPatientSessions() {
+        let raw = null;
+        try {
+            raw = localStorage.getItem('emr_patient_sessions');
+        } catch (e) {
+            return [];
+        }
+        if (_emrSessionsCache.raw === raw && _emrSessionsCache.data) {
+            return _emrSessionsCache.data;
+        }
+        let data = [];
+        try {
+            data = JSON.parse(raw || '[]');
+        } catch (e) {
+            data = [];
+        }
+        _emrSessionsCache = { raw, data };
+        return data;
+    }
 
     /**
      * Lấy ngày (YYYY-MM-DD) từ timestamp (ms) hoặc chuỗi ISO.
@@ -2828,15 +3095,40 @@ document.addEventListener('click', function(e) {
         }
 
         // Bước 1: Lấy toàn bộ therapy_records của bệnh nhân từ Hard-Write DB
-        let allRecords = [];
-        try {
-            const sessions = JSON.parse(localStorage.getItem('emr_patient_sessions')) || [];
-            for (const s of sessions) {
-                if (s && s.patientId === patientId && Array.isArray(s.therapy_records)) {
-                    allRecords.push(...s.therapy_records);
+        // (cache parse — không JSON.parse lại nếu dữ liệu localStorage chưa đổi)
+        const patientSessions = getEmrPatientSessions();
+        const allRecords = [];
+        for (const s of patientSessions) {
+            if (s && s.patientId === patientId && Array.isArray(s.therapy_records)) {
+                allRecords.push(...s.therapy_records);
+            }
+        }
+
+        // Bước 1b: [FIX] Nếu bệnh nhân ĐÃ có lịch sử chuỗi Combo
+        // (có bản ghi tổng hợp "Combo Đánh Giá Nhược Thị" / cờ hasBaseline,
+        // hoặc đã có đủ 4 bài test thuộc chuỗi) → BẮT BUỘC ẩn banner mời Combo.
+        const COMBO_TEST_TYPE_NAMES = [
+            'Auto Distance VA',
+            'Auto Near VA',
+            'Auto Contrast E',
+            'Auto Stereo Random Dot'
+        ];
+        const hasComboBaseline = allRecords.some(rec => rec && (
+            rec.gameName === COMBO_GAME_NAME || rec.hasBaseline === true
+        ));
+        const comboTestTypesFound = new Set();
+        for (const s of patientSessions) {
+            if (!s || s.patientId !== patientId || !Array.isArray(s.results)) continue;
+            for (const r of s.results) {
+                if (r && COMBO_TEST_TYPE_NAMES.includes(r.test_type)) {
+                    comboTestTypesFound.add(r.test_type);
                 }
             }
-        } catch (e) { allRecords = []; }
+        }
+        if (hasComboBaseline || comboTestTypesFound.size >= 4) {
+            banner.style.display = 'none';
+            return;
+        }
 
         // Bước 2: Tìm mốc chốt — record "Combo Đánh Giá Nhược Thị" gần nhất
         let lastTestTime = null;

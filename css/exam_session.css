@@ -332,12 +332,15 @@
 .exam-modal-close {
     background: var(--gray-100);
     border: 1px solid var(--gray-200);
-    font-size: 22px;
+    font-size: 24px;
     color: var(--gray-500);
     cursor: pointer;
     padding: 0;
-    width: 34px;
-    height: 34px;
+    /* Touch target chuẩn Apple/Google: tối thiểu 44x44px */
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -563,6 +566,30 @@
     font-size: 12.5px;
 }
 
+/* ===== TỔNG HỢP THỊ LỰC NHÌN XA / NHÌN GẦN — 2 hàng riêng biệt ===== */
+.report-vision-summary {
+    margin-bottom: 16px;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, #f0f7ff 0%, #eef4ff 100%);
+    border: 1px solid #bfdbfe;
+    border-left: 4px solid var(--exam-primary);
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    line-height: 2;
+    color: var(--gray-800);
+}
+
+.report-vision-summary strong {
+    display: inline-block;
+    min-width: 150px;
+    color: var(--gray-900);
+    font-weight: 700;
+}
+
+#end-exam-vision-summary .report-vision-summary {
+    margin: 12px 0 16px 0;
+}
+
 /* Empty State */
 .report-patient-info p,
 .report-results p {
@@ -621,6 +648,108 @@
     }
 }
 
+/* ===== PRINT REPORT — STYLE MÀN HÌNH =====
+   Dùng cho: (1) overlay trắng khi bấm "In Hồ Sơ" (chống flash HTML thô),
+   (2) PDF export — html2pdf chụp ở media screen nên cần style đầy đủ
+   ở đây (không chỉ trong @media print). */
+.print-report-container {
+    position: fixed;
+    inset: 0;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background: #fff;
+    color: #000;
+    z-index: 2147483000;
+    font-family: 'Times New Roman', serif;
+    padding: 24px;
+    box-sizing: border-box;
+}
+
+.print-report {
+    max-width: 794px;
+    margin: 0 auto;
+}
+
+.print-header {
+    text-align: center;
+    margin-bottom: 18px;
+}
+
+.print-header h1 {
+    font-size: 22px;
+    margin: 0 0 4px;
+    color: #111;
+}
+
+.print-header h2 {
+    font-size: 16px;
+    margin: 0;
+    color: #1e293b;
+    font-weight: 600;
+}
+
+/* Khi đã có header phòng khám thật (từ Cài đặt), ẩn tên phòng khám chung */
+.clinic-report-header + .print-header h1 {
+    display: none;
+}
+
+.print-patient-info h3,
+.print-results h3 {
+    font-size: 16px;
+    font-weight: bold;
+    color: #1e293b;
+    margin: 14px 0 10px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #10b981;
+}
+
+.print-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 12px;
+}
+
+.print-table th,
+.print-table td {
+    border: 1px solid #333;
+    padding: 7px 10px;
+    text-align: left;
+    font-size: 13px;
+}
+
+.print-table td.label {
+    font-weight: 600;
+    background: #f3f4f6;
+    width: 130px;
+}
+
+/* Khối tổng hợp Thị lực Nhìn Xa / Nhìn Gần — style màn hình (PDF) */
+.print-vision-summary {
+    margin: 0 0 14px 0;
+    padding: 10px 12px;
+    border: 1px solid #333;
+    border-left: 4px solid #1d4ed8;
+    font-size: 14px;
+    line-height: 2;
+    color: #000;
+}
+
+.print-vision-summary strong {
+    display: inline-block;
+    min-width: 160px;
+    font-weight: 700;
+}
+
+.print-footer {
+    text-align: center;
+    margin-top: 24px;
+    color: #333;
+    font-size: 13px;
+}
+
 /* ===== PRINT STYLES ===== */
 @media print {
     /* Ẩn toàn bộ ứng dụng nhưng giải phóng không gian (KHÔNG dùng visibility: hidden) */
@@ -643,10 +772,38 @@
         font-family: 'Times New Roman', serif;
     }
 
+    /* [FIX] Tiêu đề bảng kết quả: trình duyệt không in background mặc định,
+       chữ trắng sẽ "biến mất" trên giấy trắng — ép màu đen + nền xám nhạt */
+    .print-report .results-table thead th,
+    .print-report th {
+        color: #000 !important;
+        background: #f3f4f6 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
     /* Ràng buộc bảng in không bị vỡ trang */
     table { page-break-inside: auto; width: 100%; border-collapse: collapse; }
     tr { page-break-inside: avoid; page-break-after: auto; }
     th, td { border: 1px solid #000; padding: 8px; text-align: left; }
+
+    /* Khối tổng hợp Thị lực Nhìn Xa / Nhìn Gần trên bản in */
+    .print-vision-summary {
+        margin: 0 0 14px 0;
+        padding: 10px 12px;
+        border: 1px solid #000;
+        border-left: 4px solid #1d4ed8;
+        font-size: 14px;
+        line-height: 2;
+        color: #000;
+        page-break-inside: avoid;
+    }
+
+    .print-vision-summary strong {
+        display: inline-block;
+        min-width: 160px;
+        font-weight: 700;
+    }
 }
 
 /* ===== RESPONSIVE ===== */
@@ -1342,4 +1499,64 @@
     width: 100% !important;
     height: 100% !important;
     z-index: 999;
+}
+
+/* ============================================================
+   DASHBOARD FULLSCREEN — Modal Biểu đồ Tiến triển Thị giác
+   Ép kích thước tối đa 100vw/100vh, che kín toàn bộ viền
+   (không padding, không viền mờ, không bo góc) để biểu đồ
+   tận dụng tối đa diện tích màn hình.
+   ============================================================ */
+#progress-dashboard-modal {
+    position: fixed !important;
+    inset: 0 !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    /* width: 100% thay vì 100vw — chống tràn thanh cuộn ngang khi có scrollbar */
+    width: 100% !important;
+    /* 100vh dự phòng cho trình duyệt cũ; 100dvh an toàn với thanh địa chỉ
+       co giãn trên Mobile (iOS/Android) */
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    background: #1a1a2e !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-sizing: border-box;
+    overflow-y: auto;
+}
+
+/* Giữ nội dung bên trong (header/filter/biểu đồ) có lề thở,
+   không đè lên mép màn hình sau khi bỏ padding của Modal. */
+#progress-dashboard-modal > div,
+#progress-dashboard-modal > p {
+    padding-left: 20px;
+    padding-right: 20px;
+    box-sizing: border-box;
+}
+
+/* Chống vỡ bố cục biểu đồ khi xoay ngang điện thoại: chiều cao card
+   bị clamp tối đa 50% chiều cao viewport (dvh). Override style.css. */
+.dashboard-chart-card {
+    height: min(420px, 50dvh);
+    min-height: 280px;
+}
+
+@media (max-width: 900px) {
+    .dashboard-chart-card {
+        height: min(360px, 50dvh);
+    }
+}
+
+/* Nhãn nguồn dữ liệu thị lực trong khối tổng hợp báo cáo */
+.vision-src {
+    font-size: 0.85em;
+    color: var(--gray-500);
+    font-weight: 400;
 }
