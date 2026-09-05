@@ -18,18 +18,21 @@ import BinocularGameEngine from './binocular_game_engine.js';
 
 // ============================================================
 // BẢNG ĐỘ KHÓ 10 MỨC (M2)
+// [A4] sizeDeg: Kích thước khung & khối theo GÓC THỊ GIÁC tuyệt đối (°)
+// — quy đổi sang px thực tế bằng this.arcsecToPixels() của Engine theo
+// hiệu chuẩn màn hình, thay cho kích thước cứng px (trôi tỷ lệ vật lý).
 // ============================================================
 const M2_LEVELS = [
-    { level: 1,  sizePx: 180, holdTimeMs: 1000, noise: 0 },
-    { level: 2,  sizePx: 160, holdTimeMs: 1000, noise: 0 },
-    { level: 3,  sizePx: 140, holdTimeMs: 1000, noise: 0 },
-    { level: 4,  sizePx: 110, holdTimeMs: 2000, noise: 1 },
-    { level: 5,  sizePx: 90,  holdTimeMs: 2000, noise: 1 },
-    { level: 6,  sizePx: 70,  holdTimeMs: 2000, noise: 1 },
-    { level: 7,  sizePx: 50,  holdTimeMs: 3000, noise: 2 },
-    { level: 8,  sizePx: 40,  holdTimeMs: 3000, noise: 2 },
-    { level: 9,  sizePx: 30,  holdTimeMs: 3000, noise: 2 },
-    { level: 10, sizePx: 20,  holdTimeMs: 3000, noise: 3 }
+    { level: 1,  sizeDeg: 5.4, holdTimeMs: 1000, noise: 0 },
+    { level: 2,  sizeDeg: 4.8, holdTimeMs: 1000, noise: 0 },
+    { level: 3,  sizeDeg: 4.2, holdTimeMs: 1000, noise: 0 },
+    { level: 4,  sizeDeg: 3.3, holdTimeMs: 2000, noise: 1 },
+    { level: 5,  sizeDeg: 2.7, holdTimeMs: 2000, noise: 1 },
+    { level: 6,  sizeDeg: 2.1, holdTimeMs: 2000, noise: 1 },
+    { level: 7,  sizeDeg: 1.5, holdTimeMs: 3000, noise: 2 },
+    { level: 8,  sizeDeg: 1.2, holdTimeMs: 3000, noise: 2 },
+    { level: 9,  sizeDeg: 0.9, holdTimeMs: 3000, noise: 2 },
+    { level: 10, sizeDeg: 0.6, holdTimeMs: 3000, noise: 3 }
 ];
 
 const M2_NOISE_LABELS = ['Trơn', 'Vài đốm nhiễu', 'Nhiễu động rải màn', 'Rừng nhiễu động'];
@@ -49,7 +52,8 @@ class ShapeAlignmentGame extends BinocularGameEngine {
 
         // --- Trạng thái cấp độ (đọc từ Lobby qua config) ---
         this.level = 1;
-        this.sizePx = 140;        // Kích thước khung/khối (px) — theo bảng M2_LEVELS
+        // [A4] Kích thước khung/khối (px THỰC TẾ từ góc thị giác theo hiệu chuẩn)
+        this.sizePx = Math.max(12, Math.round(this.arcsecToPixels(4.2 * 3600) || 140));
         this.holdTimeMs = 1000;   // Thời gian giữ yên để khớp khung (ms)
         this.noise = 0;           // Mức nhiễu nền (0..3)
 
@@ -85,13 +89,14 @@ class ShapeAlignmentGame extends BinocularGameEngine {
 
     /**
      * Ánh xạ Level → cấu hình bảng M2_LEVELS
+     * [A4] sizeDeg (góc thị giác) → px thực tế bằng arcsecToPixels của Engine
      * @param {number|string} level
      * @returns {number} Level hợp lệ (clamp 1..10)
      */
     _applyLevel(level) {
         const lvl = Math.max(1, Math.min(10, parseInt(level, 10) || 1));
         const cfg = M2_LEVELS.find(l => l.level === lvl) || M2_LEVELS[0];
-        this.sizePx = cfg.sizePx;
+        this.sizePx = Math.max(12, Math.round(this.arcsecToPixels(cfg.sizeDeg * 3600)));
         this.holdTimeMs = cfg.holdTimeMs;
         this.noise = cfg.noise;
         return lvl;

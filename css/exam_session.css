@@ -1326,3 +1326,20 @@
     transform: scale(1.1);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4);
 }
+
+/* ============================================================
+   RESPONSIVE CANVAS — BinocularGameEngine (M1..M13)
+   Canvas của các game phân thị luôn bung tràn 100% container
+   #workspace-therapeutic (không viền đen, không kích thước cứng).
+   Kích thước nội tại (width/height) do Engine gán theo
+   clientWidth/clientHeight thực tế — tỷ lệ 1:1 (Scale Lock).
+   ============================================================ */
+#workspace-therapeutic canvas {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: 999;
+}

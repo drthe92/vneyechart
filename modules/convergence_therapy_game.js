@@ -1,5 +1,11 @@
 import BinocularGameEngine from './binocular_game_engine.js';
 
+// [A4] Kích thước thanh hợp thị theo GÓC THỊ GIÁC tuyệt đối (arcsec) —
+// quy đổi sang px bằng this.arcsecToPixels() của Engine, thay cho
+// kích thước cứng 60x150px (trôi tỷ lệ vật lý khi đổi màn hình / resize).
+const M13_BAR_WIDTH_ARCSEC = 6480;   // ~1.8° chiều ngang thanh hợp thị
+const M13_BAR_HEIGHT_ARCSEC = 16200; // ~4.5° chiều dọc thanh hợp thị
+
 class ConvergenceTherapyGame extends BinocularGameEngine {
     constructor() {
         super();
@@ -16,12 +22,23 @@ class ConvergenceTherapyGame extends BinocularGameEngine {
         this.totalPlayTime = 0;
         this.gameStartTime = 0;
 
-        this.barWidth = 60;
-        this.barHeight = 150;
+        // [A4] Kích thước vật lý thanh hợp thị (px thực tế theo hiệu chuẩn)
+        this._updateBarPhysicalSize();
         
         this._spaceHandler = (e) => {
             if (e.code === 'Space' && this.state === 'PLAYING') this._handleBreak();
         };
+    }
+
+    /**
+     * [A4] Quy đổi kích thước thanh hợp thị từ góc thị giác (arcsec)
+     * sang px thực tế bằng hệ số hiệu chuẩn của Engine (arcsecToPixels).
+     * Kích thước vật lý giữ nguyên khi đổi màn hình / resize cửa sổ.
+     * @private
+     */
+    _updateBarPhysicalSize() {
+        this.barWidth = Math.max(24, Math.round(this.arcsecToPixels(M13_BAR_WIDTH_ARCSEC)));
+        this.barHeight = Math.max(40, Math.round(this.arcsecToPixels(M13_BAR_HEIGHT_ARCSEC)));
     }
 
     start(config = {}) {
@@ -86,12 +103,9 @@ class ConvergenceTherapyGame extends BinocularGameEngine {
     }
 
     // --- 3. ĐỒNG HỒ VÒNG TRÒN & QUANG HỌC ---
-    _dioptersToPixels(diopters) {
-        const distMeters = (this.calibration?.viewingDistanceCm || 40) / 100;
-        const pixelsPerCm = (this.calibration?.pixelsPerMm || 3.78) * 10;
-        const pixelsPerPrism = pixelsPerCm * distMeters; // 1 PD = 1cm at 1m
-        return diopters * pixelsPerPrism;
-    }
+    // [A3] Sử dụng this.diopterToPixels() kế thừa từ Engine (hệ quy chiếu
+    // Prism Diopter duy nhất theo hiệu chuẩn) — đã xóa công thức tự tính
+    // với hardcode 3.78 px/mm & 40cm.
 
     render() {
         super.render(); // Nền trắng an toàn
@@ -110,7 +124,7 @@ class ConvergenceTherapyGame extends BinocularGameEngine {
             visualDiopter = Math.max(0, this.currentDiopter - 2); 
         }
         
-        const splitPx = this._dioptersToPixels(visualDiopter) / 2;
+        const splitPx = this.diopterToPixels(visualDiopter) / 2;
         const leftBarX = cx + splitPx;  // Trái tiến sang Phải
         const rightBarX = cx - splitPx; // Phải tiến sang Trái
 

@@ -89,15 +89,36 @@ class RDSTherapyGame extends BinocularGameEngine {
     }
 
     /**
+     * [C11] Tạo 1 layer nhiễu tĩnh — ưu tiên OffscreenCanvas (không nằm
+     * trong luồng render chính), fallback về canvas phụ nếu không hỗ trợ.
+     * @param {number} w - Chiều rộng layer (px)
+     * @param {number} h - Chiều cao layer (px)
+     * @returns {OffscreenCanvas|HTMLCanvasElement}
+     * @private
+     */
+    _createNoiseLayer(w, h) {
+        if (typeof OffscreenCanvas !== 'undefined') {
+            try {
+                const off = new OffscreenCanvas(w, h);
+                if (off.getContext) return off;
+            } catch (e) { /* fallback xuống canvas phụ */ }
+        }
+        const c = document.createElement('canvas');
+        c.width = w;
+        c.height = h;
+        return c;
+    }
+
+    /**
      * Khởi tạo 2 OffscreenCanvas riêng biệt cho phân thị hai mắt (Cyan/Red)
+     * [C11] Lớp nền nhiễu TĨNH: mỗi frame chỉ drawImage() layer này ra
+     * màn hình, không tính toán lại từng hạt pixel nhiễu.
      * @param {number} w - Chiều rộng canvas nội tại
      * @param {number} h - Chiều cao canvas nội tại
      */
     _initNoiseCache(w, h) {
-        this.noiseCanvasRight = document.createElement('canvas'); // Cyan
-        this.noiseCanvasRight.width = w; this.noiseCanvasRight.height = h;
-        this.noiseCanvasLeft = document.createElement('canvas'); // Red
-        this.noiseCanvasLeft.width = w; this.noiseCanvasLeft.height = h;
+        this.noiseCanvasRight = this._createNoiseLayer(w, h); // Cyan
+        this.noiseCanvasLeft = this._createNoiseLayer(w, h);  // Red
         this._regenerateNoisePixels();
     }
 
@@ -555,10 +576,13 @@ class RDSTherapyGame extends BinocularGameEngine {
 
     /**
      * Override update(): xử lý fade-out viền biofeedback mỗi frame
+     * [A1] Fade theo Delta-time (3.0 alpha/s — tương đương 0.05/frame @60fps)
+     * để tốc độ mờ đồng nhất trên mọi refresh rate.
+     * @param {number} dt - Delta-time (giây) từ Engine
      */
-    update() {
+    update(dt = 0) {
         if (this.flashAlpha > 0) {
-            this.flashAlpha -= 0.05; // Tốc độ mờ dần (chớp trong khoảng 20 frames)
+            this.flashAlpha -= 3 * dt;
             if (this.flashAlpha < 0) this.flashAlpha = 0;
         }
     }
