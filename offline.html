@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ngoại tuyến</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: #1a1a2e;
+      color: #e5e7eb;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+    }
+    .offline-box { max-width: 420px; }
+    .offline-icon { font-size: 4rem; margin-bottom: 1.25rem; display: block; }
+    h1 { font-size: 1.4rem; font-weight: 600; color: #fff; margin-bottom: 0.6rem; }
+    p { font-size: 0.95rem; line-height: 1.6; color: #9ca3af; margin-bottom: 1.5rem; }
+    .retry-btn {
+      background: #4da6ff;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 28px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .retry-btn:hover { background: #3b92e8; }
+    .retry-btn:active { transform: scale(0.97); }
+  </style>
+</head>
+<body>
+  <div class="offline-box">
+    <span class="offline-icon" aria-hidden="true">
+      <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="#4da6ff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="1" y1="1" x2="23" y2="23"></line>
+        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
+        <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
+        <path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path>
+        <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path>
+        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+        <line x1="12" y1="20" x2="12.01" y2="20"></line>
+      </svg>
+    </span>
+    <h1>Bạn đang ngoại tuyến</h1>
+    <p>Vui lòng kiểm tra lại kết nối mạng. Dữ liệu khám &amp; luyện tập vẫn được lưu nội bộ và sẽ đồng bộ khi có mạng trở lại.</p>
+    <button class="retry-btn" onclick="location.reload()">Thử lại</button>
+  </div>
+</body>
+</html>

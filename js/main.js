@@ -2178,3 +2178,105 @@ export { state, loadTest, nextStep, prevStep, back, registerTestModule, testModu
 if (typeof window !== 'undefined') {
     window.generateTherapyReportHTML = generateTherapyReportHTML;
 }
+
+// ================================================================
+//  PWA: Đăng ký Service Worker + Trạng thái mạng + Kiểm soát cập nhật
+// ================================================================
+(function initPWA() {
+    if (!('serviceWorker' in navigator)) return;
+
+    // --- Toast helper (tái sử dụng class .toast-notification sẵn có của app) ---
+    let pwaToastContainer = null;
+    function ensurePwaToastContainer() {
+        if (pwaToastContainer) return pwaToastContainer;
+        pwaToastContainer = document.createElement('div');
+        pwaToastContainer.className = 'toast-container';
+        pwaToastContainer.style.zIndex = '2147483000';
+        document.body.appendChild(pwaToastContainer);
+        return pwaToastContainer;
+    }
+
+    function dismissPwaToast(toast) {
+        toast.classList.remove('show');
+        setTimeout(() => {
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 350);
+    }
+
+    function showPwaToast(message, options = {}) {
+        const { duration = 3000, actionText = null, onAction = null } = options;
+        const toast = document.createElement('div');
+        toast.className = 'toast-notification';
+        toast.innerHTML = message;
+
+        if (actionText && onAction) {
+            const btn = document.createElement('button');
+            btn.textContent = actionText;
+            btn.style.cssText = 'margin-left:12px;background:#4da6ff;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-weight:600;cursor:pointer;white-space:nowrap;';
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dismissPwaToast(toast);
+                onAction();
+            });
+            toast.appendChild(btn);
+        }
+
+        ensurePwaToastContainer().appendChild(toast);
+        setTimeout(() => toast.classList.add('show'), 10);
+        if (duration > 0) setTimeout(() => dismissPwaToast(toast), duration);
+    }
+
+    // --- Badge Online/Offline ---
+    let offlineBadge = null;
+    function showOfflineBadge() {
+        if (offlineBadge || !document.body) return;
+        offlineBadge = document.createElement('div');
+        offlineBadge.id = 'pwa-offline-badge';
+        offlineBadge.textContent = 'Ngoại tuyến - Dữ liệu lưu nội bộ';
+        offlineBadge.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:2147483000;background:#dc2626;color:#fff;padding:8px 18px;border-radius:999px;font:600 13px system-ui,sans-serif;box-shadow:0 4px 16px rgba(220,38,38,0.4);white-space:nowrap;';
+        document.body.appendChild(offlineBadge);
+    }
+    function hideOfflineBadge() {
+        if (offlineBadge) {
+            offlineBadge.remove();
+            offlineBadge = null;
+        }
+    }
+    window.addEventListener('offline', showOfflineBadge);
+    window.addEventListener('online', hideOfflineBadge);
+    if (!navigator.onLine) showOfflineBadge();
+
+    // --- Đăng ký SW: Toast sẵn sàng + Update Toast (chống mất session) ---
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then((reg) => {
+                showPwaToast('Hệ thống đã sẵn sàng hoạt động ngoại tuyến');
+
+                reg.addEventListener('updatefound', () => {
+                    const newWorker = reg.installing;
+                    if (!newWorker) return;
+
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            // Có worker mới chờ activate + controller cũ đang chạy
+                            // → KHÔNG F5 ngay, chờ người dùng cấp phép để không đứt gãy phiên khám
+                            showPwaToast('Có phiên bản mới.', {
+                                duration: 0,
+                                actionText: 'Bấm để tải lại',
+                                onAction: () => {
+                                    const worker = reg.waiting || newWorker;
+                                    if (worker) worker.postMessage({ type: 'SKIP_WAITING' });
+                                }
+                            });
+                        }
+                    });
+                });
+            })
+            .catch((err) => console.error('Service Worker registration failed:', err));
+    });
+
+    // Khi worker mới đã activate (sau khi người dùng cấp phép) → tải lại đúng lúc
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        window.location.reload();
+    });
+})();

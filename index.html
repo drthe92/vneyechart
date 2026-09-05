@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Eye Chart Cầu vồng</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#1a1a2e">
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/credit_card_calibration.css">
   <link rel="stylesheet" href="css/exam_session.css">
@@ -405,6 +407,17 @@
       document.getElementById('global-result-modal').style.display = 'none';
       // Đảm bảo đóng iframe hoặc reset UI về Lobby sau khi xác nhận
       if (typeof window.closeTherapyModule === 'function') window.closeTherapyModule();
+    }
+  </script>
+
+  <!-- PWA: Đăng ký Service Worker cho hoạt động offline -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(reg => console.log('Service Worker registered!', reg.scope))
+          .catch(err => console.error('Service Worker registration failed:', err));
+      });
     }
   </script>
   </body>

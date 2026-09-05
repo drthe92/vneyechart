@@ -832,7 +832,7 @@ window.startTherapyModule = function(id) {
 
 /**
  * Render giao diện sảnh (Lobby) dạng lưới Grid, phân luồng theo Phác đồ:
- * - amblyopia: Phác đồ Nhược thị & Tật khúc xạ (4 giai đoạn)
+ * - amblyopia: Phác đồ Nhược thị (4 giai đoạn)
  * - strabismus_postop: Phác đồ Hậu phẫu Lác (3 bước, KHÔNG bịt mắt)
  * Mỗi hàng = 1 giai đoạn: cột trái là thẻ Giai đoạn (220px) + tối đa
  * 5 module => tổng cộng tối đa 6 ô trên một hàng ngang.
@@ -849,7 +849,7 @@ window.renderTherapeuticLobby = function(container) {
     // Định nghĩa cấu trúc động
     const config = {
         'amblyopia': {
-            title: "Phác đồ Điều trị Nhược thị & Tật khúc xạ",
+            title: "Phác đồ Điều trị Nhược thị",
             rows: [
                 { title: "Giai đoạn 1: Đánh thức Hoàng điểm (Đơn thị)", modules: [
                     { id: 'M7', name: 'Kích thích Lưới CAM', icon: '🌀' },
