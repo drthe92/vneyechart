@@ -15,15 +15,15 @@
  * Chiều cao vật lý ký tự được tính từ bảng thông số chuẩn ở 40 cm.
  */
 
-import { getOptotypeSize } from '../js/calibration.js';
+import { getActiveNearDistanceM } from '../js/calibration.js';
 import { SLOAN } from './optotype_paths.js';
 
 // ================================================================
 //  Constants
 // ================================================================
 
-/** Khoảng cách khám thị lực gần (mét) */
-const NEAR_DISTANCE_M = 0.4;
+/** Khoảng cách tham chiếu của bảng chuẩn (mét) — dùng khi chưa có calibrator */
+const REFERENCE_DISTANCE_M = 0.4;
 
 /** Giá trị LogMAR cho từng hàng (từ to → nhỏ) */
 const LOGMAR_LEVELS = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0, -0.1, -0.2];
@@ -73,12 +73,15 @@ function pick5() {
 
 /**
  * Lấy PPI từ calibrator (hoặc ước lượng).
- * @returns {{ ppi: number, pxPerMm: number }}
+ * Khoảng cách Nhìn Gần lấy từ helper chung getActiveNearDistanceM()
+ * (js/calibration.js) — main.js đã chuyển distanceM theo nhóm test.
+ * @returns {{ ppi: number, pxPerMm: number, distanceM: number }}
  */
 function getCalibration() {
+  const distanceM = getActiveNearDistanceM();
   const calibrator = window.__calibrator;
   if (calibrator && calibrator.ppi > 0) {
-    return { ppi: calibrator.ppi, pxPerMm: calibrator.pxPerMm };
+    return { ppi: calibrator.ppi, pxPerMm: calibrator.pxPerMm, distanceM };
   }
   // Fallback: ước lượng PPI
   // Dùng CSS pixels — trình duyệt tự ánh xạ sang physical px
@@ -86,7 +89,19 @@ function getCalibration() {
   const h = window.screen.height;
   const diagPx = Math.sqrt(w * w + h * h);
   const ppi = diagPx / 24; // giả định 24 inch, số thực
-  return { ppi, pxPerMm: ppi / 25.4 };
+  return { ppi, pxPerMm: ppi / 25.4, distanceM };
+}
+
+/**
+ * Chiều cao vật lý (mm) của ký tự tại khoảng cách khám đang active.
+ * Bảng chuẩn PHYSICAL_HEIGHT_MM được đo ở 40 cm nên scale tuyến tính theo
+ * tỷ lệ khoảng cách: height(D) = height(40cm) × D / 0.4.
+ * @param {number} logmar
+ * @param {number} distanceM
+ * @returns {number}
+ */
+function physicalHeightMm(logmar, distanceM) {
+  return PHYSICAL_HEIGHT_MM[logmar] * (distanceM / REFERENCE_DISTANCE_M);
 }
 
 /**
@@ -134,11 +149,11 @@ function renderCrowdingBars(pxSize) {
  * @returns {string} SVG hoàn chỉnh
  */
 function buildFullChart(highlightIndex, lettersMatrix, calib) {
-  const { pxPerMm } = calib;
+  const { pxPerMm, distanceM } = calib;
 
-  // Tính kích thước pixel cho từng hàng
+  // Tính kích thước pixel cho từng hàng (scale theo khoảng cách đang active)
   const rowPxSizes = LOGMAR_LEVELS.map((logmar) =>
-    mmToPx(PHYSICAL_HEIGHT_MM[logmar], pxPerMm)
+    mmToPx(physicalHeightMm(logmar, distanceM), pxPerMm)
   );
 
   // Tính chiều rộng mỗi hàng
@@ -231,9 +246,9 @@ function buildFullChart(highlightIndex, lettersMatrix, calib) {
  * @returns {string} SVG
  */
 function buildSingleRow(rowIndex, letters, calib) {
-  const { pxPerMm } = calib;
+  const { pxPerMm, distanceM } = calib;
   const logmar = LOGMAR_LEVELS[rowIndex];
-  const pxSize = mmToPx(PHYSICAL_HEIGHT_MM[logmar], pxPerMm);
+  const pxSize = mmToPx(physicalHeightMm(logmar, distanceM), pxPerMm);
   const rowWidth = pxSize * LETTERS_PER_ROW + pxSize * (LETTERS_PER_ROW - 1);
   const scale = pxSize / 5;
 
@@ -262,9 +277,9 @@ function buildSingleRow(rowIndex, letters, calib) {
  * @returns {string} SVG
  */
 function buildSingleOptotype(rowIndex, letter, showBars, calib) {
-  const { pxPerMm } = calib;
+  const { pxPerMm, distanceM } = calib;
   const logmar = LOGMAR_LEVELS[rowIndex];
-  const pxSize = mmToPx(PHYSICAL_HEIGHT_MM[logmar], pxPerMm);
+  const pxSize = mmToPx(physicalHeightMm(logmar, distanceM), pxPerMm);
   const scale = pxSize / 5;
 
   // Vùng mở rộng để chứa crowding bars
@@ -306,9 +321,10 @@ function buildSingleOptotype(rowIndex, letter, showBars, calib) {
 //  Info Panel
 // ================================================================
 
-function buildInfoPanel(logmar, rowIndex, totalRows, mode) {
+function buildInfoPanel(logmar, rowIndex, totalRows, mode, distanceM) {
   const snellenDenom = Math.round(20 * Math.pow(10, logmar));
   const decimalAcuity = Math.pow(10, -logmar);
+  const distanceCm = (distanceM * 100).toFixed(0);
 
   let modeLabel = '';
   switch (mode) {
@@ -333,7 +349,7 @@ function buildInfoPanel(logmar, rowIndex, totalRows, mode) {
       </div>
       <div class="near-vision-info-row">
         <span class="near-vision-info-label">Khoảng cách</span>
-        <strong class="near-vision-info-value">40 cm</strong>
+        <strong class="near-vision-info-value">${distanceCm} cm</strong>
       </div>
       <div class="near-vision-info-divider"></div>
       <div class="near-vision-info-row">
@@ -437,7 +453,7 @@ const nearLogmarModule = {
 
     const html = [
       chartHtml,
-      buildInfoPanel(logmar, index, totalRows, mode),
+      buildInfoPanel(logmar, index, totalRows, mode, calib.distanceM),
       buildToolbar(mode, this._crowdingBars),
     ].join('\n');
 

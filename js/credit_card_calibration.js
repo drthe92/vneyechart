@@ -36,7 +36,9 @@ class CreditCardCalibrator {
 
     // Tự khôi phục nếu đã từng hiệu chuẩn
     try {
-      const saved = localStorage.getItem(CC_STORAGE_KEY);
+      const saved = (typeof window !== 'undefined' && window.SettingsStore)
+        ? window.SettingsStore.get(CC_STORAGE_KEY)
+        : localStorage.getItem(CC_STORAGE_KEY);
       if (saved) this._pxPerMm = parseFloat(saved);
     } catch (e) { /* ignore */ }
   }
@@ -155,7 +157,14 @@ class CreditCardCalibrator {
   /** @private */
   _saveAndSync(pxWidth) {
     this._pxPerMm = pxWidth / CREDIT_CARD_WIDTH_MM;
-    try { localStorage.setItem(CC_STORAGE_KEY, String(this._pxPerMm)); } catch (e) {}
+    const value = String(this._pxPerMm);
+    try {
+      if (typeof window !== 'undefined' && window.SettingsStore) {
+        window.SettingsStore.set(CC_STORAGE_KEY, value);
+      } else {
+        localStorage.setItem(CC_STORAGE_KEY, value);
+      }
+    } catch (e) {}
 
     // Đồng bộ ngay vào global __calibrator (kể cả khi chưa truyền instance calibrator)
     if (!window.__calibrator) window.__calibrator = {};

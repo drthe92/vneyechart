@@ -141,6 +141,9 @@ function back() {
   const test = getTestModule(state.currentTest);
   state.steps = test ? test.steps : [];
 
+  // Khôi phục khoảng cách khám đúng nhóm của bài test trước đó
+  applyDistanceGroup(state.currentTest);
+
   // Resume UniversalInput when returning to previous module
   if (universalInput) {
     if (test && test.customControls === true) {
@@ -169,6 +172,156 @@ const COMBO_TEST_IDS = [
 
 window.__comboQueue = null;
 window.__comboResults = {};
+
+/**
+ * Ánh xạ nhóm khoảng cách theo ID bài test (Map thay vì Prefix).
+ * - FAR : bài đo Nhìn Xa   → áp window.__calibrator.distanceFarM
+ * - NEAR: bài đo Nhìn Gần  → áp window.__calibrator.distanceNearM
+ * Bài test không có trong map → fallback nhóm FAR mặc định.
+ */
+const TEST_DISTANCE_GROUPS = {
+  // ----- Nhìn Xa -----
+  'far-vision': 'FAR',
+  'far-vision-etdrs': 'FAR',
+  'far-vision-snellen': 'FAR',
+  'far-vision-lea': 'FAR',
+  'far-vision-landolt': 'FAR',
+  'far-vision-tumbling-e': 'FAR',
+  'far-vision-auto-bcva-crowding': 'FAR',
+  'far-vision-auto-distance-va': 'FAR',
+  'far-vision-numbers': 'FAR',
+  'far-vision-auckland': 'FAR',
+  'far-vision-hotv': 'FAR',
+  'retina-auto-contrast-e': 'FAR',
+  'neuro-duochrome': 'FAR',
+  'astigmatism': 'FAR',
+  'jcc-simulation': 'FAR',
+  'schober-heterophoria': 'FAR',
+  'maddox-grid': 'FAR',
+  // ----- Nhìn Gần -----
+  'near-vision-logmar': 'NEAR',
+  'near-vision-npoint': 'NEAR',
+  'near-vision-lea': 'NEAR',
+  'near-vision-auto-near-va': 'NEAR',
+  'neuro-okn': 'NEAR',
+  'binocular-auto-stereo-random-dot': 'NEAR',
+};
+
+/**
+ * Các bài test nhóm FAR CÓ ĐỌC biến khoảng cách
+ * (window.__calibrator.distanceM) → đủ điều kiện hiển thị chip
+ * "Đo tại: X m". Bài FAR nào không dùng khoảng cách (vd maddox-grid
+ * chỉ dùng pxPerMm) sẽ KHÔNG hiển thị chip.
+ */
+const DISTANCE_INDICATOR_IDS = new Set([
+  'far-vision',
+  'far-vision-etdrs',
+  'far-vision-snellen',
+  'far-vision-lea',
+  'far-vision-landolt',
+  'far-vision-tumbling-e',
+  'far-vision-auto-bcva-crowding',
+  'far-vision-auto-distance-va',
+  'far-vision-numbers',
+  'far-vision-auckland',
+  'far-vision-hotv',
+  'retina-auto-contrast-e',
+  'neuro-duochrome',
+  'schober-heterophoria',
+]);
+
+/**
+ * Áp dụng khoảng cách khám đúng nhóm của bài test (Nhìn Xa / Nhìn Gần).
+ * Giá trị được lấy từ window.__calibrator.distanceFarM / distanceNearM
+ * (2 cấu hình độc lập, lưu vĩnh viễn trong localStorage).
+ * @param {string} testId
+ */
+function applyDistanceGroup(testId) {
+  if (!testId) return;
+  const cal = window.__calibrator;
+  if (!cal) return;
+
+  // Đọc nhóm từ Map ID; không có trong map → nhóm FAR mặc định
+  const group = TEST_DISTANCE_GROUPS[testId] || 'FAR';
+
+  if (group === 'NEAR') {
+    const near = cal.distanceNearM || 0.4;
+    if (Math.abs(cal.distanceM - near) > 0.001) {
+      cal.applyNearVisionPreset();
+    }
+  } else {
+    const far = cal.distanceFarM || 4;
+    if (Math.abs(cal.distanceM - far) > 0.001) {
+      cal.applyDistanceVisionPreset();
+    }
+  }
+}
+
+/**
+ * Toast GLOBAL DUY NHẤT của toàn app — hợp nhất 3 hệ toast cũ
+ * (exam_session_manager, PWA, calibration). Dùng chung CSS
+ * `.toast-container` / `.toast-notification` (exam_session.css).
+ *
+ * @param {string}  message
+ * @param {'info'|'success'|'error'|'warning'} [type='info']
+ * @param {Object}  [options] { duration=3000, actionText, onAction }
+ */
+function showGlobalToast(message, type = 'info', options = {}) {
+  if (typeof document === 'undefined' || !document.body) return;
+
+  const { duration = 3000, actionText = null, onAction = null } = options;
+
+  let container = document.getElementById('global-toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'global-toast-container';
+    container.className = 'toast-container';
+    container.style.zIndex = '2147483000';
+    document.body.appendChild(container);
+  }
+
+  const BACKGROUNDS = {
+    info: 'linear-gradient(135deg, rgba(31, 41, 55, 0.96) 0%, rgba(55, 65, 81, 0.96) 100%)',
+    success: 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)',
+    error: 'linear-gradient(135deg, #b91c1c 0%, #dc2626 100%)',
+    warning: 'linear-gradient(135deg, #b45309 0%, #d97706 100%)',
+  };
+
+  const toast = document.createElement('div');
+  toast.className = 'toast-notification';
+  toast.textContent = message;
+  toast.style.background = BACKGROUNDS[type] || BACKGROUNDS.info;
+
+  const dismiss = () => {
+    toast.classList.remove('show');
+    setTimeout(() => {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 350);
+  };
+
+  if (actionText && typeof onAction === 'function') {
+    const btn = document.createElement('button');
+    btn.textContent = actionText;
+    btn.style.cssText =
+      'margin-left:12px;background:rgba(255,255,255,0.22);color:#fff;border:1px solid rgba(255,255,255,0.5);' +
+      'border-radius:6px;padding:6px 12px;font-weight:600;cursor:pointer;white-space:nowrap;';
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dismiss();
+      onAction();
+    });
+    toast.appendChild(btn);
+  }
+
+  container.appendChild(toast);
+  setTimeout(() => toast.classList.add('show'), 10);
+  if (duration > 0) setTimeout(dismiss, duration);
+}
+
+// Expose global cho mọi script (exam_session_manager, calibration, modules)
+if (typeof window !== 'undefined') {
+  window.showGlobalToast = showGlobalToast;
+}
 
 /**
  * Bóc tách giá trị số (parseFloat) từ clinical_metrics theo danh sách key.
@@ -321,20 +474,15 @@ function advanceCombo() {
     return;
   }
 
-  // Auto‑switch calibrator distance theo nhóm test
-  if (nextId.startsWith('near-vision-')) {
-    const cal = window.__calibrator;
-    if (cal && cal.distanceM > 0.5) cal.applyNearVisionPreset();
-  } else if (nextId.startsWith('far-vision-')) {
-    const cal = window.__calibrator;
-    if (cal && cal.distanceM < 0.5) cal.applyDistanceVisionPreset();
-  }
+  // Auto‑switch calibrator distance theo nhóm test (Nhìn Xa / Nhìn Gần)
+  applyDistanceGroup(nextId);
 
   highlightMenuItem(nextId);
   loadTest(nextId, mod.steps);
 
   const sidebar = document.getElementById('sidebar');
   if (sidebar) sidebar.classList.add('sidebar-hidden');
+  updateDistanceIndicator();
 }
 
 // ================================================================
@@ -481,6 +629,50 @@ registerTestModule(makeModule('accommodation',  'Điều tiết',        ['⬤',
 //  Render
 // ================================================================
 
+/**
+ * Chỉ báo lâm sàng: thẻ nhỏ mờ góc màn hình hiển thị khoảng cách đang đo.
+ * Chỉ hiển thị khi:
+ *   - Đang ở workspace Khám (diagnostic).
+ *   - Sidebar menu ĐANG ĐÓNG (chỉ xuất hiện ở vùng đo, không lấn menu).
+ *   - Bài test hiện tại CÓ ĐỌC biến khoảng cách (DISTANCE_INDICATOR_IDS).
+ * Bấm vào thẻ → mở ngay Modal cài đặt khoảng cách.
+ */
+function updateDistanceIndicator() {
+  let chip = document.getElementById('distance-indicator');
+  const testId = state.currentTest;
+  const cal = window.__calibrator;
+  const distanceM = cal ? parseFloat(cal.distanceM) : NaN;
+
+  // Ẩn khi sidebar menu đang mở
+  const sidebar = document.getElementById('sidebar');
+  const sidebarVisible = sidebar && !sidebar.classList.contains('sidebar-hidden');
+
+  const showChip =
+    currentWorkspace === 'diagnostic' &&
+    !sidebarVisible &&
+    DISTANCE_INDICATOR_IDS.has(testId) &&
+    !isNaN(distanceM) && distanceM > 0;
+
+  if (showChip) {
+    if (!chip) {
+      chip = document.createElement('div');
+      chip.id = 'distance-indicator';
+      chip.setAttribute('role', 'button');
+      chip.setAttribute('title', 'Bấm để mở cài đặt khoảng cách');
+      chip.addEventListener('click', () => {
+        if (window.__calibrator && typeof window.__calibrator.showModal === 'function') {
+          window.__calibrator.showModal();
+        }
+      });
+      document.body.appendChild(chip);
+    }
+    chip.textContent = `Đo tại: ${distanceM} m`;
+    chip.style.display = 'block';
+  } else if (chip) {
+    chip.style.display = 'none';
+  }
+}
+
 function renderStep() {
   const mod = getTestModule(state.currentTest);
   if (!mod) return;
@@ -495,6 +687,7 @@ function renderStep() {
   if (state.stepIndex < 0) state.stepIndex = 0;
 
   mod.render(state.stepIndex);
+  updateDistanceIndicator();
 }
 
 // ================================================================
@@ -520,6 +713,7 @@ function setupSidebar() {
       if (testId === state.currentTest) {
         const sidebar = document.getElementById('sidebar');
         if (sidebar) sidebar.classList.add('sidebar-hidden');
+        updateDistanceIndicator();
         return;
       }
 
@@ -529,22 +723,8 @@ function setupSidebar() {
       // Thoát ngang combo → hủy queue an toàn
       cancelCombo();
 
-      // Auto‑switch calibrator distance for near vision tests (40 cm)
-      if (testId && (testId.startsWith('near-vision-'))) {
-        const cal = window.__calibrator;
-        if (cal) {
-          if (cal.distanceM > 0.5) {
-            cal.applyNearVisionPreset();
-          }
-        }
-      } else if (testId && (testId.startsWith('far-vision-'))) {
-        const cal = window.__calibrator;
-        if (cal) {
-          if (cal.distanceM < 0.5) {
-            cal.applyDistanceVisionPreset();
-          }
-        }
-      }
+      // Auto‑switch calibrator distance theo nhóm test (Nhìn Xa / Nhìn Gần)
+      applyDistanceGroup(testId);
 
       highlightMenuItem(testId);
       loadTest(testId, mod.steps);
@@ -552,6 +732,7 @@ function setupSidebar() {
       // Rút gọn: ẩn menu sau khi chọn xong bảng thị lực, chỉ hiện vùng đo.
       const sidebar = document.getElementById('sidebar');
       if (sidebar) sidebar.classList.add('sidebar-hidden');
+      updateDistanceIndicator();
     });
   });
 
@@ -582,6 +763,8 @@ function setupSidebar() {
         }
       }
     }
+    // Đồng bộ chip chỉ báo khoảng cách với trạng thái menu
+    updateDistanceIndicator();
   }
 
   // Persistent bottom-left toggle button — click to show/hide menu
@@ -1375,6 +1558,7 @@ function setupSidebar() {
     // Show sidebar when mouse enters bottom-left 120x120px corner
     if (e.clientX < 120 && e.clientY > window.innerHeight - 120) {
       sidebar.classList.remove('sidebar-hidden');
+      updateDistanceIndicator();
     }
   });
 
@@ -1618,6 +1802,9 @@ function toggleWorkspace() {
     // Lưu vết workspace để F5 khôi phục đúng tab
     try { localStorage.setItem('currentWorkspace', currentWorkspace); } catch (e) { /* ignore */ }
   }
+
+  // Đồng bộ chỉ báo khoảng cách với workspace mới (ẩn khi sang Luyện tập)
+  updateDistanceIndicator();
 }
 
 /**
@@ -1655,11 +1842,19 @@ function init() {
   //  Phục hồi toàn bộ thông số hiệu chuẩn sau khi tải lại trang (F5)
   // ================================================================
 
-  // 1. Khoảng cách đo (vision-therapy-calibrate-distance-m)
-  const savedDist = localStorage.getItem('vision-therapy-calibrate-distance-m');
-  if (savedDist && parseFloat(savedDist) > 0 && window.__calibrator) {
-    window.__calibrator.distanceM = parseFloat(savedDist);
+  // 1. Khoảng cách khám — hydrate qua API của DisplayCalibrator
+  //    (single source of truth: js/calibration.js → loadDistanceSettings)
+  if (window.__calibrator && typeof window.__calibrator.loadDistanceSettings === 'function') {
+    window.__calibrator.loadDistanceSettings();
   }
+
+  // Cài đặt khoảng cách đổi (Modal Lưu & Đóng) → re-render tức thì bài test
+  // đang active theo mốc vừa lưu, không cần tải lại trang.
+  document.addEventListener('calibrator:distance-settings-changed', () => {
+    if (currentWorkspace === 'diagnostic') {
+      renderStep();
+    }
+  });
 
   // 2. Màu kính Anaglyph (vision_color_calibration) — dự phòng cho __anaglyphColors
   try {
@@ -1749,6 +1944,7 @@ function init() {
     startCombo();
     const sidebar = document.getElementById('sidebar');
     if (sidebar) sidebar.classList.add('sidebar-hidden');
+    updateDistanceIndicator();
   });
 
   // Sau khi người dùng đóng Global Result Modal → tự động chuyển bài tiếp theo
@@ -2185,45 +2381,12 @@ if (typeof window !== 'undefined') {
 (function initPWA() {
     if (!('serviceWorker' in navigator)) return;
 
-    // --- Toast helper (tái sử dụng class .toast-notification sẵn có của app) ---
-    let pwaToastContainer = null;
-    function ensurePwaToastContainer() {
-        if (pwaToastContainer) return pwaToastContainer;
-        pwaToastContainer = document.createElement('div');
-        pwaToastContainer.className = 'toast-container';
-        pwaToastContainer.style.zIndex = '2147483000';
-        document.body.appendChild(pwaToastContainer);
-        return pwaToastContainer;
-    }
-
-    function dismissPwaToast(toast) {
-        toast.classList.remove('show');
-        setTimeout(() => {
-            if (toast.parentNode) toast.parentNode.removeChild(toast);
-        }, 350);
-    }
-
+    // --- Toast helper: delegate về showGlobalToast DUY NHẤT ---
     function showPwaToast(message, options = {}) {
         const { duration = 3000, actionText = null, onAction = null } = options;
-        const toast = document.createElement('div');
-        toast.className = 'toast-notification';
-        toast.innerHTML = message;
-
-        if (actionText && onAction) {
-            const btn = document.createElement('button');
-            btn.textContent = actionText;
-            btn.style.cssText = 'margin-left:12px;background:#4da6ff;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-weight:600;cursor:pointer;white-space:nowrap;';
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                dismissPwaToast(toast);
-                onAction();
-            });
-            toast.appendChild(btn);
+        if (typeof showGlobalToast === 'function') {
+            showGlobalToast(message, 'info', { duration, actionText, onAction });
         }
-
-        ensurePwaToastContainer().appendChild(toast);
-        setTimeout(() => toast.classList.add('show'), 10);
-        if (duration > 0) setTimeout(() => dismissPwaToast(toast), duration);
     }
 
     // --- Badge Online/Offline ---

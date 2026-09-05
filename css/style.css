@@ -867,6 +867,13 @@ button {
   color: var(--sidebar-accent);
 }
 
+.calib-btn-preset.active {
+  background: var(--sidebar-accent);
+  border-color: var(--sidebar-accent);
+  color: #fff;
+  font-weight: 600;
+}
+
 .calib-note {
   font-size: 0.75rem;
   color: #aaa;
@@ -910,6 +917,52 @@ button {
 }
 .calib-btn-save:hover {
   background: #3a7bc8;
+}
+
+.calib-btn-cc {
+  padding: 8px 20px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  border: 1px solid var(--sidebar-accent);
+  background: #fff;
+  color: var(--sidebar-accent);
+}
+.calib-btn-cc:hover {
+  background: #eef3fc;
+}
+
+/* Chỉ báo lâm sàng: khoảng cách đang đo — mờ nhẹ, chỉ hiện ở vùng đo */
+#distance-indicator {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 5000;
+  display: none;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07);
+  padding: 6px 12px;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #777;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  user-select: none;
+  opacity: 0.9;
+  cursor: pointer;
+  transition: opacity 0.2s, border-color 0.2s, box-shadow 0.2s, color 0.2s;
+}
+#distance-indicator:hover {
+  opacity: 1;
+  color: #444;
+  border-color: var(--sidebar-accent);
+  box-shadow: 0 8px 24px rgba(74, 144, 217, 0.22);
 }
 
 /* ---------- Medium screens: 2 item columns ---------- */

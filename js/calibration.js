@@ -23,12 +23,22 @@ const MM_PER_INCH = 25.4;
 /** LocalStorage keys */
 const STORAGE_KEYS = {
   distanceM:   'vision-therapy-calibrate-distance-m',
+  // 2 cấu hình khoảng cách độc lập: Nhìn Xa / Nhìn Gần (lưu vĩnh viễn)
+  distanceFarM:  'vision_distance_far_m',
+  distanceNearM: 'vision_distance_near_m',
   // Rào cản #1: Hiệu chuẩn vật lý bằng thẻ tín dụng (chính xác nhất).
   // Khóa này PHẢI khớp với CC_STORAGE_KEY trong credit_card_calibration.js.
   ccPxPerMm:   'vision-therapy-cc-pxpermm',
 };
 
-const DEFAULT_DISTANCE_M = 4;    // 4 mét
+const DEFAULT_DISTANCE_M = 4;         // 4 mét (Nhìn Xa)
+const DEFAULT_NEAR_DISTANCE_M = 0.4;  // 40 cm (Nhìn Gần)
+
+/** Giới hạn an toàn lâm sàng — giá trị ngoài khoảng này bị clamp khi lưu */
+const FAR_MIN_M  = 2.0;   // Nhìn Xa:  2m  – 6m
+const FAR_MAX_M  = 6.0;
+const NEAR_MIN_M = 0.2;   // Nhìn Gần: 0.2m – 0.8m
+const NEAR_MAX_M = 0.8;
 
 // ================================================================
 //  Core Math
@@ -87,8 +97,9 @@ function getOptotypeSize(logmarValue, calib = null) {
  */
 function _loadCalibFromStorage() {
   try {
-    const dist   = localStorage.getItem(STORAGE_KEYS.distanceM);
-    const ccPx   = localStorage.getItem(STORAGE_KEYS.ccPxPerMm);
+    const store = () => (typeof window !== 'undefined' && window.SettingsStore) || null;
+    const dist   = store() ? store().get(STORAGE_KEYS.distanceM) : localStorage.getItem(STORAGE_KEYS.distanceM);
+    const ccPx   = store() ? store().get(STORAGE_KEYS.ccPxPerMm) : localStorage.getItem(STORAGE_KEYS.ccPxPerMm);
 
     const distanceM = dist ? parseFloat(dist) : DEFAULT_DISTANCE_M;
     let ppi = 0;
@@ -127,6 +138,46 @@ function _estimatePPI() {
   return diagPx / FALLBACK_DIAGONAL_INCH;
 }
 
+/**
+ * Khoảng cách Nhìn Gần đang active (mét) — helper dùng chung cho các
+ * module Nhìn Gần (near_logmar / near_lea / near_npoint).
+ *
+ * main.js tự chuyển đổi window.__calibrator.distanceM theo nhóm test
+ * trước khi gọi render nên giá trị active đã đúng cho bài test Nhìn Gần;
+ * nếu không có, fallback về cấu hình distanceNearM rồi mới về mặc định.
+ * @returns {number}
+ */
+function getActiveNearDistanceM() {
+  if (typeof window === 'undefined' || !window.__calibrator) {
+    return DEFAULT_NEAR_DISTANCE_M;
+  }
+  const cal = window.__calibrator;
+  const active = parseFloat(cal.distanceM);
+  if (!isNaN(active) && active > 0) return active;
+  const near = parseFloat(cal.distanceNearM);
+  if (!isNaN(near) && near > 0) return near;
+  return DEFAULT_NEAR_DISTANCE_M;
+}
+
+/**
+ * Toast duy nhất: delegate về window.showGlobalToast (main.js).
+ * Fallback console.warn khi main.js chưa tải (chỉ phòng hờ).
+ * @param {string} message
+ * @param {'info'|'success'|'error'|'warning'} [type]
+ * @private
+ */
+function _notify(message, type = 'info') {
+  try {
+    if (typeof window !== 'undefined' && typeof window.showGlobalToast === 'function') {
+      window.showGlobalToast(message, type);
+      return;
+    }
+    console.warn('[Toast]', message);
+  } catch (e) {
+    console.warn('[Toast]', message);
+  }
+}
+
 // ================================================================
 //  DisplayCalibrator
 // ================================================================
@@ -134,11 +185,19 @@ function _estimatePPI() {
 class DisplayCalibrator {
   /**
    * @param {Object} [options]
-   * @param {number}  [options.distanceM=4]       Khoảng cách khám (mét)
+   * @param {number}  [options.distanceM=4]       Khoảng cách khám đang active (mét)
+   * @param {number}  [options.distanceFarM=4]    Khoảng cách Nhìn Xa (mét)
+   * @param {number}  [options.distanceNearM=0.4] Khoảng cách Nhìn Gần (mét)
    * @param {boolean} [options.autoLoad=true]     Tự động đọc localStorage
    */
   constructor(options = {}) {
     this.distanceM = options.distanceM ?? DEFAULT_DISTANCE_M;
+
+    /** @type {number} Khoảng cách Nhìn Xa (mét) — lưu vĩnh viễn */
+    this.distanceFarM = options.distanceFarM ?? DEFAULT_DISTANCE_M;
+
+    /** @type {number} Khoảng cách Nhìn Gần (mét) — lưu vĩnh viễn */
+    this.distanceNearM = options.distanceNearM ?? DEFAULT_NEAR_DISTANCE_M;
 
     /** @type {number} PPI tính được (số thực) */
     this.ppi = 0;
@@ -176,7 +235,8 @@ class DisplayCalibrator {
    */
   _recalculate() {
     try {
-      const ccPx = localStorage.getItem(STORAGE_KEYS.ccPxPerMm);
+      const store = () => (typeof window !== 'undefined' && window.SettingsStore) || null;
+      const ccPx = store() ? store().get(STORAGE_KEYS.ccPxPerMm) : localStorage.getItem(STORAGE_KEYS.ccPxPerMm);
       if (ccPx && parseFloat(ccPx) > 0) {
         this.pxPerMm = parseFloat(ccPx);
         this.ppi = this.pxPerMm * MM_PER_INCH; // số thực
@@ -216,18 +276,44 @@ class DisplayCalibrator {
   // ================================================================
 
   /**
-   * Áp dụng preset mặc định cho thị lực nhìn gần (40 cm).
-   * Đặt khoảng cách = 0.4 m, giữ nguyên PPI hiện tại.
+   * Áp dụng preset cho thị lực nhìn gần.
+   * Khoảng cách lấy từ cấu hình Nhìn Gần (distanceNearM), giữ nguyên PPI.
    */
   applyNearVisionPreset() {
-    this.setDistance(0.4);
+    this.setDistance(this.distanceNearM || DEFAULT_NEAR_DISTANCE_M);
   }
 
   /**
-   * Áp dụng preset mặc định cho thị lực nhìn xa (4 m).
+   * Áp dụng preset cho thị lực nhìn xa.
+   * Khoảng cách lấy từ cấu hình Nhìn Xa (distanceFarM), giữ nguyên PPI.
    */
   applyDistanceVisionPreset() {
-    this.setDistance(4);
+    this.setDistance(this.distanceFarM || DEFAULT_DISTANCE_M);
+  }
+
+  /**
+   * Lưu đồng thời 2 cấu hình khoảng cách độc lập (Nhìn Xa / Nhìn Gần)
+   * xuống localStorage và cập nhật chính instance này (window.__calibrator).
+   * @param {number} farM  Khoảng cách Nhìn Xa (mét)
+   * @param {number} nearM Khoảng cách Nhìn Gần (mét)
+   */
+  saveDistanceSettings(farM, nearM) {
+    this.distanceFarM = farM;
+    this.distanceNearM = nearM;
+
+    const persist = (key, value) => {
+      try {
+        if (typeof window !== 'undefined' && window.SettingsStore) {
+          window.SettingsStore.set(key, String(value));
+        } else {
+          localStorage.setItem(key, String(value));
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+    persist(STORAGE_KEYS.distanceFarM, farM);
+    persist(STORAGE_KEYS.distanceNearM, nearM);
   }
 
   // ================================================================
@@ -237,7 +323,12 @@ class DisplayCalibrator {
   /** @private */
   _saveToStorage() {
     try {
-      localStorage.setItem(STORAGE_KEYS.distanceM, String(this.distanceM));
+      const value = String(this.distanceM);
+      if (typeof window !== 'undefined' && window.SettingsStore) {
+        window.SettingsStore.set(STORAGE_KEYS.distanceM, value);
+      } else {
+        localStorage.setItem(STORAGE_KEYS.distanceM, value);
+      }
     } catch (e) {
       // ignore
     }
@@ -245,9 +336,56 @@ class DisplayCalibrator {
 
   /** @private */
   _loadFromStorage() {
+    this.loadDistanceSettings();
+  }
+
+  /**
+   * Nạp toàn bộ cấu hình khoảng cách từ storage — SINGLE SOURCE OF TRUTH
+   * cho việc hydrate (main.js chỉ gọi API này, không tự đọc key).
+   *
+   * - distanceFarM  ← 'vision_distance_far_m'  (mặc định 4.0)
+   * - distanceNearM ← 'vision_distance_near_m' (mặc định 0.4)
+   * - Di trú key cũ 'vision-therapy-calibrate-distance-m':
+   *   >= 1m → Nhìn Xa, < 1m → Nhìn Gần (chỉ khi key mới chưa tồn tại).
+   * - distanceM (active) = distanceFarM — bài test mặc định khi tải trang
+   *   là Nhìn Xa; các lần chuyển test sau sẽ áp preset đúng nhóm.
+   */
+  loadDistanceSettings() {
     try {
-      const dist = localStorage.getItem(STORAGE_KEYS.distanceM);
-      if (dist) this.distanceM = parseFloat(dist);
+      const get = (key) => (typeof window !== 'undefined' && window.SettingsStore)
+        ? window.SettingsStore.get(key)
+        : localStorage.getItem(key);
+
+      const parseKey = (key, fallback) => {
+        try {
+          const raw = get(key);
+          const v = parseFloat(raw);
+          return (!isNaN(v) && v > 0) ? v : fallback;
+        } catch (e) {
+          return fallback;
+        }
+      };
+
+      // Di trú từ key cũ (khoảng cách active cuối cùng)
+      let legacyFar = null;
+      let legacyNear = null;
+      try {
+        const legacy = parseFloat(get(STORAGE_KEYS.distanceM));
+        if (!isNaN(legacy) && legacy > 0) {
+          if (legacy >= 1) legacyFar = legacy;
+          else legacyNear = legacy;
+        }
+      } catch (e) { /* ignore */ }
+
+      this.distanceFarM = parseKey(
+        STORAGE_KEYS.distanceFarM,
+        legacyFar ?? this.distanceFarM ?? DEFAULT_DISTANCE_M
+      );
+      this.distanceNearM = parseKey(
+        STORAGE_KEYS.distanceNearM,
+        legacyNear ?? this.distanceNearM ?? DEFAULT_NEAR_DISTANCE_M
+      );
+      this.distanceM = this.distanceFarM;
     } catch (e) {
       // ignore
     }
@@ -258,99 +396,193 @@ class DisplayCalibrator {
   // ================================================================
 
   /**
-   * Hiển thị modal hiệu chuẩn.
-   * Đã được đơn giản hóa: Chuyển hướng trực tiếp sang module
-   * CreditCardCalibrator để hiệu chuẩn vật lý bằng thẻ tín dụng.
-   * 
-   * Khoảng cách khám (distanceM) phải được thiết lập trước khi gọi hàm này
-   * (thông qua constructor hoặc setDistance()).
+   * Hiển thị modal chọn khoảng cách khám (Nhìn Xa / Nhìn Gần độc lập).
+   * Footer gồm 2 nút độc lập:
+   *   - "Lưu & Đóng"              : lưu 2 giá trị, đóng modal, toast xác nhận.
+   *   - "Hiệu chuẩn thẻ tín dụng" : lưu 2 giá trị rồi mở modal thẻ tín dụng.
+   * Cả 2 đều cross-validate (Nhìn Xa > Nhìn Gần) và phát sự kiện
+   * 'calibrator:distance-settings-changed' để main.js re-render bài test
+   * đang active ngay lập tức.
    */
   showModal() {
-    // Hiển thị hộp thoại chọn khoảng cách khám trước khi mở hiệu chuẩn thẻ tín dụng
+    const far = this.distanceFarM ?? DEFAULT_DISTANCE_M;
+    const near = this.distanceNearM ?? DEFAULT_NEAR_DISTANCE_M;
+
     const overlay = document.createElement('div');
     overlay.className = 'calib-modal-overlay';
     overlay.innerHTML = `
-      <div class="calib-modal-box" style="max-width: 400px;">
+      <div class="calib-modal-box" style="max-width: 520px;">
         <div class="calib-modal-header">
           <span class="calib-modal-title">Chọn khoảng cách khám</span>
           <button class="calib-modal-close" aria-label="Đóng">&times;</button>
         </div>
         <div class="calib-modal-body">
-          <p style="margin-bottom: 16px; color: #555;">Khoảng cách từ mắt đến màn hình (mét):</p>
-          <div class="calib-field-group">
-            <label class="calib-field-label" for="calib-distance-input">Khoảng cách (m)</label>
-            <div class="calib-field-row">
-              <input type="number" id="calib-distance-input" class="calib-field-input"
-                     value="${this.distanceM}" step="0.1" min="0.5" max="20" inputmode="decimal">
-              <span class="calib-field-unit">mét</span>
-            </div>
-          </div>
-          <div class="calib-preset-container" style="margin-top: 16px;">
-            <!-- Nhóm Nhìn gần -->
+          <div class="calib-preset-container">
+            <!-- Nhìn Xa -->
             <div class="calib-preset-group">
-              <div class="calib-preset-group-title">Nhìn gần</div>
+              <div class="calib-preset-group-title">Khoảng cách Nhìn Xa (m)</div>
+              <div class="calib-field-row" style="margin-bottom: 10px;">
+                <input type="number" id="calib-distance-far-input" class="calib-field-input"
+                       value="${far}" step="0.1" min="${FAR_MIN_M}" max="${FAR_MAX_M}" inputmode="decimal">
+                <span class="calib-field-unit">mét</span>
+              </div>
               <div class="calib-preset-row">
-                <button class="calib-btn-preset" data-distance="0.3" title="30 cm">30 cm</button>
-                <button class="calib-btn-preset" data-distance="0.4" title="40 cm">40 cm</button>
-                <button class="calib-btn-preset" data-distance="0.5" title="50 cm">50 cm</button>
-                <button class="calib-btn-preset" data-distance="0.6" title="60 cm">60 cm</button>
+                <button class="calib-btn-preset" data-target="far" data-distance="3" title="3 mét">3 m</button>
+                <button class="calib-btn-preset" data-target="far" data-distance="4" title="4 mét">4 m</button>
+                <button class="calib-btn-preset" data-target="far" data-distance="5" title="5 mét">5 m</button>
+                <button class="calib-btn-preset" data-target="far" data-distance="6" title="6 mét">6 m</button>
               </div>
             </div>
-            <!-- Nhóm Nhìn xa -->
-            <div class="calib-preset-group">
-              <div class="calib-preset-group-title">Nhìn xa</div>
+            <!-- Nhìn Gần -->
+            <div class="calib-preset-group" style="margin-top: 18px;">
+              <div class="calib-preset-group-title">Khoảng cách Nhìn Gần (m)</div>
+              <div class="calib-field-row" style="margin-bottom: 10px;">
+                <input type="number" id="calib-distance-near-input" class="calib-field-input"
+                       value="${near}" step="0.01" min="${NEAR_MIN_M}" max="${NEAR_MAX_M}" inputmode="decimal">
+                <span class="calib-field-unit">mét</span>
+              </div>
               <div class="calib-preset-row">
-                <button class="calib-btn-preset" data-distance="3" title="3 mét">3 m</button>
-                <button class="calib-btn-preset" data-distance="4" title="4 mét">4 m</button>
-                <button class="calib-btn-preset" data-distance="5" title="5 mét">5 m</button>
-                <button class="calib-btn-preset" data-distance="6" title="6 mét">6 m</button>
+                <button class="calib-btn-preset" data-target="near" data-distance="0.3" title="30 cm">0.3 m</button>
+                <button class="calib-btn-preset" data-target="near" data-distance="0.4" title="40 cm">0.4 m</button>
+                <button class="calib-btn-preset" data-target="near" data-distance="0.5" title="50 cm">0.5 m</button>
+                <button class="calib-btn-preset" data-target="near" data-distance="0.6" title="60 cm">0.6 m</button>
               </div>
             </div>
           </div>
         </div>
-        <div class="calib-modal-footer">
+        <div class="calib-modal-footer" style="flex-wrap: wrap;">
           <button class="calib-btn-cancel">Huỷ</button>
-          <button class="calib-btn-save">Tiếp tục →</button>
+          <button class="calib-btn-cc" id="calib-btn-cc">Hiệu chuẩn thẻ tín dụng</button>
+          <button class="calib-btn-save">Lưu &amp; Đóng</button>
         </div>
       </div>
     `;
-    
+
     document.body.appendChild(overlay);
-    
-    const input = overlay.querySelector('#calib-distance-input');
+
+    const farInput = overlay.querySelector('#calib-distance-far-input');
+    const nearInput = overlay.querySelector('#calib-distance-near-input');
     const closeBtn = overlay.querySelector('.calib-modal-close');
     const cancelBtn = overlay.querySelector('.calib-btn-cancel');
     const saveBtn = overlay.querySelector('.calib-btn-save');
+    const ccBtn = overlay.querySelector('#calib-btn-cc');
     const presetBtns = overlay.querySelectorAll('.calib-btn-preset');
-    
+
     // Close handlers
     const closeModal = () => overlay.remove();
     closeBtn.addEventListener('click', closeModal);
     cancelBtn.addEventListener('click', closeModal);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
-    
-    // Preset buttons
+
+    // ---- Active state: nút preset trùng giá trị ô input được highlight ----
+    const syncPresetActive = () => {
+      presetBtns.forEach(btn => {
+        const target = btn.dataset.target === 'near' ? nearInput : farInput;
+        const active =
+          parseFloat(target.value) === parseFloat(btn.dataset.distance) &&
+          !isNaN(parseFloat(target.value));
+        btn.classList.toggle('active', active);
+      });
+    };
+    farInput.addEventListener('input', syncPresetActive);
+    nearInput.addEventListener('input', syncPresetActive);
+
+    // Preset buttons — mỗi nút gán vào đúng ô (Nhìn Xa / Nhìn Gần)
     presetBtns.forEach(btn => {
       btn.addEventListener('click', () => {
-        input.value = btn.dataset.distance;
+        const target = btn.dataset.target === 'near' ? nearInput : farInput;
+        target.value = btn.dataset.distance;
+        syncPresetActive();
       });
     });
-    
-    // Save and continue
+    syncPresetActive();
+
+    // ---- Validation + Hard Limits (clamp tự động) ----
+    const validate = (farVal, nearVal) => {
+      if (isNaN(farVal) || farVal <= 0) {
+        farInput.focus();
+        return false;
+      }
+      if (isNaN(nearVal) || nearVal <= 0) {
+        nearInput.focus();
+        return false;
+      }
+      if (farVal <= nearVal) {
+        _notify('Khoảng cách Nhìn Xa phải LỚN HƠN Nhìn Gần', 'error');
+        return false;
+      }
+      return true;
+    };
+
+    // Clamp về giới hạn an toàn lâm sàng: Xa [2, 6] m, Gần [0.2, 0.8] m
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+    // ---- Lưu chung cho cả 2 nút; trả về true nếu thành công ----
+    const commit = () => {
+      const rawFar = parseFloat(farInput.value);
+      const rawNear = parseFloat(nearInput.value);
+
+      if (isNaN(rawFar) || rawFar <= 0) {
+        farInput.focus();
+        return false;
+      }
+      if (isNaN(rawNear) || rawNear <= 0) {
+        nearInput.focus();
+        return false;
+      }
+
+      // Kẹp về giới hạn an toàn trước khi validation Xa > Gần
+      const farVal = clamp(rawFar, FAR_MIN_M, FAR_MAX_M);
+      const nearVal = clamp(rawNear, NEAR_MIN_M, NEAR_MAX_M);
+      const clamped = farVal !== rawFar || nearVal !== rawNear;
+
+      if (clamped) {
+        // Phản ánh lại giá trị đã kẹp lên ô input + thông báo
+        farInput.value = String(farVal);
+        nearInput.value = String(nearVal);
+        syncPresetActive();
+        _notify(
+          `Đã điều chỉnh về giới hạn an toàn lâm sàng (Xa: ${FAR_MIN_M}–${FAR_MAX_M}m, Gần: ${NEAR_MIN_M}–${NEAR_MAX_M}m)`,
+          'warning'
+        );
+      }
+
+      if (!validate(farVal, nearVal)) return false;
+
+      // Giữ nguyên nhóm (Xa/Gần) đang active để bài test đang hiển thị
+      // không bị đổi kích thước đột ngột sau khi lưu cấu hình mới.
+      const wasNear =
+        Math.abs(this.distanceM - this.distanceNearM) <=
+        Math.abs(this.distanceM - this.distanceFarM);
+
+      // Lưu cả 2 giá trị xuống localStorage + cập nhật window.__calibrator
+      this.saveDistanceSettings(farVal, nearVal);
+      this.setDistance(wasNear ? nearVal : farVal);
+
+      closeModal();
+
+      // Re-render tức thì bài test đang active theo mốc vừa lưu
+      try {
+        document.dispatchEvent(new CustomEvent('calibrator:distance-settings-changed'));
+      } catch (e) { /* ignore */ }
+
+      return true;
+    };
+
+    // "Lưu & Đóng": chỉ lưu + đóng, KHÔNG bị ép mở hiệu chuẩn thẻ tín dụng
     saveBtn.addEventListener('click', () => {
-      const dist = parseFloat(input.value);
-      if (!isNaN(dist) && dist > 0) {
-        this.setDistance(dist);
-        closeModal();
-        // Mở hiệu chuẩn thẻ tín dụng
-        if (window.__ccCal) {
-          window.__ccCal.showModal();
-        }
+      if (commit()) _notify('Đã lưu khoảng cách khám', 'success');
+    });
+
+    // "Hiệu chuẩn thẻ tín dụng": lưu rồi mở modal thẻ tín dụng
+    ccBtn.addEventListener('click', () => {
+      if (commit() && window.__ccCal) {
+        window.__ccCal.showModal();
       }
     });
-    
+
     // Focus input
-    setTimeout(() => input.focus(), 100);
+    setTimeout(() => farInput.focus(), 100);
   }
 
   /**
@@ -365,4 +597,4 @@ class DisplayCalibrator {
 //  Export
 // ================================================================
 export default DisplayCalibrator;
-export { DisplayCalibrator, getOptotypeSize };
+export { DisplayCalibrator, getOptotypeSize, getActiveNearDistanceM };

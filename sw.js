@@ -4,7 +4,7 @@
  * chỉ chịu trách nhiệm phần tải UI (App Shell + tài nguyên tĩnh).
  */
 
-const CACHE_NAME = 'vision-emr-cache-v1';
+const CACHE_NAME = 'vision-emr-cache-v2';
 
 /* App Shell + tài nguyên tĩnh thiết yếu (đường dẫn tương đối với gốc trang) */
 const urlsToCache = [
@@ -24,6 +24,7 @@ const urlsToCache = [
   '/js/settings.js',
   '/js/calibration.js',
   '/js/credit_card_calibration.js',
+  '/js/settings_store.js',
   '/js/firebase_config.js',
   '/js/exam_session_manager.js',
   '/js/dashboard_controller.js',

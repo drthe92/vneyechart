@@ -14,6 +14,8 @@
  *   Pixel = Chiều cao (mm) × (PPI / 25.4)
  */
 
+import { getActiveNearDistanceM } from '../js/calibration.js';
+
 // ================================================================
 //  Constants
 // ================================================================
@@ -29,8 +31,8 @@ const NPOINT_LEVELS = [
   { n:  5, label: 'N5',  desc: 'Thị lực gần hoàn hảo',    heightMm: 1.76 },
 ];
 
-/** Khoảng cách khám (mét) */
-const NEAR_DISTANCE_M = 0.4;
+/** Khoảng cách tham chiếu của bảng chuẩn (mét) — dùng khi chưa có calibrator */
+const REFERENCE_DISTANCE_M = 0.4;
 
 /** Số lượng đoạn văn tối đa lưu trong lịch sử để tránh lặp lại */
 const MAX_HISTORY = 10;
@@ -92,6 +94,8 @@ function shuffle(arr) {
 
 /**
  * Lấy PPI từ calibrator.
+ * Khoảng cách Nhìn Gần lấy từ helper chung getActiveNearDistanceM()
+ * (js/calibration.js) — main.js đã chuyển distanceM theo nhóm test.
  * @returns {{ ppi: number, pxPerMm: number }}
  */
 function getCalibration() {
@@ -160,8 +164,11 @@ const nearNpointModule = {
     if (!board) return;
 
     const calib = getCalibration();
+    const distanceM = getActiveNearDistanceM();
     const level = NPOINT_LEVELS[index];
-    const pxSize = mmToPx(level.heightMm, calib.pxPerMm);
+    // Chiều cao vật lý scale theo khoảng cách đang active
+    const heightMm = level.heightMm * (distanceM / REFERENCE_DISTANCE_M);
+    const pxSize = mmToPx(heightMm, calib.pxPerMm);
 
     // Luôn chọn đoạn văn mới khi chuyển hàng (lên/xuống)
     this._pickNewParagraph();
@@ -171,15 +178,15 @@ const nearNpointModule = {
       this._history.shift();
     }
 
-    // Font size: point = mm → inch → point
-    // Chiều cao mm → inch → point (1pt = 1/72 inch)
+    // Font size: point = mm → inch → point (1pt = 1/72 inch) — chỉ để hiển thị thông tin
     const fontSizePt = Math.round(level.heightMm / 25.4 * 72);
+    const distanceCm = (distanceM * 100).toFixed(0);
 
     const html = `
       <div class="near-npoint-container">
         <div class="near-npoint-text" style="
           font-family: 'Times New Roman', 'Times', serif;
-          font-size: ${fontSizePt}pt;
+          font-size: ${pxSize}px;
           line-height: 1.8;
           max-width: 90%;
           margin: 0 auto;
@@ -197,7 +204,7 @@ const nearNpointModule = {
           </div>
           <div class="near-vision-info-row">
             <span class="near-vision-info-label">Chiều cao</span>
-            <strong class="near-vision-info-value">${level.heightMm.toFixed(2)} mm</strong>
+            <strong class="near-vision-info-value">${heightMm.toFixed(2)} mm</strong>
           </div>
           <div class="near-vision-info-row">
             <span class="near-vision-info-label">Font size</span>
@@ -205,7 +212,7 @@ const nearNpointModule = {
           </div>
           <div class="near-vision-info-row">
             <span class="near-vision-info-label">Khoảng cách</span>
-            <strong class="near-vision-info-value">40 cm</strong>
+            <strong class="near-vision-info-value">${distanceCm} cm</strong>
           </div>
           <div class="near-vision-info-divider"></div>
           <div class="near-vision-info-row">

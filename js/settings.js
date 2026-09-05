@@ -116,9 +116,13 @@ class DisplayManager {
       }
     }
 
-    // Lưu vào localStorage
+    // Lưu vào localStorage (kèm cookie dự phòng qua SettingsStore)
     try {
-      localStorage.setItem(STORAGE_KEY, presetKey);
+      if (typeof window !== 'undefined' && window.SettingsStore) {
+        window.SettingsStore.set(STORAGE_KEY, presetKey);
+      } else {
+        localStorage.setItem(STORAGE_KEY, presetKey);
+      }
     } catch (e) {
       // localStorage may be unavailable in some contexts
     }
@@ -149,7 +153,9 @@ class DisplayManager {
   /** @private */
   _loadFromStorage() {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = (typeof window !== 'undefined' && window.SettingsStore)
+        ? window.SettingsStore.get(STORAGE_KEY)
+        : localStorage.getItem(STORAGE_KEY);
       if (saved && PRESETS[saved]) {
         this.applyPreset(saved);
         return;
