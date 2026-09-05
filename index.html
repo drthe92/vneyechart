@@ -359,7 +359,7 @@
     <script src="js/dashboard_controller.js"></script>
 
     <!-- Dashboard tiến trình thị giác cho phụ huynh -->
-    <div id="progress-dashboard-modal" class="exam-modal" style="display: none; padding: 20px; background: #1a1a2e; color: #fff; z-index: 1000;">
+    <div id="progress-dashboard-modal" class="exam-modal" role="dialog" aria-modal="true" aria-label="Biểu đồ Tiến triển Thị giác" style="display: none; padding: 20px; background: #1a1a2e; color: #fff; z-index: 1000;">
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
         <h2 style="margin: 0; color: #4da6ff;">Biểu đồ Tiến triển Thị giác</h2>
         <button onclick="closeDashboard()" style="padding: 8px 16px; background: #444; border: none; color: white; border-radius: 4px; cursor: pointer;">Đóng</button>
@@ -381,7 +381,7 @@
     </div>
 
   <!-- GLOBAL CLINICAL RESULT MODAL -->
-  <div id="global-result-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); z-index: 999999; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+  <div id="global-result-modal" role="dialog" aria-modal="true" aria-label="Kết quả Lâm sàng" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); z-index: 999999; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
     <div style="background: #1e1e2d; border: 1px solid #4da6ff; border-radius: 12px; padding: 30px; width: 400px; max-width: 90%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); font-family: system-ui, sans-serif; color: #fff; text-align: center;">
       <div style="font-size: 40px; margin-bottom: 10px;">📋</div>
       <h2 style="margin: 0 0 20px 0; color: #4da6ff; font-size: 20px; text-transform: uppercase;">Kết quả Lâm sàng</h2>

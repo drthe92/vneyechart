@@ -277,6 +277,9 @@ function showGlobalToast(message, type = 'info', options = {}) {
     container.id = 'global-toast-container';
     container.className = 'toast-container';
     container.style.zIndex = '2147483000';
+    // A11y: công bố nội dung toast cho screen reader
+    container.setAttribute('aria-live', 'polite');
+    container.setAttribute('role', 'status');
     document.body.appendChild(container);
   }
 
@@ -2231,11 +2234,13 @@ function formatTherapyClinicalResult(input) {
 
 /**
  * Generate therapy report HTML for a given patient
- * Reads therapy_records from localStorage emr_patient_sessions
  * @param {string} patientId - The patient identifier
+ * @param {Array|null} recordsOverride - Nếu được truyền (Array), dùng đúng
+ *        therapy_records của phiên khám đang xem (Lịch sử/EMR cũ) thay vì đọc
+ *        session mới nhất trong localStorage.
  * @returns {string} HTML string for Part II of unified report
  */
-function generateTherapyReportHTML(patientId) {
+function generateTherapyReportHTML(patientId, recordsOverride = null) {
     let sessions = [];
     try {
         sessions = JSON.parse(localStorage.getItem('emr_patient_sessions') || '[]');
@@ -2243,11 +2248,18 @@ function generateTherapyReportHTML(patientId) {
         console.warn('[TherapyReport] Failed to parse emr_patient_sessions:', e);
         sessions = [];
     }
-    
-    const activeSession = sessions.find(s => s.patientId === patientId);
-    const records = activeSession && Array.isArray(activeSession.therapy_records)
-        ? activeSession.therapy_records
-        : [];
+
+    // [FIX] Ưu tiên bản ghi của đúng phiên đang xem (tránh hiển thị
+    // dữ liệu huấn luyện của phiên mới nhất khi xem lịch sử phiên cũ)
+    let records;
+    if (Array.isArray(recordsOverride)) {
+        records = recordsOverride;
+    } else {
+        const activeSession = sessions.find(s => s.patientId === patientId);
+        records = activeSession && Array.isArray(activeSession.therapy_records)
+            ? activeSession.therapy_records
+            : [];
+    }
     
     if (records.length === 0) {
         return `<p style="font-style: italic; color: #64748b;">Không thực hiện huấn luyện thị giác trong phiên khám này.</p>`;
