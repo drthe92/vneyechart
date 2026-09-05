@@ -158,6 +158,7 @@
             if (doc.exists) {
                 localStorage.setItem("currentPatientId", patientId);
                 localStorage.setItem("currentPatientName", nameInput);
+                localStorage.setItem("currentPatientYob", yearInput);
                 localStorage.setItem("currentProtocol", protocolInput);
                 if (typeof window.syncM12ProgressFromFirebase === 'function') {
                     window.syncM12ProgressFromFirebase(patientId, 'M12');
@@ -189,6 +190,7 @@ if (nmEl) nmEl.disabled = false;
                     });
                     localStorage.setItem("currentPatientId", patientId);
                     localStorage.setItem("currentPatientName", nameInput);
+                    localStorage.setItem("currentPatientYob", yearInput);
                     localStorage.setItem("currentProtocol", protocolInput);
                     if (typeof window.syncM12ProgressFromFirebase === 'function') {
                         window.syncM12ProgressFromFirebase(patientId, 'M12');
@@ -366,7 +368,7 @@ if (nmEl) nmEl.disabled = false;
                         <div class="form-group" style="margin-top: 10px;">
                             <label for="input_protocol">Phác đồ điều trị:</label>
                             <select id="input_protocol" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;">
-                                <option value="amblyopia">Nhược thị & Tật khúc xạ</option>
+                                <option value="amblyopia">Nhược thị</option>
                                 <option value="strabismus_postop">Hậu phẫu Lác (Không bịt mắt)</option>
                             </select>
                         </div>
@@ -377,8 +379,8 @@ if (nmEl) nmEl.disabled = false;
                             </label>
                         </div>
                         <div class="form-actions">
-                            <button type="submit" class="exam-btn submit-btn" tabindex="4">Bắt đầu khám</button>
-                            <button type="button" class="exam-btn cancel-btn" tabindex="5">Hủy</button>
+                            <button type="submit" class="exam-btn submit-btn">Bắt đầu khám</button>
+                            <button type="button" class="exam-btn cancel-btn">Hủy</button>
                         </div>
                     </form>
                 </div>
@@ -1059,6 +1061,7 @@ if (nmEl) nmEl.disabled = false;
         if (startExamBtn) {
             startExamBtn.addEventListener('click', (e) => {
                 e.preventDefault();
+                prefillStartExamModal();
                 showModal(startExamModal);
             });
         }
@@ -1425,6 +1428,17 @@ if (nmEl) nmEl.disabled = false;
             elem.requestFullscreen().catch(err => {
                 console.error('Error entering fullscreen:', err);
             });
+        }
+    }
+
+    // Điền sẵn Năm sinh của người bệnh ở lần khám trước (tương tự Họ tên/SĐT)
+    function prefillStartExamModal() {
+        if (!startExamModal) return;
+        const yobEl = startExamModal.querySelector('#patient-yob');
+        if (!yobEl || yobEl.disabled) return;
+        const savedYob = localStorage.getItem('currentPatientYob');
+        if (savedYob && !yobEl.value) {
+            yobEl.value = savedYob;
         }
     }
 

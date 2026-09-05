@@ -714,6 +714,14 @@
     outline-offset: 2px;
 }
 
+/* Viền highlight rõ ràng cho nút "Bắt đầu khám" & "Hủy" khi điều hướng bằng Tab */
+.submit-btn:focus-visible,
+.cancel-btn:focus-visible {
+    outline: 2px solid #0056b3;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(0, 86, 179, 0.25);
+}
+
 /* Keyboard 2D navigation (nav-btn).
    Cac nut chuc nang tren header (start/end-exam, history, clinic-settings)
    mang class .nav-btn de thuat toan dieu huong ban phim 2D trong main.js
