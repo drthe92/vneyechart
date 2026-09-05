@@ -16,13 +16,14 @@
  */
 
 import { LEA } from './optotype_paths.js';
+import { getActiveNearDistanceM } from '../js/calibration.js';
 
 // ================================================================
 //  Constants
 // ================================================================
 
-/** Khoảng cách khám (mét) */
-const NEAR_DISTANCE_M = 0.4;
+/** Khoảng cách tham chiếu của bảng chuẩn (mét) — dùng khi chưa có calibrator */
+const REFERENCE_DISTANCE_M = 0.4;
 
 /** Giá trị LogMAR cho từng hàng (giống bảng LogMAR) */
 const LOGMAR_LEVELS = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0, -0.1, -0.2];
@@ -76,18 +77,34 @@ function pick4() {
 
 /**
  * Lấy PPI từ calibrator.
+ * Khoảng cách Nhìn Gần lấy từ helper chung getActiveNearDistanceM()
+ * (js/calibration.js) — main.js đã chuyển distanceM theo nhóm test.
+ * @returns {{ ppi: number, pxPerMm: number, distanceM: number }}
  */
 function getCalibration() {
+  const distanceM = getActiveNearDistanceM();
   const calibrator = window.__calibrator;
   if (calibrator && calibrator.ppi > 0) {
-    return { ppi: calibrator.ppi, pxPerMm: calibrator.pxPerMm };
+    return { ppi: calibrator.ppi, pxPerMm: calibrator.pxPerMm, distanceM };
   }
   // Dùng CSS pixels — trình duyệt tự ánh xạ sang physical px
   const w = window.screen.width;
   const h = window.screen.height;
   const diagPx = Math.sqrt(w * w + h * h);
   const ppi = diagPx / 24; // giả định 24 inch, số thực
-  return { ppi, pxPerMm: ppi / 25.4 };
+  return { ppi, pxPerMm: ppi / 25.4, distanceM };
+}
+
+/**
+ * Chiều cao vật lý (mm) của ký hiệu tại khoảng cách khám đang active.
+ * Bảng chuẩn PHYSICAL_HEIGHT_MM được đo ở 40 cm nên scale tuyến tính theo
+ * tỷ lệ khoảng cách: height(D) = height(40cm) × D / 0.4.
+ * @param {number} logmar
+ * @param {number} distanceM
+ * @returns {number}
+ */
+function physicalHeightMm(logmar, distanceM) {
+  return PHYSICAL_HEIGHT_MM[logmar] * (distanceM / REFERENCE_DISTANCE_M);
 }
 
 /**
@@ -109,10 +126,10 @@ function mmToPx(heightMm, pxPerMm) {
  * @returns {string} SVG
  */
 function buildFullChart(highlightIndex, symbolsMatrix, calib) {
-  const { pxPerMm } = calib;
+  const { pxPerMm, distanceM } = calib;
 
   const rowPxSizes = LOGMAR_LEVELS.map((logmar) =>
-    mmToPx(PHYSICAL_HEIGHT_MM[logmar], pxPerMm)
+    mmToPx(physicalHeightMm(logmar, distanceM), pxPerMm)
   );
 
   // Mỗi hàng: 4 ký hiệu, gap = chiều rộng ký hiệu (pxSize)
@@ -190,9 +207,9 @@ function buildFullChart(highlightIndex, symbolsMatrix, calib) {
 // ================================================================
 
 function buildSingleRow(rowIndex, symbols, calib) {
-  const { pxPerMm } = calib;
+  const { pxPerMm, distanceM } = calib;
   const logmar = LOGMAR_LEVELS[rowIndex];
-  const pxSize = mmToPx(PHYSICAL_HEIGHT_MM[logmar], pxPerMm);
+  const pxSize = mmToPx(physicalHeightMm(logmar, distanceM), pxPerMm);
   const rowWidth = pxSize * SYMBOLS_PER_ROW + pxSize * (SYMBOLS_PER_ROW - 1);
   const scale = pxSize / 5;
 
@@ -217,9 +234,9 @@ function buildSingleRow(rowIndex, symbols, calib) {
 // ================================================================
 
 function buildSingleOptotype(rowIndex, symbolKey, showBars, calib) {
-  const { pxPerMm } = calib;
+  const { pxPerMm, distanceM } = calib;
   const logmar = LOGMAR_LEVELS[rowIndex];
-  const pxSize = mmToPx(PHYSICAL_HEIGHT_MM[logmar], pxPerMm);
+  const pxSize = mmToPx(physicalHeightMm(logmar, distanceM), pxPerMm);
   const scale = pxSize / 5;
 
   const margin = showBars ? pxSize * 2.5 : pxSize * 0.3;
@@ -256,8 +273,9 @@ function buildSingleOptotype(rowIndex, symbolKey, showBars, calib) {
 //  Info Panel & Toolbar
 // ================================================================
 
-function buildInfoPanel(logmar, rowIndex, totalRows, mode) {
+function buildInfoPanel(logmar, rowIndex, totalRows, mode, distanceM) {
   const decimalAcuity = Math.pow(10, -logmar);
+  const distanceCm = (distanceM * 100).toFixed(0);
   let modeLabel = '';
   switch (mode) {
     case DISPLAY_MODE.FULL: modeLabel = 'Toàn bảng'; break;
@@ -277,7 +295,7 @@ function buildInfoPanel(logmar, rowIndex, totalRows, mode) {
       </div>
       <div class="near-vision-info-row">
         <span class="near-vision-info-label">Khoảng cách</span>
-        <strong class="near-vision-info-value">40 cm</strong>
+        <strong class="near-vision-info-value">${distanceCm} cm</strong>
       </div>
       <div class="near-vision-info-divider"></div>
       <div class="near-vision-info-row">
@@ -375,7 +393,7 @@ const nearLeaModule = {
 
     board.innerHTML = [
       chartHtml,
-      buildInfoPanel(logmar, index, totalRows, mode),
+      buildInfoPanel(logmar, index, totalRows, mode, calib.distanceM),
       buildToolbar(mode, this._crowdingBars),
     ].join('\n');
 

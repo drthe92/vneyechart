@@ -27,9 +27,6 @@ const FINE_STEP = 0.05;
 const MIN_LOGMAR = 0.0;
 const MAX_LOGMAR = 1.0;
 
-/** Khoảng cách đo cố định cho thị lực nhìn gần (40cm) */
-const NEAR_DISTANCE_M = 0.4;
-
 const ORIENTATIONS = {
   right: 'ArrowRight',
   left: 'ArrowLeft',
@@ -165,7 +162,7 @@ const autoNearVaModule = {
       </div>
     `;
     const btn = board.querySelector('#bcva-start-btn');
-    if (btn) btn.addEventListener('click', () => this._startTest());
+    if (btn) btn.addEventListener('click', () => this._renderPrepScreen('OD'));
   },
 
   _renderPrepScreen(eye) {
@@ -252,9 +249,10 @@ const autoNearVaModule = {
     const board = document.getElementById('display-board');
     if (!board) return;
 
-    let calib = { distanceM: NEAR_DISTANCE_M, ppi: 96 };
+    let calib = { distanceM: null, ppi: 96 };
     if (window.__calibrator) {
-      calib.distanceM = NEAR_DISTANCE_M; // Ép cứng 40cm cho test nhìn gần
+      // Khoảng cách do main.js chuyển đổi theo nhóm test trước khi render
+      calib.distanceM = window.__calibrator.distanceM;
       if (window.__calibrator.ppi > 0) calib.ppi = window.__calibrator.ppi;
     }
 

@@ -9,13 +9,14 @@
  * - Click trúng hình trong 15 giây = Đúng, ngược lại (trượt / hết giờ) = Sai.
  */
 
+import { getActiveNearDistanceM } from '../js/calibration.js';
+
 // ================================================================
 //  Constants
 // ================================================================
 
 const MODULE_ID = 'binocular-auto-stereo-random-dot';
 const ARCSEC_STEPS = [800, 600, 400, 200, 100, 60, 40];
-const NEAR_DISTANCE_M = 0.4;
 const RESPONSE_TIMEOUT_MS = 15000;
 const HIT_RADIUS_PX = 100;
 
@@ -253,12 +254,15 @@ const autoStereoRandomDotModule = {
       ppi = window.__calibrator.ppi;
     }
 
-    // Độ lệch pixel: Δx = (arcsec/3600) × (π/180) × (0.4×1000) × (ppi/25.4)
-    const arcsec = ARCSEC_STEPS[this._currentIndex];
-    const deltaXPx = (arcsec / 3600) * (Math.PI / 180) * (NEAR_DISTANCE_M * 1000) * (ppi / 25.4);
+    // Khoảng cách Nhìn Gần do main.js chuyển đổi (nhóm NEAR) qua window.__calibrator
+    const distanceM = getActiveNearDistanceM();
 
-    // Kích thước hạt nhiễu: 4 arcmin tại 40cm
-    const cellPx = Math.max(1.5, (4 / 60) * (Math.PI / 180) * (NEAR_DISTANCE_M * 1000) * (ppi / 25.4));
+    // Độ lệch pixel: Δx = (arcsec/3600) × (π/180) × (distanceM×1000) × (ppi/25.4)
+    const arcsec = ARCSEC_STEPS[this._currentIndex];
+    const deltaXPx = (arcsec / 3600) * (Math.PI / 180) * (distanceM * 1000) * (ppi / 25.4);
+
+    // Kích thước hạt nhiễu: 4 arcmin tại khoảng cách đang đo
+    const cellPx = Math.max(1.5, (4 / 60) * (Math.PI / 180) * (distanceM * 1000) * (ppi / 25.4));
     const halfShiftCells = (deltaXPx / 2) / cellPx;
 
     const cols = Math.ceil(canvas.width / cellPx);

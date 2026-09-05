@@ -260,9 +260,10 @@ const autoBcvaCrowdingModule = {
     const board = document.getElementById('display-board');
     if (!board) return;
 
-    let calib = { distanceM: 4, ppi: 96 }; // Fallback mặc định
+    let calib = { distanceM: null, ppi: 96 };
     if (window.__calibrator) {
-      calib.distanceM = window.__calibrator.distanceM || 4;
+      // Khoảng cách do main.js cung cấp (nhóm FAR theo TEST_DISTANCE_GROUPS)
+      calib.distanceM = window.__calibrator.distanceM;
       if (window.__calibrator.ppi > 0) calib.ppi = window.__calibrator.ppi;
     }
 

@@ -9,6 +9,8 @@
  * và khử răng cưa (anti-aliasing) ở tần số không gian cao (>20 cpd).
  */
 
+import { getActiveNearDistanceM } from '../js/calibration.js';
+
 // ================================================================
 //  Constants
 // ================================================================
@@ -117,7 +119,7 @@ class WebGLOKNRenderer {
     this.cpd = 2.0;                   
     this.angVelDeg = 20.0;            
     this.direction = 0; // 0: LTR, 1: RTL, 2: UP, 3: DOWN
-    this.distanceM = 0.4;             
+    this.distanceM = null; // gán từ window.__calibrator.distanceM trước start()
     this.ppi = 96;                    
     this._ppd = 96.0;
 
@@ -370,11 +372,11 @@ const neuroOknModule = {
       this._renderer = null;
     }
 
-    let distanceM = 0.4;
+    // Khoảng cách Nhìn Gần do main.js chuyển đổi (nhóm NEAR) qua window.__calibrator
+    const distanceM = getActiveNearDistanceM();
     let ppi = 96;
     const cal = window.__calibrator;
     if (cal && cal.ppi > 0) {
-      distanceM = cal.distanceM || 0.4;
       ppi = cal.ppi;
     }
 

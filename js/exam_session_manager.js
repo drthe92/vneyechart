@@ -156,10 +156,17 @@
             const doc = await patientRef.get();
 
             if (doc.exists) {
-                localStorage.setItem("currentPatientId", patientId);
-                localStorage.setItem("currentPatientName", nameInput);
-                localStorage.setItem("currentPatientYob", yearInput);
-                localStorage.setItem("currentProtocol", protocolInput);
+                if (typeof window.SettingsStore !== 'undefined') {
+                    window.SettingsStore.set("currentPatientId", patientId);
+                    window.SettingsStore.set("currentPatientName", nameInput);
+                    window.SettingsStore.set("currentPatientYob", yearInput);
+                    window.SettingsStore.set("currentProtocol", protocolInput);
+                } else {
+                    localStorage.setItem("currentPatientId", patientId);
+                    localStorage.setItem("currentPatientName", nameInput);
+                    localStorage.setItem("currentPatientYob", yearInput);
+                    localStorage.setItem("currentProtocol", protocolInput);
+                }
                 if (typeof window.syncM12ProgressFromFirebase === 'function') {
                     window.syncM12ProgressFromFirebase(patientId, 'M12');
                     window.syncM12ProgressFromFirebase(patientId, 'M1');
@@ -188,10 +195,17 @@ if (nmEl) nmEl.disabled = false;
                         status: "Active",
                         protocol: protocolInput
                     });
-                    localStorage.setItem("currentPatientId", patientId);
-                    localStorage.setItem("currentPatientName", nameInput);
-                    localStorage.setItem("currentPatientYob", yearInput);
-                    localStorage.setItem("currentProtocol", protocolInput);
+                    if (typeof window.SettingsStore !== 'undefined') {
+                        window.SettingsStore.set("currentPatientId", patientId);
+                        window.SettingsStore.set("currentPatientName", nameInput);
+                        window.SettingsStore.set("currentPatientYob", yearInput);
+                        window.SettingsStore.set("currentProtocol", protocolInput);
+                    } else {
+                        localStorage.setItem("currentPatientId", patientId);
+                        localStorage.setItem("currentPatientName", nameInput);
+                        localStorage.setItem("currentPatientYob", yearInput);
+                        localStorage.setItem("currentProtocol", protocolInput);
+                    }
                     if (typeof window.syncM12ProgressFromFirebase === 'function') {
                         window.syncM12ProgressFromFirebase(patientId, 'M12');
                         window.syncM12ProgressFromFirebase(patientId, 'M1');
@@ -219,6 +233,10 @@ if (nmEl) nmEl.disabled = false;
 
     // Initialize the module
     function init() {
+        // Tự phục hồi cấu hình nếu localStorage bị trình duyệt xóa (đóng/khởi động lại)
+        if (typeof window.SettingsStore !== 'undefined') {
+            window.SettingsStore.heal();
+        }
         loadColorCalibration();
         createUI();
         bindEvents();
@@ -237,7 +255,9 @@ if (nmEl) nmEl.disabled = false;
      */
     function loadColorCalibration() {
         try {
-            const data = localStorage.getItem(CALIBRATION_KEY);
+            const data = (typeof window.SettingsStore !== 'undefined')
+                ? window.SettingsStore.get(CALIBRATION_KEY)
+                : localStorage.getItem(CALIBRATION_KEY);
             if (data) {
                 const calibrated = JSON.parse(data);
                 if (calibrated.red) {
@@ -790,7 +810,12 @@ if (nmEl) nmEl.disabled = false;
     function saveSession() {
         if (window.__currentExam) {
             try {
-                localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(window.__currentExam));
+                const payload = JSON.stringify(window.__currentExam);
+                if (typeof window.SettingsStore !== 'undefined') {
+                    window.SettingsStore.set(SESSION_STORAGE_KEY, payload);
+                } else {
+                    localStorage.setItem(SESSION_STORAGE_KEY, payload);
+                }
             } catch (e) {
                 console.warn('Failed to save session to localStorage:', e);
             }
@@ -1370,7 +1395,12 @@ if (nmEl) nmEl.disabled = false;
                 history.pop();
             }
             
-            localStorage.setItem(EMR_HISTORY_KEY, JSON.stringify(history));
+            const payload = JSON.stringify(history);
+            if (typeof window.SettingsStore !== 'undefined') {
+                window.SettingsStore.set(EMR_HISTORY_KEY, payload);
+            } else {
+                localStorage.setItem(EMR_HISTORY_KEY, payload);
+            }
         } catch (e) {
             console.error('[ExamSessionManager] Failed to save to history:', e);
         }
@@ -1401,7 +1431,11 @@ if (nmEl) nmEl.disabled = false;
 
         // Remove saved session from localStorage
         try {
-            localStorage.removeItem(SESSION_STORAGE_KEY);
+            if (typeof window.SettingsStore !== 'undefined') {
+                window.SettingsStore.remove(SESSION_STORAGE_KEY);
+            } else {
+                localStorage.removeItem(SESSION_STORAGE_KEY);
+            }
         } catch (e) {
             console.warn('Failed to remove session from localStorage:', e);
         }
@@ -1460,8 +1494,13 @@ if (nmEl) nmEl.disabled = false;
         }
     }
 
-    // Show toast notification
+    // Show toast notification — delegate về window.showGlobalToast DUY NHẤT (main.js)
     function showToast(message) {
+        if (typeof window.showGlobalToast === 'function') {
+            window.showGlobalToast(message, 'info');
+            return;
+        }
+        // Fallback cũ (độc lập — chỉ chạy khi main.js chưa tải)
         if (!toastContainer) return;
 
         const toast = document.createElement('div');
@@ -2055,7 +2094,9 @@ if (nmEl) nmEl.disabled = false;
      */
     function loadClinicSettings() {
         try {
-            const data = localStorage.getItem(CLINIC_SETTINGS_KEY);
+            const data = (typeof window.SettingsStore !== 'undefined')
+                ? window.SettingsStore.get(CLINIC_SETTINGS_KEY)
+                : localStorage.getItem(CLINIC_SETTINGS_KEY);
             if (data) {
                 return JSON.parse(data);
             }
@@ -2090,12 +2131,20 @@ if (nmEl) nmEl.disabled = false;
             const selectedCyan = document.querySelector('.palette-row.cyan .color-swatch.active')?.dataset.color || '#00FFFF';
 
             window.__anaglyphColors = { red: selectedRed, cyan: selectedCyan };
-            localStorage.setItem(CALIBRATION_KEY, JSON.stringify(window.__anaglyphColors));
+            if (typeof window.SettingsStore !== 'undefined') {
+                window.SettingsStore.set(CALIBRATION_KEY, JSON.stringify(window.__anaglyphColors));
+            } else {
+                localStorage.setItem(CALIBRATION_KEY, JSON.stringify(window.__anaglyphColors));
+            }
 
             document.documentElement.style.setProperty('--calibrated-red', selectedRed);
             document.documentElement.style.setProperty('--calibrated-cyan', selectedCyan);
 
-            localStorage.setItem(CLINIC_SETTINGS_KEY, JSON.stringify(settings));
+            if (typeof window.SettingsStore !== 'undefined') {
+                window.SettingsStore.set(CLINIC_SETTINGS_KEY, JSON.stringify(settings));
+            } else {
+                localStorage.setItem(CLINIC_SETTINGS_KEY, JSON.stringify(settings));
+            }
             hideModal(clinicSettingsModal);
             showToast('Đã lưu cài đặt phòng khám');
 
@@ -2580,7 +2629,12 @@ function openClinicSettingsModal() {
                     // Dùng hàm save gốc nếu có
                     saveClinicSettings(settings);
                 } else {
-                    localStorage.setItem('vision_clinic_settings', JSON.stringify(settings));
+                    const payload = JSON.stringify(settings);
+                    if (typeof window.SettingsStore !== 'undefined') {
+                        window.SettingsStore.set('vision_clinic_settings', payload);
+                    } else {
+                        localStorage.setItem('vision_clinic_settings', payload);
+                    }
                 }
             }
             // Lưu màu
@@ -2588,7 +2642,12 @@ function openClinicSettingsModal() {
             const selectedCyan = modal.querySelector('.palette-row.cyan .color-swatch.active')?.dataset.color || '#00FFFF';
             window.__anaglyphColors = { red: selectedRed, cyan: selectedCyan };
             if (typeof CALIBRATION_KEY !== 'undefined') {
-                localStorage.setItem(CALIBRATION_KEY, JSON.stringify(window.__anaglyphColors));
+                const colorPayload = JSON.stringify(window.__anaglyphColors);
+                if (typeof window.SettingsStore !== 'undefined') {
+                    window.SettingsStore.set(CALIBRATION_KEY, colorPayload);
+                } else {
+                    localStorage.setItem(CALIBRATION_KEY, colorPayload);
+                }
             }
             document.documentElement.style.setProperty('--calibrated-red', selectedRed);
             document.documentElement.style.setProperty('--calibrated-cyan', selectedCyan);
@@ -2876,7 +2935,12 @@ document.addEventListener('click', function(e) {
                 }
                 
                  // Đóng gói và lưu lại
-                 localStorage.setItem('emr_patient_sessions', JSON.stringify(sessions));
+                 const sessionsPayload = JSON.stringify(sessions);
+                 if (typeof window.SettingsStore !== 'undefined') {
+                     window.SettingsStore.set('emr_patient_sessions', sessionsPayload);
+                 } else {
+                     localStorage.setItem('emr_patient_sessions', sessionsPayload);
+                 }
                  
                  // BẮT ĐẦU: ĐỒNG BỘ LÊN FIREBASE
                  const currentPatientId = localStorage.getItem("currentPatientId");

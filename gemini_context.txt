@@ -4,6 +4,10 @@
 ```text
 📂 vision-therapy-webapp/
     📄 index.html
+    📄 sw.js                       (🔥 MỚI: Service Worker — PWA offline, Network First)
+    📄 manifest.json               (🔥 MỚI: Web App Manifest — cài đặt ứng dụng)
+    📄 offline.html                (🔥 MỚI: trang fallback khi điều hướng ngoại tuyến)
+    📂 icons/                      (🔥 MỚI: icon PWA placeholder 192/512)
     📂 js/
         📄 settings.js
         📄 exam_session_manager.js
@@ -97,6 +101,10 @@
 ```html
 // DOM IDs có sẵn để JS tương tác:
 IDs = ['app', 'sidebar', 'sidebar-header', 'settings-btn', 'cc-calib-btn', 'fullscreen-btn', 'sidebar-title', 'workspace-toggle-btn', 'menu-diagnostic', 'menu-therapeutic', 'menu-toggle-btn', 'menu-hotzone', 'main-area', 'workspace-diagnostic', 'display-board', 'workspace-therapeutic', 'therapeutic-content']
+
+// PWA (🔥 MỚI):
+// <head>: <link rel="manifest" href="/manifest.json"> + meta theme-color #1a1a2e
+// </body>: đăng ký navigator.serviceWorker.register('/sw.js') khi window load
 ```
 
 ### File: `js/calibration.js`
@@ -183,6 +191,7 @@ function resetSession(): ...
 function enterFullscreen(): ...
 function showModal(modal): ...
 function hideModal(modal): ...
+function prefillStartExamModal(): ...   // 🔥 điền sẵn Năm sinh từ localStorage.currentPatientYob khi mở modal
 function showToast(message): ...
 function formatHistoryDate(timestamp): ...
 function createHistoryViewerUI(): ...
@@ -261,6 +270,7 @@ function setupWorkspaceToggle(): ...
 function init(): ...
 function formatTherapyClinicalResult(input): ...
 function generateTherapyReportHTML(patientId): ...
+// (initPWA IIFE cuối file — 🔥 MỚI: SW register + toast sẵn sàng/update + badge offline)
 ```
 
 ### File: `js/settings.js`
@@ -788,6 +798,7 @@ Game kế thừa `BinocularGameEngine` (modules/binocular_game_engine.js):
 | `vision-therapy-cc-pxpermm` | px/mm từ thẻ tín dụng (nguồn PPI chuẩn) |
 | `currentPatientId` | 🔥 ID bệnh nhân đang khám (`SĐT_tênchuẩnhóa_namsinh`) — cần cho Dashboard |
 | `currentPatientName` | 🔥 tên hiển thị bệnh nhân hiện tại |
+| `currentPatientYob` | 🔥 năm sinh bệnh nhân — điền sẵn lại ô Năm sinh khi mở modal Bắt đầu khám |
 | `currentProtocol` | 🔥 phác đồ điều trị: `amblyopia` | `strabismus_postop` |
 
 ### 9.1 Firestore Data Model (🔥 MỚI)
@@ -854,6 +865,12 @@ manual-save-fab, toast-container`. Menu item: `.menu-item[data-test=...]`.
   hover góc dưới-trái 120×120px.
 - `MutationObserver` auto-focus ô nhập đầu tiên khi modal mở; lưu
   `lastFocusedElementBeforeModal` để restore focus khi đóng.
+- A11y (🔥 MỚI): nút "Bắt đầu khám"/"Hủy" là `<button>` chuẩn, KHÔNG có
+  tabindex dương (trước đây `tabindex="4"/"5"` làm Tab không tới được);
+  Tab chạy theo DOM: inputs → checkbox → Bắt đầu khám → Hủy. Enter kích
+  hoạt native (submit form / click). Viền focus:
+  `.submit-btn:focus-visible, .cancel-btn:focus-visible` (outline #0056b3)
+  trong css/exam_session.css.
 
 ## 12. LƯU Ý THIẾT KẾ QUAN TRỌNG
 
@@ -1096,7 +1113,7 @@ YÊU CẦU HIỆN TẠI CỦA TÔI:
 ## 17. PHÁC ĐỒ ĐIỀU TRỊ (Protocols)
 
 - `#input_protocol` trong form Bắt đầu khám:
-  - `amblyopia` — Nhược thị & Tật khúc xạ (mặc định)
+  - `amblyopia` — Nhược thị (mặc định)
   - `strabismus_postop` — Hậu phẫu Lác (không bịt mắt)
 - Lưu vào `localStorage.currentProtocol` + field `protocol` trong doc
   `Patients/{patientId}`.
@@ -1118,7 +1135,7 @@ YÊU CẦU HIỆN TẠI CỦA TÔI:
   duy nhất cho ánh xạ mã hiệu y khoa → module id.
 - `renderSidebar()` → `window.renderTherapeuticLobby(container)`:
   render sảnh dạng **CSS Grid** động theo `localStorage.currentProtocol`:
-  - `amblyopia` — Phác đồ Nhược thị & Tật khúc xạ, 4 giai đoạn:
+  - `amblyopia` — Phác đồ Nhược thị, 4 giai đoạn:
     1. Đánh thức Hoàng điểm (Đơn thị): M7, M8, M9, M10, M11
     2. Chống ức chế: M1, M2, M12
     3. Hợp thị Vận động: M3, M6, M13
@@ -1184,3 +1201,64 @@ exam_session_manager.js addTherapyRecord()         ▼
 | Placeholder | Xóa `neuroRedDesatModule` giả lập "đang được phát triển" (neuro_okn.js) — module thật `red_desat.js` đã đăng ký cùng id; xóa block "đang được phát triển..." trong `#menu-therapeutic` (index.html). |
 | Fix sidebar | `refreshTherapeuticMenu()` + `renderTherapeuticLobby()` giờ ẩn `#menu-diagnostic` (display:none) khi bật menu Huấn luyện — trước đây sau đăng nhập cả 2 menu cùng hiển thị xếp dọc chia đôi sidebar. |
 | ESM | `export { DisplayCalibrator, getOptotypeSize }` (bỏ `debugPrintSizes`); `neuro_okn.js` bỏ export `neuroRedDesatModule`. |
+
+## 22. PWA + A11Y + UX 05/09/2026 (commit 0ec5160)
+
+### 22.1 PWA — Hoạt động ngoại tuyến (Service Worker `sw.js`)
+
+- **Chiến lược**: Network First, Fallback to Cache — luôn lấy code mới nhất
+  từ mạng; khi mất mạng `.catch()` → `caches.match(event.request)`; nếu
+  `request.mode === 'navigate'` và URL chưa cache → trả `/offline.html`.
+- **Pre-cache (install)**: `CACHE_NAME = 'vision-emr-cache-v1'`, `urlsToCache`
+  = toàn bộ App Shell: `/`, `/index.html`, `/offline.html`, 4 CSS,
+  8 file `js/`, toàn bộ module graph (Khám + Huấn luyện + `auto_*` +
+  engine phụ trợ) và 5 thư viện CDN (FontAwesome, Firebase 9.23.0 compat,
+  Chart.js, html2pdf). `cache.addAll()` có fallback cache từng file
+  (`Promise.allSettled`) để đường dẫn lỗi không làm hỏng cài đặt.
+- **Cập nhật có cấp phép (chống mất session)**: install KHÔNG tự động
+  `skipWaiting()`. Trang gửi `postMessage({type:'SKIP_WAITING'})` → worker
+  cũ `message` listener → `skipWaiting()` → activate → `clients.claim()` →
+  `controllerchange` → reload.
+- **activate**: xóa cache cũ không khớp `CACHE_NAME` (giữ `clients.claim()`).
+- **Manifest**: `manifest.json` — `start_url:"/"`, `display:"standalone"`,
+  `theme_color:#1a1a2e`, icons `icons/icon-{192,512}.png` (placeholder
+  sinh bằng script Node, PNG hợp lệ).
+
+### 22.2 UI trạng thái mạng & cập nhật (js/main.js — IIFE `initPWA` cuối file)
+
+- Toast "Hệ thống đã sẵn sàng hoạt động ngoại tuyến" (3s) khi
+  `register('/sw.js')` resolve.
+- `reg.onupdatefound` + `statechange` → worker `installed` VÀ đã có
+  `navigator.serviceWorker.controller` cũ → Toast "Có phiên bản mới.
+  [Bấm để tải lại]" (duration 0, chờ người dùng); nút bấm →
+  `postMessage({type:'SKIP_WAITING'})`. `controllerchange` → reload.
+- Badge đỏ "Ngoại tuyến - Dữ liệu lưu nội bộ" (`#pwa-offline-badge`, góc
+  trên giữa) qua `window 'offline'` / `'online'` events; khởi tạo theo
+  `navigator.onLine`; ẩn tự động khi có mạng.
+- Toast PWA dùng chung class `.toast-container`/`.toast-notification`
+  (exam_session.css), container riêng z-index 2147483000.
+
+### 22.3 A11y — Popup "Bắt đầu phiên khám"
+
+- Bỏ `tabindex="4"`/`tabindex="5"` trên nút "Bắt đầu khám"/"Hủy"
+  (exam_session_manager.js): trước đây positive tabindex xếp chúng vào
+  nhóm Tab riêng → Tab thuận từ form không tới được (vòng lại từ nút
+  đóng). Nay Tab chạy đúng DOM order: inputs → checkbox Ẩn danh →
+  Bắt đầu khám → Hủy. Enter hoạt động native (`<button>` + form submit).
+- CSS: `.submit-btn:focus-visible, .cancel-btn:focus-visible` →
+  `outline: 2px solid #0056b3; outline-offset: 2px` + box-shadow mềm
+  (exam_session.css).
+
+### 22.4 UX — Nhớ Năm sinh người bệnh
+
+- `handleSessionStart()` lưu thêm `localStorage.currentPatientYob` (cả
+  nhánh hồ sơ cũ + mới); `prefillStartExamModal()` điền sẵn vào
+  `#patient-yob` khi mở modal (chỉ điền khi ô trống, bỏ qua nếu disabled
+  do Khám ẩn danh) — ngang bằng Họ tên/SĐT.
+
+### 22.5 Đổi tên phác đồ
+
+- Nhãn `amblyopia`: "Nhược thị & Tật khúc xạ" → **"Nhược thị"** tại
+  option `#input_protocol` (exam_session_manager.js) + tiêu đề Lobby
+  "Phác đồ Điều trị Nhược thị" (therapeutic_menu_controller.js).
+  Giá trị lưu trữ `amblyopia` KHÔNG đổi (tương thích dữ liệu cũ).
