@@ -25,6 +25,24 @@
 
 import BinocularGameEngine from './binocular_game_engine.js';
 
+// Bảng độ khó 10 mức (M8_LEVELS) — gamify giống M2/M4/M9/M10/M12:
+// Level càng cao → chữ E chính (T) nhỏ dần, khoảng cách chen chúc khởi đầu
+// (startSratio) ép sát hơn, ngưỡng khoảng cách tối thiểu phải đạt để qua màn
+// (minSratioRequired) hẹp dần, thời gian hiển thị (displayMs) ngắn dần.
+// displayMs = 0 → không giới hạn thời gian.
+const M8_LEVELS = [
+    { level: 1,  sizeFactor: 0.18, startSratio: 2.5, minSratioRequired: 1.6,  displayMs: 0    },
+    { level: 2,  sizeFactor: 0.17, startSratio: 2.3, minSratioRequired: 1.5,  displayMs: 0    },
+    { level: 3,  sizeFactor: 0.15, startSratio: 2.1, minSratioRequired: 1.4,  displayMs: 0    },
+    { level: 4,  sizeFactor: 0.13, startSratio: 1.9, minSratioRequired: 1.3,  displayMs: 0    },
+    { level: 5,  sizeFactor: 0.12, startSratio: 1.8, minSratioRequired: 1.2,  displayMs: 2000 },
+    { level: 6,  sizeFactor: 0.10, startSratio: 1.7, minSratioRequired: 1.2,  displayMs: 2000 },
+    { level: 7,  sizeFactor: 0.09, startSratio: 1.6, minSratioRequired: 1.15, displayMs: 1500 },
+    { level: 8,  sizeFactor: 0.08, startSratio: 1.5, minSratioRequired: 1.1,  displayMs: 1200 },
+    { level: 9,  sizeFactor: 0.07, startSratio: 1.4, minSratioRequired: 1.1,  displayMs: 1000 },
+    { level: 10, sizeFactor: 0.06, startSratio: 1.3, minSratioRequired: 1.1,  displayMs: 800  }
+];
+
 class AntiCrowdingGame extends BinocularGameEngine {
     constructor() {
         super(); // Khởi tạo cha: kiểm tra hiệu chuẩn, tạo canvas, bind SPA listener
@@ -58,8 +76,11 @@ class AntiCrowdingGame extends BinocularGameEngine {
         this._minSratio = this.START_SRATIO;
 
         // --- Cấu hình từ Lobby (mặc định) ---
-        this._sizeFactor = 0.12;         // T = sizeFactor * min(canvasW, canvasH)
-        this._displayMs = 0;             // 0 = không giới hạn; >0 = giới hạn hiển thị
+        this.level = 1;                 // Cấp độ hiện tại (1..10) — gamify
+        this._sizeFactor = 0.12;        // T = sizeFactor * min(canvasW, canvasH)
+        this._displayMs = 0;            // 0 = không giới hạn; >0 = giới hạn hiển thị
+        this._startSratio = this.START_SRATIO;      // Sratio khởi đầu theo Level
+        this._minSratioRequired = 1.6;  // Ngưỡng Sratio tối thiểu phải đạt để qua màn Level
 
         // --- Trạng thái lượt chơi ---
         this.state = 'WAITING_INPUT';    // 'WAITING_INPUT' | 'FEEDBACK_DELAY'
@@ -109,29 +130,52 @@ class AntiCrowdingGame extends BinocularGameEngine {
     }
 
     /**
+     * Ánh xạ Level (1..10) → Cấu hình độ khó theo bảng M8_LEVELS.
+     * @param {number|string} level - Cấp độ người dùng chọn (mặc định 1)
+     * @returns {number} Level hợp lệ (clamp 1..10)
+     */
+    _applyLevel(level) {
+        const lvl = Math.max(1, Math.min(10, parseInt(level, 10) || 1));
+        const cfg = M8_LEVELS.find(l => l.level === lvl) || M8_LEVELS[0];
+        this.level = lvl;
+        this._sizeFactor = cfg.sizeFactor;
+        this._displayMs = cfg.displayMs;
+        this._startSratio = cfg.startSratio;
+        this._minSratioRequired = cfg.minSratioRequired;
+        return lvl;
+    }
+
+    /**
      * Khởi chạy game với cấu hình từ Lobby
-     * @param {Object} config - { targetSize: 'Lớn'|'Vừa'|'Nhỏ', displayTime: 'unlimited'|'2000' }
+     * @param {Object} config - { level } hoặc legacy { targetSize: 'Lớn'|'Vừa'|'Nhỏ', displayTime: 'unlimited'|'2000' }
      */
     start(config = {}) {
-        // Cấu hình kích thước vật tiêu (T)
-        const targetSize = (config && config.targetSize) ? config.targetSize : 'Vừa';
-        this._sizeFactor = (
-            targetSize === 'Lớn' ? 0.18 :
-            targetSize === 'Nhỏ' ? 0.08 : 0.12
-        );
+        if (config && config.level != null) {
+            // Gamify: áp dụng Level 1..10 từ Lobby
+            this._applyLevel(config.level);
+        } else {
+            // Legacy: cấu hình kích thước vật tiêu (T) + thời gian hiển thị
+            const targetSize = (config && config.targetSize) ? config.targetSize : 'Vừa';
+            this._sizeFactor = (
+                targetSize === 'Lớn' ? 0.18 :
+                targetSize === 'Nhỏ' ? 0.08 : 0.12
+            );
 
-        // Cấu hình thời gian hiển thị
-        const displayTime = (config && config.displayTime) ? config.displayTime : 'unlimited';
-        this._displayMs = (
-            displayTime === '2000' ? 2000 : 0
-        );
+            const displayTime = (config && config.displayTime) ? config.displayTime : 'unlimited';
+            this._displayMs = (
+                displayTime === '2000' ? 2000 : 0
+            );
+            this.level = 1;
+            this._startSratio = this.START_SRATIO;
+            this._minSratioRequired = M8_LEVELS[0].minSratioRequired;
+        }
 
         // Reset trạng thái phiên
         this.trialIndex = 0;
         this.correctAnswers = 0;
         this._consecutiveCorrect = 0;
-        this.Sratio = this.START_SRATIO;
-        this._minSratio = this.START_SRATIO;
+        this.Sratio = this._startSratio;
+        this._minSratio = this._startSratio;
         this._endAfterFeedback = false;
 
         // Bắt đầu render loop
@@ -372,7 +416,8 @@ class AntiCrowdingGame extends BinocularGameEngine {
         ctx.fillText(`Đúng: ${this.correctAnswers}`, 18, 48);
 
         ctx.textAlign = 'right';
-        ctx.fillText(`Khoảng cách S: ${(this.Sratio).toFixed(2)} × T`, cw - 18, 18);
+        ctx.fillText(`Level ${this.level}/10`, cw - 18, 18);
+        ctx.fillText(`Khoảng cách S: ${(this.Sratio).toFixed(2)} × T`, cw - 18, 48);
         ctx.textAlign = 'left';
 
         // E. Phản hồi ĐÚNG / SAI
@@ -404,12 +449,29 @@ class AntiCrowdingGame extends BinocularGameEngine {
             ? (this.correctAnswers / this.trialIndex) * 100
             : 0;
 
+        // --- Tiêu chí qua màn theo Level: ≥ 85% chính xác VÀ đạt khoảng cách hẹp của Level ---
+        const spacingPassed = this._minSratio <= (this._minSratioRequired + 0.001);
+        const isPassed = accuracy >= 85 && spacingPassed;
+
+        // --- Mở khóa Level kế tiếp nếu QUA MÀN và chưa phải Level tối đa ---
+        const LEVEL_KEY = 'vision-therapy-m8-max-level';
+        const maxLevel = parseInt(localStorage.getItem(LEVEL_KEY) || '1', 10) || 1;
+        let unlockedNew = false;
+        if (isPassed && this.level >= maxLevel && this.level < 10) {
+            localStorage.setItem(LEVEL_KEY, String(this.level + 1));
+            unlockedNew = true;
+        }
+
         // Đóng gói customData theo đặc tả
         this.sessionMetrics.customData = {
             totalTrials: this.TOTAL_TRIALS,
             correctAnswers: this.correctAnswers,
             accuracy: accuracy,
+            level: this.level,
+            passed: isPassed,
+            nextLevelUnlocked: unlockedNew,
             minimumSpacingReached: `${this._minSratio.toFixed(2)} × T`,
+            minSratioReached: Math.round(this._minSratio * 100) / 100,
             finalSpacing: `${this.Sratio.toFixed(2)} × T`
         };
         this.sessionMetrics.hits = this.correctAnswers;
@@ -417,6 +479,63 @@ class AntiCrowdingGame extends BinocularGameEngine {
 
         this.finishSession();
         this.stop();
+        this._showResultOverlay(accuracy, isPassed, unlockedNew);
+    }
+
+    /**
+     * Hiển thị overlay kết quả phiên (kèm trạng thái mở khóa Level kế tiếp)
+     * @param {number} accuracy - Tỷ lệ chính xác (%)
+     * @param {boolean} isPassed - Đạt tiêu chí Level hiện tại hay không
+     * @param {boolean} unlockedNew - Có mở khóa Level mới hay không
+     */
+    _showResultOverlay(accuracy, isPassed, unlockedNew) {
+        const evalColor = isPassed ? '#10b981' : '#f87171';
+        const evalText = isPassed
+            ? (unlockedNew ? `ĐẠT — Đã mở khóa Level ${this.level + 1}!` : `ĐẠT (Chinh phục Level ${this.level})`)
+            : `CHƯA ĐẠT (Cần ≥ 85% chính xác và đạt khoảng cách hẹp ≤ ${this._minSratioRequired.toFixed(2)} × T để mở khóa Level kế tiếp)`;
+
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed; inset: 0; z-index: 10000;
+            background: rgba(15, 23, 42, 0.95);
+            color: white;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; padding: 30px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        `;
+
+        overlay.innerHTML = `
+            <h1 style="font-size: 32px; color: ${evalColor}; margin-bottom: 20px;">
+                ✅ ${isPassed ? 'BÁO CÁO LÂM SÀNG: ĐẠT MỤC TIÊU' : 'BÁO CÁO LÂM SÀNG: HOÀN THÀNH PHIÊN TẬP'}
+            </h1>
+
+            <div style="max-width: 600px; background: rgba(255,255,255,0.05); border-radius: 12px; padding: 25px; margin-bottom: 25px;">
+                <p style="font-size: 20px; margin: 8px 0;"><strong>⭐ Cấp độ đã chinh phục:</strong> <span style="color: #fbbf24;">Level ${this.level}</span></p>
+                <p style="font-size: 20px; margin: 8px 0;"><strong>📊 Độ chính xác:</strong> <span style="color: #22d3ee;">${accuracy.toFixed(1)}%</span></p>
+                <p style="font-size: 20px; margin: 8px 0;"><strong>🔬 Khoảng cách hẹp nhất:</strong> <span style="color: #60a5fa;">${this._minSratio.toFixed(2)} × T</span></p>
+                <p style="font-size: 20px; margin: 8px 0;"><strong>🎯 Trả lời đúng:</strong> <span style="color: #10b981;">${this.correctAnswers}</span> / ${this.TOTAL_TRIALS}</p>
+            </div>
+
+            <p style="font-size: 18px; color: ${evalColor}; margin: 0 0 20px 0; font-weight: bold;">${evalText}</p>
+
+            <button id="btn-next-module" style="
+                padding: 15px 40px; font-size: 18px; cursor: pointer;
+                background: #3b82f6; color: white; border: none; border-radius: 8px;
+                font-weight: bold; transition: background 0.3s;
+            ">Trở về Lobby</button>
+        `;
+
+        document.body.appendChild(overlay);
+
+        const nextBtn = document.getElementById('btn-next-module');
+        nextBtn.onmouseover = () => nextBtn.style.background = '#2563eb';
+        nextBtn.onmouseout = () => nextBtn.style.background = '#3b82f6';
+        nextBtn.onclick = () => {
+            document.body.removeChild(overlay);
+            if (document.fullscreenElement) {
+                document.exitFullscreen().catch(() => {});
+            }
+        };
     }
 
     /**

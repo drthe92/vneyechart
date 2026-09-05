@@ -156,13 +156,13 @@ class TherapeuticMenuController {
                 indication: 'Giai đoạn cuối cùng. Yêu cầu hai mắt đã khá đều nhau.',
                 contraindication: 'Không dùng nếu chưa có hợp thị.',
                 gameplay: 'Tìm khối vuông đang "nổi" lên khỏi nền nhiễu và click vào nó.',
-                goal: 'Đạt ngưỡng thị giác nổi 40 Giây cung (Arcsec). Trẻ thực sự khỏi nhược thị hoàn toàn.',
+                goal: 'Trúng LIÊN TIẾP 5 lần ở mức khó nhất của Level để mở khóa Level kế tiếp (Level 9: 40 giây cung = ngưỡng bình thường, Level 10: 20 giây cung).',
                 settings: [
                     {
-                        id: 'rds-time', key: 'searchTimeMs', label: 'Thời gian tìm kiếm tối đa', numeric: true,
-                        options: [
-                            { value: '300000', label: '300 giây', selected: true }
-                        ]
+                        id: 'rds-level', key: 'level', label: 'Cấp độ', type: 'levels',
+                        min: 1, max: 10,
+                        storageKey: 'vision-therapy-m5-max-level',
+                        help: 'Level càng cao: Disparity khởi đầu càng khó (1200 → 60 arcsec), Đích trúng liên tiếp càng nhỏ (600 → 20 arcsec), ô vuông nổi càng nhỏ (140 → 50px). Phiên tối đa 3 phút / 30 hits. Trúng liên tiếp 5 lần ở Đích Level để mở khóa Level kế tiếp.'
                     }
                 ],
                 mandatoryWarning: '⚠️ CẢNH BÁO: Đeo kính Đỏ-Lục Lam (Mắt phải ĐỎ / Mắt trái XANH) trước khi chơi.'
@@ -258,31 +258,21 @@ class TherapeuticMenuController {
                 indication: 'Mắt nhược thị rất nặng (Thị lực < 2/10). Trẻ hay nhìn nghiêng đầu, liếc mắt.',
                 contraindication: 'TUYỆT ĐỐI KHÔNG dùng nếu trẻ có tiền sử động kinh, co giật khi nhìn ánh sáng nhấp nháy.',
                 gameplay: 'Bịt mắt sáng, chỉ dùng mắt mờ nhìn thẳng vào chấm tròn giữa vòng xoáy. Khi chấm tròn đổi màu, bấm SPACE ngay lập tức.',
-                goal: 'Đạt độ chính xác > 85%. Chơi 1-2 lần/ngày.',
+                goal: 'Đạt ≥ 85% chính xác VÀ phản xạ theo ngưỡng Level để mở khóa Level kế tiếp.',
                 settings: [
                     {
-                        id: 'cam-stim-stripe', key: 'stripeWidth', label: 'Kích thước sọc (SF)', numeric: true,
-                        options: [
-                            { value: '80', label: 'Sọc to (Low SF)', selected: false },
-                            { value: '40', label: 'Sọc vừa (Medium SF)', selected: true },
-                            { value: '20', label: 'Sọc nhỏ (High SF)', selected: false }
-                        ]
-                    },
-                    {
-                        id: 'cam-stim-speed', key: 'rotationSpeed', label: 'Tốc độ xoay (vòng/phút)', numeric: true,
-                        options: [
-                            { value: '1.5', label: 'Chậm (1.5 vòng/phút)', selected: false },
-                            { value: '2', label: 'Chuẩn lâm sàng (2 vòng/phút)', selected: true },
-                            { value: '2.5', label: 'Nhanh (2.5 vòng/phút)', selected: false }
-                        ]
+                        id: 'cam-level', key: 'level', label: 'Cấp độ', type: 'levels',
+                        min: 1, max: 10,
+                        storageKey: 'vision-therapy-m7-max-level',
+                        help: 'Level càng cao: đĩa CAM quay nhanh hơn (0.5 → 5 vòng/phút, chuẩn lâm sàng 2), sọc hẹp hơn (60 → 20px), cue đỏ hiển thị ngắn hơn (1.2s → 0.4s). Đạt ≥ 85% chính xác + phản xạ theo Level để mở khóa Level kế tiếp.'
                     },
                     {
                         id: 'cam-stim-duration', key: 'durationMs', label: 'Thời gian', numeric: true,
                         options: [
+                            { value: '60000', label: '60 giây', selected: true },
                             { value: '120000', label: '120 giây', selected: false },
                             { value: '180000', label: '180 giây', selected: false },
-                            { value: '300000', label: '300 giây (mặc định)', selected: true },
-                            { value: '600000', label: '600 giây', selected: false }
+                            { value: '300000', label: '300 giây', selected: false }
                         ]
                     }
                 ],
@@ -299,22 +289,13 @@ class TherapeuticMenuController {
                 indication: 'Mắt nhược thị nhìn từng chữ thì rõ, nhưng nhìn cả hàng chữ thì mờ.',
                 contraindication: 'Trẻ chưa biết phân biệt các hướng Lên/Xuống/Trái/Phải.',
                 gameplay: 'Bịt mắt sáng. Chỉ tập trung vào chữ E ở chính giữa (bỏ qua 4 chữ E xung quanh). Bấm phím mũi tên theo hướng hở của chữ E giữa. Trả lời đúng, các chữ xung quanh sẽ ép sát vào để thử thách thêm.',
-                goal: 'Chịu đựng được khoảng cách ép sát ở mức 1.2x.',
+                goal: 'Đạt ≥ 85% chính xác VÀ khoảng cách hẹp theo Level để mở khóa Level kế tiếp (Level 10: ép sát 1.1x).',
                 settings: [
                     {
-                        id: 'anti-crowding-target-size', key: 'targetSize', label: 'Kích thước vật tiêu', numeric: false,
-                        options: [
-                            { value: 'Lớn', label: 'Lớn', selected: false },
-                            { value: 'Vừa', label: 'Vừa', selected: true },
-                            { value: 'Nhỏ', label: 'Nhỏ', selected: false }
-                        ]
-                    },
-                    {
-                        id: 'anti-crowding-display-time', key: 'displayTime', label: 'Thời gian hiển thị', numeric: false,
-                        options: [
-                            { value: 'unlimited', label: 'Không giới hạn', selected: true },
-                            { value: '2000', label: '2 giây', selected: false }
-                        ]
+                        id: 'anti-crowding-level', key: 'level', label: 'Cấp độ', type: 'levels',
+                        min: 1, max: 10,
+                        storageKey: 'vision-therapy-m8-max-level',
+                        help: 'Level càng cao: chữ E nhỏ hơn (Lớn → Nhỏ), khoảng cách chen chúc khởi đầu ép sát hơn (2.5x → 1.3x), thời gian hiển thị ngắn hơn (Vô hạn → 0.8s). 40 lượt/phiên. Đạt ≥ 85% chính xác + khoảng cách hẹp theo Level để mở khóa Level kế tiếp.'
                     }
                 ],
                 mandatoryWarning: '⚠️ BẮT BUỘC: CHỈ MỞ MẮT NHƯỢC THỊ (BỊT MẮT LÀNH). Tuyệt đối không sử dụng kính Đỏ-Lục Lam (Anaglyph).'
@@ -381,14 +362,13 @@ class TherapeuticMenuController {
                 indication: 'Nhược thị đã ổn định định thị, giảm độ nhạy tương phản (Contrast Sensitivity).',
                 contraindication: 'Chưa bịt mắt lành (Bắt buộc đơn nhãn).',
                 gameplay: 'Bịt mắt sáng. Nhìn dấu (+) ở giữa. Khi vằn Gabor loé lên, hãy quan sát các đường sọc chéo chạy từ trên xuống dưới: nếu sọc rẽ sang Trái thì bấm mũi tên Trái, nếu rẽ sang Phải thì bấm mũi tên Phải.',
-                goal: 'Xác định ngưỡng tương phản (Contrast Threshold) đạt mức thấp (< 10%).',
+                goal: 'Hội tụ ngưỡng tương phản đạt mức xuất phát của Level (Level 10: C = 10%) để mở khóa Level kế tiếp.',
                 settings: [
                     {
-                        id: 'gabor-flash-duration', key: 'flashDuration', label: 'Thời gian flash', numeric: false,
-                        options: [
-                            { value: '200', label: '200 ms - Khó hơn', selected: true },
-                            { value: '500', label: '500 ms - Dễ hơn', selected: false }
-                        ]
+                        id: 'gabor-level', key: 'level', label: 'Cấp độ', type: 'levels',
+                        min: 1, max: 10,
+                        storageKey: 'vision-therapy-m11-max-level',
+                        help: 'Level càng cao: xuất phát Cầu thang gần ngưỡng bình thường hơn (C: 100% → 10%), flash ngắn hơn (500ms → 100ms), cần nhiều đảo chiều hội tụ hơn (4 → 8). Vượt tiêu chí để mở khóa Level kế tiếp.'
                     }
                 ],
                 mandatoryWarning: '⚠️ BẮT BUỘC: CHỈ MỞ MẮT NHƯỢC THỊ (BỊT MẮT LÀNH).'
@@ -410,7 +390,7 @@ class TherapeuticMenuController {
                         id: 'pursuit-level', key: 'level', label: 'Cấp độ', type: 'levels',
                         min: 1, max: 10,
                         storageKey: 'vision-therapy-m12-max-level',
-                        help: 'Đường ray Rộng→Rất hẹp | Tốc độ Chậm→Siêu nhanh | Thoải→Chữ S→Zic-zac từ Level 7. Mỗi phiên 180 giây. Vượt > 85% để mở khóa Level tiếp theo.'
+                        help: 'Đường ray Rộng→Rất hẹp | Tốc độ Chậm→Siêu nhanh | Thoải→Chữ S→Zic-zac từ Level 7. Mỗi phiên 90 giây. Vượt > 85% để mở khóa Level tiếp theo.'
                     }
                 ],
                 mandatoryWarning: '⚠️ BẮT BUỘC: ĐEO KÍNH ĐỎ (MẮT PHẢI) - LỤC LAM (MẮT TRÁI) TRONG SUỐT QUÁ TRÌNH TẬP.'
@@ -442,9 +422,18 @@ class TherapeuticMenuController {
      */
     _handleFullscreenExit() {
         if (!document.fullscreenElement) {
-            this.stopCurrentGame();
-            this.workspaceContainer.style = '';
-            this.workspaceContainer.innerHTML = '';
+            // [CHỐNG TRẮNG MÀN] Reset style/innerHTML workspace TRƯỚC khi
+            // stopCurrentGame(): nếu stop() subclass ném lỗi, workspace vẫn
+            // được trả về luồng trang bình thường (hết nền trắng fixed).
+            if (this.workspaceContainer) {
+                this.workspaceContainer.style = '';
+                this.workspaceContainer.innerHTML = '';
+            }
+            try {
+                this.stopCurrentGame();
+            } catch (err) {
+                console.warn('[Therapeutic] Lỗi khi dừng game trên fullscreenchange:', err);
+            }
             this._restoreTherapeuticLobby();
         }
     }
@@ -512,7 +501,15 @@ class TherapeuticMenuController {
 
     stopCurrentGame() {
         if (this.currentGame) {
-            this.currentGame.stop();
+            try {
+                this.currentGame.stop();
+            } catch (err) {
+                // [CHỐNG TRẮNG MÀN] Một subclass stop() lỗi (vd canva đã bị
+                // _forceClean xóa) KHÔNG được phép làm kẹt luồng dọn dẹp
+                // fullscreen — nếu không, workspace giữ nguyên lớp nền trắng
+                // fixed phủ toàn màn hình và Lobby không bao giờ khôi phục.
+                console.warn('[Therapeutic] stop() lỗi khi dọn dẹp game cũ:', err);
+            }
             this.currentGame = null;
         }
     }
@@ -643,7 +640,19 @@ class TherapeuticMenuController {
             mandatory_warning_html: module.mandatoryWarning || '⚠️ CẢNH BÁO: Tuân thủ quy định an toàn trước khi chơi.'
         };
 
-        const distM = parseFloat(localStorage.getItem('vision-therapy-calibrate-distance-m')) || 0.5;
+        // [SỬA LỖI CỰ LY] Mọi phác đồ huấn luyện (M1-M13) diễn ra ở CỰ LY GẦN:
+        // banner phải hiển thị đúng khoảng cách thực tế mà game dùng để tính
+        // góc thị giác — lấy từ cấu hình Nhìn Gần (distanceNearM, mặc định 0.4m = 40cm),
+        // KHÔNG đọc key legacy 'vision-therapy-calibrate-distance-m' (vẫn còn giữ
+        // giá trị Nhìn Xa 4m = 400cm sau lần hiệu chuẩn Xa gần nhất).
+        let nearM = 0.4;
+        if (window.__calibrator && window.__calibrator.distanceNearM > 0) {
+            nearM = window.__calibrator.distanceNearM;
+        } else {
+            const storedNear = parseFloat(localStorage.getItem('vision_distance_near_m'));
+            if (!isNaN(storedNear) && storedNear > 0) nearM = storedNear;
+        }
+        const distM = nearM;
         const distCm = Math.round(distM * 100);
 
         // Liên kết tài liệu y khoa: mapping linh hoạt href theo ID module
@@ -1085,6 +1094,10 @@ const M2_LEVEL_KEY = 'vision-therapy-m2-max-level';
 const M10_LEVEL_KEY = 'vision-therapy-m10-max-level';
 const M9_LEVEL_KEY = 'vision-therapy-m9-max-level';
 const M4_LEVEL_KEY = 'vision-therapy-m4-max-level';
+const M5_LEVEL_KEY = 'vision-therapy-m5-max-level';
+const M7_LEVEL_KEY = 'vision-therapy-m7-max-level';
+const M8_LEVEL_KEY = 'vision-therapy-m8-max-level';
+const M11_LEVEL_KEY = 'vision-therapy-m11-max-level';
 
 /**
  * Truy vấn Firestore để tìm Level cao nhất mà bệnh nhân đã chinh phục ở module gamify
@@ -1097,7 +1110,9 @@ const M4_LEVEL_KEY = 'vision-therapy-m4-max-level';
 window.syncM12ProgressFromFirebase = async function(patientId, moduleKey = 'M12') {
     const LEVEL_KEY_MAP = {
         'M1': M1_LEVEL_KEY, 'M2': M2_LEVEL_KEY, 'M4': M4_LEVEL_KEY,
-        'M9': M9_LEVEL_KEY, 'M10': M10_LEVEL_KEY, 'M12': M12_LEVEL_KEY
+        'M5': M5_LEVEL_KEY, 'M7': M7_LEVEL_KEY, 'M8': M8_LEVEL_KEY,
+        'M9': M9_LEVEL_KEY, 'M10': M10_LEVEL_KEY, 'M11': M11_LEVEL_KEY,
+        'M12': M12_LEVEL_KEY
     };
     const LEVEL_KEY = LEVEL_KEY_MAP[moduleKey] || M12_LEVEL_KEY;
     try {
@@ -1126,7 +1141,9 @@ window.syncM12ProgressFromFirebase = async function(patientId, moduleKey = 'M12'
         // Nếu Lobby module đang mở, làm mới trạng thái khóa/mở khóa các nút Level
         const WRAP_ID_MAP = {
             'M1': 'catch-level-wrap', 'M2': 'align-level-wrap', 'M4': 'saccadic-level-wrap',
-            'M9': 'redcone-level-wrap', 'M10': 'okn-level-wrap', 'M12': 'pursuit-level-wrap'
+            'M5': 'rds-level-wrap', 'M7': 'cam-level-wrap', 'M8': 'anti-crowding-level-wrap',
+            'M9': 'redcone-level-wrap', 'M10': 'okn-level-wrap', 'M11': 'gabor-level-wrap',
+            'M12': 'pursuit-level-wrap'
         };
         const wrapId = WRAP_ID_MAP[moduleKey] || `${moduleKey.toLowerCase()}-level-wrap`;
         const levelWrap = document.getElementById(wrapId);
@@ -1173,8 +1190,16 @@ document.addEventListener('onWorkspaceChanged', (e) => {
 window.closeTherapyModule = function() {
     // 1. Dừng game đang chạy + reset overlay fullscreen của workspace
     if (window.therapeuticMenu) {
-        window.therapeuticMenu.stopCurrentGame();
-        window.therapeuticMenu._handleFullscreenExit();
+        try {
+            window.therapeuticMenu.stopCurrentGame();
+        } catch (err) {
+            console.warn('[Therapeutic] closeTherapyModule: lỗi stopCurrentGame:', err);
+        }
+        try {
+            window.therapeuticMenu._handleFullscreenExit();
+        } catch (err) {
+            console.warn('[Therapeutic] closeTherapyModule: lỗi khôi phục Lobby:', err);
+        }
     }
 
     // Thoát fullscreen nếu vẫn còn (fullscreenchange sẽ tự dọn + vẽ lại Lobby)

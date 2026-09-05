@@ -57,7 +57,9 @@ class VergenceTrackerGame extends BinocularGameEngine {
      */
     stop() {
         window.removeEventListener('keydown', this.handleSpacebar);
-        this.canvas.style.cursor = 'default';
+        if (this.canvas) {
+            this.canvas.style.cursor = 'default';
+        }
         super.stop();
     }
 

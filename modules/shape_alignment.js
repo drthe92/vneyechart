@@ -381,8 +381,11 @@ class ShapeAlignmentGame extends BinocularGameEngine {
      * Ghi đè stop() để dọn dẹp event listener và khôi phục con trỏ chuột
      */
     stop() {
-        // Khôi phục con trỏ chuột
-        this.canvas.style.cursor = 'default';
+        // Khôi phục con trỏ chuột (guard: canvas có thể đã bị _forceClean() xóa
+        // khi stop() được gọi lần 2 qua stopCurrentGame() trên fullscreenchange)
+        if (this.canvas) {
+            this.canvas.style.cursor = 'default';
+        }
 
         // Dọn dẹp event listener chuột
         if (this.canvas) {
