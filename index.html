@@ -376,8 +376,19 @@
       </div>
       <div id="dashboard-charts" class="dashboard-charts-grid"></div>
       <p style="font-size: 0.9em; color: #aaa; margin-top: 15px; font-style: italic;">
-        * Mỗi điểm dữ liệu tương ứng 1 phiên tập (cần ≥ 2 phiên để vẽ biểu đồ). Dao động điểm số ±15% giữa các phiên tập là hiện tượng sinh lý bình thường.
+        * Mỗi điểm = trung bình các phiên tập trong cùng 1 ngày (cần ≥ 2 phiên để vẽ biểu đồ). Hover để xem từng phiên; click vào điểm để xem chi tiết từng phiên + biểu đồ theo phiên. Dao động điểm số ±15% giữa các phiên tập là hiện tượng sinh lý bình thường.
       </p>
+    </div>
+
+    <!-- Modal chi tiết phiên tập trong ngày (Dashboard) -->
+    <div id="day-detail-modal" class="exam-modal" role="dialog" aria-modal="true" aria-label="Chi tiết phiên tập trong ngày" style="display: none;">
+      <div class="exam-modal-content">
+        <div class="exam-modal-header">
+          <h3 id="day-detail-title">Chi tiết phiên tập</h3>
+          <button id="day-detail-close" class="exam-modal-close" aria-label="Đóng">×</button>
+        </div>
+        <div class="exam-modal-body" id="day-detail-body"></div>
+      </div>
     </div>
 
   <!-- GLOBAL CLINICAL RESULT MODAL -->

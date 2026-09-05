@@ -422,12 +422,18 @@ class SaccadicTrackingGame extends BinocularGameEngine {
         const isPassed = this._isPassByCriteria(criteria, accuracy, avgLatency);
 
         // 6. Mở khóa Level kế tiếp nếu đạt tiêu chí (Level 10 qua màn = TỐT NGHIỆP, không có Level 11)
-        const LEVEL_KEY = 'vision-therapy-m4-max-level';
-        const maxLevel = parseInt(localStorage.getItem(LEVEL_KEY) || '1', 10) || 1;
+        // [FIX LEVEL] Đọc/ghi theo từng bệnh nhân (helper trong therapeutic_menu_controller)
+        const maxLevel = (typeof window.getTherapyMaxLevel === 'function')
+            ? window.getTherapyMaxLevel('M4')
+            : (parseInt(localStorage.getItem('vision-therapy-m4-max-level') || '1', 10) || 1);
         let unlockedNew = false;
         const graduated = isPassed && this.level >= 10;
         if (isPassed && this.level >= maxLevel && this.level < 10) {
-            localStorage.setItem(LEVEL_KEY, String(this.level + 1));
+            if (typeof window.setTherapyMaxLevel === 'function') {
+                window.setTherapyMaxLevel('M4', this.level + 1);
+            } else {
+                localStorage.setItem('vision-therapy-m4-max-level', String(this.level + 1));
+            }
             unlockedNew = true;
         }
 
@@ -505,10 +511,14 @@ class SaccadicTrackingGame extends BinocularGameEngine {
         const finishBtn = document.getElementById('btn-finish-m4');
         if (finishBtn) {
             finishBtn.onclick = () => {
-                if (document.fullscreenElement) {
+                overlay.remove();
+                // Trở về Sảnh game (menu huấn luyện) — closeTherapyModule idempotent:
+                // dừng game, dọn canvas, thoát fullscreen và vẽ lại Lobby.
+                if (typeof window.closeTherapyModule === 'function') {
+                    window.closeTherapyModule();
+                } else if (document.fullscreenElement) {
                     document.exitFullscreen().catch(() => {});
                 }
-                overlay.remove();
             };
         }
     }

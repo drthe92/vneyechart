@@ -404,13 +404,21 @@ class DichopticPursuitGame extends BinocularGameEngine {
         const completionRate = trackingAccuracy;
 
         // 2. Mở khóa Level kế tiếp nếu đạt > 85% (chưa phải Level tối đa)
-        const LEVEL_KEY = 'vision-therapy-m12-max-level';
-        const maxLevel = parseInt(localStorage.getItem(LEVEL_KEY) || '1', 10) || 1;
+        // [FIX LEVEL] Đọc/ghi theo từng bệnh nhân (helper trong therapeutic_menu_controller)
+        const maxLevel = (typeof window.getTherapyMaxLevel === 'function')
+            ? window.getTherapyMaxLevel('M12')
+            : (parseInt(localStorage.getItem('vision-therapy-m12-max-level') || '1', 10) || 1);
         let unlockedNew = false;
         if (completionRate > 85 && this.level >= maxLevel && this.level < 10) {
-            localStorage.setItem(LEVEL_KEY, String(this.level + 1));
+            if (typeof window.setTherapyMaxLevel === 'function') {
+                window.setTherapyMaxLevel('M12', this.level + 1);
+            } else {
+                localStorage.setItem('vision-therapy-m12-max-level', String(this.level + 1));
+            }
             unlockedNew = true;
         }
+        // [TỐT NGHIỆP L10] Đồng bộ M4: vượt qua Level 10 = tốt nghiệp module
+        const graduated = completionRate > 85 && this.level >= 10;
 
         // 3. Chuỗi độ khó (ghi rõ Level đã chinh phục)
         const speedLabel = this.speedFactor <= 0.6 ? 'Chậm' : (this.speedFactor >= 1.8 ? 'Nhanh' : 'Vừa');
@@ -427,7 +435,8 @@ class DichopticPursuitGame extends BinocularGameEngine {
             outOfBoundsHits: this.outOfBoundsHits,
             trackingAccuracy: trackingAccuracy,
             difficulty: difficulty,
-            nextLevelUnlocked: unlockedNew
+            nextLevelUnlocked: unlockedNew,
+            graduated: graduated
         };
         this.finishSession();
 
@@ -435,7 +444,9 @@ class DichopticPursuitGame extends BinocularGameEngine {
         const isPassed = completionRate > 85;
         const evalColor = isPassed ? '#4ade80' : '#f87171';
         const evalText = isPassed
-            ? `${unlockedNew ? 'ĐẠT — Đã mở khóa Level ' + (this.level + 1) + '!' : 'ĐẠT (Bám đuôi ổn định)'}`
+            ? (graduated
+                ? '🏆 TỐT NGHIỆP — Bạn đã chinh phục toàn bộ 10 Level!'
+                : `${unlockedNew ? 'ĐẠT — Đã mở khóa Level ' + (this.level + 1) + '!' : 'ĐẠT (Bám đuôi ổn định)'}`)
             : 'CHƯA ĐẠT (Cần đạt > 85% để mở khóa Level kế tiếp)';
 
         // 6. Dừng game
@@ -477,10 +488,14 @@ class DichopticPursuitGame extends BinocularGameEngine {
         const finishBtn = document.getElementById('btn-finish-m12');
         if (finishBtn) {
             finishBtn.onclick = () => {
-                if (document.fullscreenElement) {
+                overlay.remove();
+                // Trở về Sảnh game (menu huấn luyện) — closeTherapyModule idempotent:
+                // dừng game, dọn canvas, thoát fullscreen và vẽ lại Lobby.
+                if (typeof window.closeTherapyModule === 'function') {
+                    window.closeTherapyModule();
+                } else if (document.fullscreenElement) {
                     document.exitFullscreen().catch(() => {});
                 }
-                overlay.remove();
             };
         }
     }

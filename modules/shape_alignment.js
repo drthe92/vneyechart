@@ -311,13 +311,21 @@ class ShapeAlignmentGame extends BinocularGameEngine {
         this.state = 'ENDED';
 
         // Mở khóa Level kế tiếp nếu QUA MÀN và chưa phải Level tối đa
-        const LEVEL_KEY = 'vision-therapy-m2-max-level';
-        const maxLevel = parseInt(localStorage.getItem(LEVEL_KEY) || '1', 10) || 1;
+        // [FIX LEVEL] Đọc/ghi theo từng bệnh nhân (helper trong therapeutic_menu_controller)
+        const maxLevel = (typeof window.getTherapyMaxLevel === 'function')
+            ? window.getTherapyMaxLevel('M2')
+            : (parseInt(localStorage.getItem('vision-therapy-m2-max-level') || '1', 10) || 1);
         let unlockedNew = false;
         if (passed && this.level >= maxLevel && this.level < 10) {
-            localStorage.setItem(LEVEL_KEY, String(this.level + 1));
+            if (typeof window.setTherapyMaxLevel === 'function') {
+                window.setTherapyMaxLevel('M2', this.level + 1);
+            } else {
+                localStorage.setItem('vision-therapy-m2-max-level', String(this.level + 1));
+            }
             unlockedNew = true;
         }
+        // [TỐT NGHIỆP L10] Đồng bộ M4: vượt qua Level 10 = tốt nghiệp module
+        const graduated = passed && this.level >= 10;
 
         // Quy đổi kích thước → Góc thị giác (Visual Angle - Độ)
         const visualAngleDeg = this.pixelsToVisualAngle(this.sizePx);
@@ -333,7 +341,8 @@ class ShapeAlignmentGame extends BinocularGameEngine {
             holdTimeMs: this.holdTimeMs,
             noiseLevel: this.noise,
             visualAngleDeg: visualAngleDeg,
-            nextLevelUnlocked: unlockedNew
+            nextLevelUnlocked: unlockedNew,
+            graduated: graduated
         };
         this.finishSession();
 
@@ -346,7 +355,9 @@ class ShapeAlignmentGame extends BinocularGameEngine {
 
         const evalColor = passed ? '#34d399' : '#f87171';
         const evalText = passed
-            ? (unlockedNew ? `🏆 QUA MÀN — Đã mở khóa Level ${this.level + 1}!` : '🏆 QUA MÀN — Chuỗi khớp hoàn hảo!')
+            ? (graduated
+                ? '🏆 TỐT NGHIỆP — Bạn đã chinh phục toàn bộ 10 Level!'
+                : (unlockedNew ? `🏆 QUA MÀN — Đã mở khóa Level ${this.level + 1}!` : '🏆 QUA MÀN — Chuỗi khớp hoàn hảo!'))
             : 'CHƯA ĐẠT — Chưa đủ 5 lần khớp LIÊN TIẾP (trượt làm gãy chuỗi). Hãy thử lại!';
 
         const overlay = document.createElement('div');
@@ -370,8 +381,11 @@ class ShapeAlignmentGame extends BinocularGameEngine {
 
         document.getElementById('btn-go-module3').addEventListener('click', () => {
             overlay.remove();
-            // Thoát fullscreen để về lại workspace Phòng tập (Lobby)
-            if (document.fullscreenElement) {
+            // Trở về Sảnh game (menu huấn luyện) — closeTherapyModule idempotent:
+            // dừng game, dọn canvas, thoát fullscreen và vẽ lại Lobby.
+            if (typeof window.closeTherapyModule === 'function') {
+                window.closeTherapyModule();
+            } else if (document.fullscreenElement) {
                 document.exitFullscreen().catch(() => {});
             }
         });

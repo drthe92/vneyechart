@@ -167,7 +167,15 @@
                     localStorage.setItem("currentPatientYob", yearInput);
                     localStorage.setItem("currentProtocol", protocolInput);
                 }
-                if (typeof window.syncM12ProgressFromFirebase === 'function') {
+                if (typeof window.migrateTherapyLevelsToPatient === 'function') {
+                    // [FIX LEVEL] Chuyển khóa level toàn cục cũ → khóa riêng theo bệnh nhân
+                    window.migrateTherapyLevelsToPatient(patientId);
+                }
+                // [CẢI THIỆN SPLASH + HIỆU NĂNG] Đồng bộ level M1..M12 bằng 1 lần chạy
+                // (1 truy vấn Firebase, cờ __levelSyncPending để Lobby hiện thông báo)
+                if (typeof window.syncAllTherapyLevels === 'function') {
+                    window.syncAllTherapyLevels(patientId);
+                } else if (typeof window.syncM12ProgressFromFirebase === 'function') {
                     window.syncM12ProgressFromFirebase(patientId, 'M12');
                     window.syncM12ProgressFromFirebase(patientId, 'M1');
                     window.syncM12ProgressFromFirebase(patientId, 'M2');
@@ -179,7 +187,6 @@
                     window.syncM12ProgressFromFirebase(patientId, 'M11');
                     window.syncM12ProgressFromFirebase(patientId, 'M4');
                 }
-                startExam(nameInput, yearInput);
                 hideModal(startExamModal);
                 const formEl = document.getElementById("start-exam-form");
                 if (formEl) formEl.reset();
@@ -210,7 +217,14 @@ if (nmEl) nmEl.disabled = false;
                         localStorage.setItem("currentPatientYob", yearInput);
                         localStorage.setItem("currentProtocol", protocolInput);
                     }
-                    if (typeof window.syncM12ProgressFromFirebase === 'function') {
+                    if (typeof window.migrateTherapyLevelsToPatient === 'function') {
+                        // [FIX LEVEL] Chuyển khóa level toàn cục cũ → khóa riêng theo bệnh nhân
+                        window.migrateTherapyLevelsToPatient(patientId);
+                    }
+                    // [CẢI THIỆN SPLASH + HIỆU NĂNG] Đồng bộ level M1..M12 bằng 1 lần chạy
+                    if (typeof window.syncAllTherapyLevels === 'function') {
+                        window.syncAllTherapyLevels(patientId);
+                    } else if (typeof window.syncM12ProgressFromFirebase === 'function') {
                         window.syncM12ProgressFromFirebase(patientId, 'M12');
                         window.syncM12ProgressFromFirebase(patientId, 'M1');
                         window.syncM12ProgressFromFirebase(patientId, 'M2');
@@ -222,7 +236,6 @@ if (nmEl) nmEl.disabled = false;
                         window.syncM12ProgressFromFirebase(patientId, 'M11');
                         window.syncM12ProgressFromFirebase(patientId, 'M4');
                     }
-                    startExam(nameInput, yearInput);
                     hideModal(startExamModal);
                     const formEl = document.getElementById("start-exam-form");
                     if (formEl) formEl.reset();
@@ -250,6 +263,10 @@ if (nmEl) nmEl.disabled = false;
         bindEvents();
         setupVisionTestListener();
         setupGlobalHotkey();
+        // [CẢI THIỆN DỌN DỮ LIỆU CŨ] Nén EMR History phình (snapshot cũ merged) + vacuum
+        // emr_patient_sessions (records therapy > 90 ngày → summary) để bền dung lượng
+        _compactEmrHistory();
+        _vacuumEmrSessions();
         restoreSession();
 
         // Combo Test Banner: render ngay khi khởi động (nếu đã có bệnh nhân)
@@ -742,8 +759,20 @@ if (nmEl) nmEl.disabled = false;
             `;
         }
 
+        // [CẢI THIỆN] Chỉ hiển thị PHIÊN HIỆN TẠI trên báo cáo: exam trong RAM đã
+        // hydrate TOÀN BỘ lịch sử bệnh nhân từ emr_patient_sessions — nếu không
+        // lọc, báo cáo (modal / in / PDF) sẽ trùng lặp kết quả các phiên trước.
+        // Áp dụng cho mọi nguồn (currentExam, history) khi có startTime hợp lệ.
+        const reportStartTs = Number(exam.startTime) || 0;
+        const _inCurrentSession = (r) => {
+            if (!r || r.timestamp == null || !reportStartTs) return true;
+            const ts = _tsMs(r.timestamp);
+            return !isNaN(ts) && ts >= reportStartTs;
+        };
+
         // [FIX] Guard legacy: phiên khám cũ có thể không có mảng results
-        const examResults = Array.isArray(exam.results) ? exam.results : [];
+        const examResults = (Array.isArray(exam.results) ? exam.results : []).filter(_inCurrentSession);
+        const reportTherapyRecords = (Array.isArray(exam.therapy_records) ? exam.therapy_records : []).filter(_inCurrentSession);
 
         // [P#4] Sắp xếp kết quả theo thứ tự lâm sàng chuẩn để Báo cáo EMR liền mạch:
         // 1) Thị lực Nhìn Xa → 2) Nhìn Gần → 3) Tương phản → 4) Hình nổi → 5) còn lại
@@ -824,7 +853,7 @@ if (nmEl) nmEl.disabled = false;
                 <!-- PHẦN II: HUẤN LUYỆN THỊ GIÁC (VISION THERAPY) -->
                 <div class="therapy-report-section" style="margin-top: 30px; page-break-inside: avoid;">
                     <h3 style="font-size: 18px; font-weight: bold; color: #1e293b; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">PHẦN II: HUẤN LUYỆN THỊ GIÁC (VISION THERAPY)</h3>
-                    ${window.generateTherapyReportHTML ? window.generateTherapyReportHTML(exam.patientId || '', exam.therapy_records) : '<p style="font-style: italic; color: #64748b;">Không có dữ liệu huấn luyện.</p>'}
+                    ${window.generateTherapyReportHTML ? window.generateTherapyReportHTML(exam.patientId || '', reportTherapyRecords) : '<p style="font-style: italic; color: #64748b;">Không có dữ liệu huấn luyện.</p>'}
                 </div>
                 
                 <div class="print-footer">
@@ -841,7 +870,7 @@ if (nmEl) nmEl.disabled = false;
                 <!-- PHẦN II: HUẤN LUYỆN THỊ GIÁC (VISION THERAPY) -->
                 <div class="therapy-report-section" style="margin-top: 30px;">
                     <h4 style="font-size: 16px; font-weight: bold; color: #1e293b; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">PHẦN II: HUẤN LUYỆN THỊ GIÁC (VISION THERAPY)</h4>
-                    ${window.generateTherapyReportHTML ? window.generateTherapyReportHTML(exam.patientId || '', exam.therapy_records) : '<p style="font-style: italic; color: #64748b;">Không có dữ liệu huấn luyện.</p>'}
+                    ${window.generateTherapyReportHTML ? window.generateTherapyReportHTML(exam.patientId || '', reportTherapyRecords) : '<p style="font-style: italic; color: #64748b;">Không có dữ liệu huấn luyện.</p>'}
                 </div>
             </div>
             `;
@@ -890,9 +919,12 @@ if (nmEl) nmEl.disabled = false;
                 }
             }
 
-            // Khôi phục tiến trình gamify (Level đã mở khóa) từ Firebase nếu đã đăng nhập
-            if (localStorage.getItem('currentPatientId')) {
-                if (typeof window.syncM12ProgressFromFirebase === 'function') {
+            // [CẢI THIỆN SPLASH + HIỆU NĂNG] Đồng bộ level M1..M12 bằng 1 lần chạy
+            // (1 truy vấn Firebase; __levelSyncPending cho Lobby hiện "đang đồng bộ")
+            if (typeof window.syncAllTherapyLevels === 'function') {
+                window.syncAllTherapyLevels(localStorage.getItem('currentPatientId'));
+            } else if (typeof window.syncM12ProgressFromFirebase === 'function') {
+                if (localStorage.getItem('currentPatientId')) {
                     window.syncM12ProgressFromFirebase(localStorage.getItem('currentPatientId'), 'M12');
                     window.syncM12ProgressFromFirebase(localStorage.getItem('currentPatientId'), 'M1');
                     window.syncM12ProgressFromFirebase(localStorage.getItem('currentPatientId'), 'M2');
@@ -1248,13 +1280,32 @@ if (nmEl) nmEl.disabled = false;
             || localStorage.getItem('currentPatientId')
             || buildPatientId('UNKNOWN', patientName || '', patientYOB || '');
 
+        // [FIX MẤT DỮ LIỆU] Mở phiên khám mới cho bệnh nhân ĐÃ có lịch sử:
+        // phục hồi toàn bộ therapy_records + results từ emr_patient_sessions
+        // (append-only store). Trước đây startExam tạo phiên "sạch", và lần
+        // addTherapyRecord đầu tiên GHI ĐÈ entry cũ → mất toàn bộ tiến trình
+        // tập/khám các phiên trước (banner Combo, biểu đồ, level đều tụt về 0).
+        let prevResults = [];
+        let prevTherapyRecords = [];
+        try {
+            const prevSessions = JSON.parse(localStorage.getItem('emr_patient_sessions') || '[]');
+            if (Array.isArray(prevSessions)) {
+                const prevEntry = prevSessions.find(s => s && s.patientId === canonicalPatientId);
+                if (prevEntry) {
+                    if (Array.isArray(prevEntry.results)) prevResults = prevEntry.results;
+                    if (Array.isArray(prevEntry.therapy_records)) prevTherapyRecords = prevEntry.therapy_records;
+                }
+            }
+        } catch (e) { /* dữ liệu hỏng — chấp nhận phiên mới sạch */ }
+
         window.__currentExam = {
             patientName: patientName,
             patientYOB: patientYOB || 'N/A',
             patientAge: age,
             patientId: canonicalPatientId,
             startTime: Date.now(),
-            results: []
+            results: prevResults.slice(),
+            therapy_records: prevTherapyRecords.slice()
         };
 
         // Auto-save session
@@ -1543,15 +1594,31 @@ if (nmEl) nmEl.disabled = false;
         try {
             let history = localStorage.getItem(EMR_HISTORY_KEY);
             history = history ? JSON.parse(history) : [];
-            
+
+            // [CẢI THIỆN] Lưu SNAPSHOT THEO PHIÊN thay vì toàn bộ exam đã merge:
+            // exam hiện chứa TOÀN BỘ lịch sử bệnh nhân (hydration từ store) — nếu
+            // lưu nguyên trạng, mỗi lần "Kết thúc khám" là một bản sao khổng lồ
+            // phình nhanh localStorage (giới hạn ~5MB) và báo cáo lịch sử hiển thị
+            // trùng lặp. Chỉ giữ bản ghi phát sinh TRONG phiên khám này.
+            const startTs = Number(exam.startTime) || 0;
+            const _inSessionSafe = (r) => {
+                if (!r || r.timestamp == null || !startTs) return false;
+                const ts = _tsMs(r.timestamp);
+                return !isNaN(ts) && ts >= startTs;
+            };
+            const sessionResults = (Array.isArray(exam.results) ? exam.results : [])
+                .filter(_inSessionSafe);
+            const sessionTherapy = (Array.isArray(exam.therapy_records) ? exam.therapy_records : [])
+                .filter(_inSessionSafe);
+
             // Add to beginning of array
-            history.unshift({ ...exam, viewedAt: null });
-            
+            history.unshift({ ...exam, results: sessionResults, therapy_records: sessionTherapy, viewedAt: null });
+
             // Memory protection: remove oldest if > 200 items
             if (history.length > 200) {
                 history.pop();
             }
-            
+
             const payload = JSON.stringify(history);
             if (typeof window.SettingsStore !== 'undefined') {
                 window.SettingsStore.set(EMR_HISTORY_KEY, payload);
@@ -1563,17 +1630,24 @@ if (nmEl) nmEl.disabled = false;
             // để vẽ biểu đồ — định tuyến qua addTherapyRecord (ghi CẢ local
             // emr_patient_sessions LẪN Firebase Sessions, hoạt động cả khi offline).
             // Nếu đã có bản tổng hợp Combo thì bỏ qua để tránh điểm trùng lặp.
-            // Loại bỏ các bản ghi đã được push ngay lúc visionTestCompleted (cùng id)
-            // để không tạo điểm trùng.
+            // `already` lấy từ TOÀN BỘ therapy_records đã lưu (không chỉ phiên này)
+            // để không đẩy lại record thị lực đã push ngay lúc visionTestCompleted
+            // → tránh tạo doc Firebase trùng id.
             const hasCombo = Array.isArray(exam.therapy_records) &&
                 exam.therapy_records.some(t => t.test_id === 'combo-amblyopia-assessment');
             if (!hasCombo && window.examSessionManager &&
                 typeof window.examSessionManager.addTherapyRecord === 'function') {
+                let storedAll = [];
+                try {
+                    const stored = JSON.parse(localStorage.getItem('emr_patient_sessions') || '[]');
+                    const entry = (Array.isArray(stored) ? stored : [])
+                        .find(s => s && s.patientId === exam.patientId);
+                    if (entry && Array.isArray(entry.therapy_records)) storedAll = entry.therapy_records;
+                } catch (e) { /* bỏ qua */ }
                 const already = new Set(
-                    (Array.isArray(exam.therapy_records) ? exam.therapy_records : [])
-                        .map(t => t && t.id).filter(Boolean)
+                    storedAll.map(t => t && t.id).filter(Boolean)
                 );
-                _buildVisionTherapyRecords(exam.results).forEach(vr => {
+                _buildVisionTherapyRecords(sessionResults).forEach(vr => {
                     if (!already.has(vr.id)) {
                         window.examSessionManager.addTherapyRecord(vr);
                     }
@@ -1581,6 +1655,208 @@ if (nmEl) nmEl.disabled = false;
             }
         } catch (e) {
             console.error('[ExamSessionManager] Failed to save to history:', e);
+        }
+    }
+
+    /**
+     * [CẢI THIỆN DỌN DỮ LIỆU CŨ] Nén vision_emr_history_v1 (1 lần): các entry
+     * được lưu TRƯỚC khi có mechanism snapshot-theo-phiên chứa TOÀN BỘ trạng
+     * thái merged (results/therapy_records của mọi phiên) → phình localStorage
+     * và là một trong các nguyên nhân trình duyệt tự xóa storage.
+     * Giữ lại bản ghi thuộc đúng phiên (timestamp >= startTime); bản ghi
+     * không phân tích được timestamp giữ nguyên (an toàn).
+     */
+    function _compactEmrHistory() {
+        try {
+            const raw = localStorage.getItem(EMR_HISTORY_KEY);
+            if (!raw) return;
+            let history = JSON.parse(raw);
+            if (!Array.isArray(history) || history.length === 0) return;
+
+            let changed = false;
+            const out = history.map(h => {
+                if (!h || !h.startTime) return h;
+                const startTs = Number(h.startTime) || 0;
+                if (!startTs) return h;
+                const compacted = { ...h };
+
+                const keep = (list) => Array.isArray(list)
+                    ? list.filter(r => {
+                        const ts = _tsMs(r && r.timestamp);
+                        return isNaN(ts) || ts >= startTs;
+                    })
+                    : list;
+
+                const nr = keep(compacted.results);
+                const nt = keep(compacted.therapy_records);
+                if (Array.isArray(compacted.results) && nr.length !== compacted.results.length) {
+                    compacted.results = nr;
+                    changed = true;
+                }
+                if (Array.isArray(compacted.therapy_records) && nt.length !== compacted.therapy_records.length) {
+                    compacted.therapy_records = nt;
+                    changed = true;
+                }
+                return compacted;
+            });
+
+            if (changed) {
+                const payload = JSON.stringify(out);
+                if (typeof window.SettingsStore !== 'undefined') {
+                    window.SettingsStore.set(EMR_HISTORY_KEY, payload);
+                } else {
+                    localStorage.setItem(EMR_HISTORY_KEY, payload);
+                }
+                console.info('[ExamSessionManager] Đã nén EMR History cũ (giảm dung lượng).');
+            }
+        } catch (e) {
+            /* dữ liệu hỏng — bỏ qua */
+        }
+    }
+
+    /**
+     * [MỤC 3] VACUUM `emr_patient_sessions` — bảo trì dung lượng dài hạn.
+     * Mỗi entry bệnh nhân tích lũy therapy_records vô hạn; sau 1-2 năm khám
+     * chữa có thể chạm giới hạn localStorage ~5MB (nguy cơ mất dữ liệu khi
+     * trình duyệt tự dọn storage).
+     *
+     * Cơ chế (THẬN TRỌNG, KHÔNG mất dữ liệu):
+     * - Với therapy_records: giữ NGUYÊN bản ghi ≤ QUÔ_90_ngày (relative `now -
+     *   window`); bản ghi CŨ hơn (có timestamp hợp lệ) được gộp thành 1 SUMMARY
+     *   MỖI TUẦN: { gameName, count, lastTimestamp, firstTimestamp,
+     *               summary: { metricKey: avg || max }, metricAvgKeys: [...] }.
+     *   `hasBaseline: true` (combo) / các bản ghi có `updatedAt` gần đây luôn giữ.
+     * - KHÔNG XÓA results (khám lâm sàng) — chỉ gom therapy.
+     * - Mọi bản ghi VẪN còn trên Firebase (Sessions) → dashboard merge lại đầy
+     *   đủ khi online; offline vẫn hiển thị điểm tổng hợp (avg) cho biểu đồ.
+     * - Chạy tối đa 1 lần / 24h / thiết bị (localStorage guard key).
+     * @returns {number} số bản ghi đã gộp (0 = không làm gì)
+     */
+    function _vacuumEmrSessions() {
+        const VACUUM_KEY = 'vision_therapy_vacuum_last_run';
+        try {
+            // Chạy tối đa 1 lần / 24h
+            const lastRun = parseInt(localStorage.getItem(VACUUM_KEY) || '0', 10) || 0;
+            if (Date.now() - lastRun < 24 * 3600 * 1000) return 0;
+
+            const raw = localStorage.getItem('emr_patient_sessions');
+            if (!raw) return 0;
+            let sessions = JSON.parse(raw);
+            if (!Array.isArray(sessions)) return 0;
+
+            const RETENTION_MS = 90 * 24 * 3600 * 1000;   // 90 ngày
+            const now = Date.now();
+            let totalCompacted = 0;
+
+            const summarizeWeek = (gameName, recs) => {
+                if (!recs || recs.length === 0) return null;
+                const sum = {};
+                const numericKeys = [];
+                const lastTs = Math.max(...recs.map(r => _tsMs(r.timestamp)));
+                const firstTs = Math.min(...recs.map(r => _tsMs(r.timestamp)));
+                for (const r of recs) {
+                    const m = (r.metrics && r.metrics.customData && typeof r.metrics.customData === 'object')
+                        ? r.metrics.customData
+                        : (r.metrics && typeof r.metrics === 'object' ? r.metrics : {});
+                    for (const [k, v] of Object.entries(m)) {
+                        const n = Number(v);
+                        if (!isNaN(n)) {
+                            sum[k] = (sum[k] || 0) + n;
+                            if (numericKeys.indexOf(k) === -1) numericKeys.push(k);
+                        }
+                    }
+                }
+                const avg = {};
+                for (const k of numericKeys) avg[k] = sum[k] / recs.length;
+                return {
+                    gameName: gameName,
+                    count: recs.length,
+                    firstTimestamp: firstTs,
+                    lastTimestamp: lastTs,
+                    summary: avg,
+                    metricAvgKeys: numericKeys,
+                    // Đánh dấu là bản ghi TỔNG HỢP — dashboard/các luồng khác
+                    // bỏ qua khi tính ngày tập riêng lẻ (vẫn đếm ngày qua lastTimestamp)
+                    isSummary: true
+                };
+            };
+
+            for (let i = 0; i < sessions.length; i++) {
+                const s = sessions[i];
+                if (!s || !Array.isArray(s.therapy_records)) continue;
+                const records = s.therapy_records;
+                if (records.length === 0) continue;
+
+                const fresh = [];
+                const stale = [];   // records cũ > 90 ngày (theo timestamp + updatedAt)
+                const keepsBaseline = [];
+
+                for (const r of records) {
+                    if (!r) continue;
+                    // Luôn giữ combo baseline (mốc chốt chuỗi 4 bài)
+                    if (r.gameName === COMBO_GAME_NAME || r.hasBaseline === true) {
+                        keepsBaseline.push(r);
+                        continue;
+                    }
+                    // Thời điểm "tuổi" = max(timestamp, updatedAt)
+                    const ts = _tsMs(r.timestamp);
+                    const updated = _tsMs(r.updatedAt);
+                    const ageRef = (isNaN(updated) ? 0 : updated) > (isNaN(ts) ? 0 : ts)
+                        ? updated : ts;
+                    if (isNaN(ageRef)) { keepsBaseline.push(r); continue; }   // không xác định → giữ
+                    if (now - ageRef > RETENTION_MS) stale.push(r);
+                    else fresh.push(r);
+                }
+
+                if (stale.length === 0) continue;
+
+                // Gom stale theo TUẦN (theo timestamp): 1 summary / game / tuần
+                const buckets = new Map();  // key: game|weekStart
+                for (const r of stale) {
+                    const ts = _tsMs(r.timestamp);
+                    const weekStart = Math.floor((isNaN(ts) ? now : ts) / (7 * 24 * 3600 * 1000));
+                    const k = (r.gameName || 'Bài tập') + '|' + weekStart;
+                    if (!buckets.has(k)) buckets.set(k, []);
+                    buckets.get(k).push(r);
+                }
+                const summaries = [];
+                for (const recs of buckets.values()) {
+                    const sm = summarizeWeek(recs[0].gameName || 'Bài tập', recs);
+                    if (sm) summaries.push(sm);
+                }
+
+                totalCompacted += stale.length;
+                // Sắp xếp giữ thứ tự thời gian: fresh + summaries chèn theo thời gian
+                s.therapy_records = [
+                    ...keepsBaseline,
+                    ...fresh,
+                    ...summaries
+                ].sort((a, b) => {
+                    const ta = _tsMs(a.timestamp || a.lastTimestamp);
+                    const tb = _tsMs(b.timestamp || b.lastTimestamp);
+                    return (isNaN(ta) ? 0 : ta) - (isNaN(tb) ? 0 : tb);
+                });
+                // [MỤC 4] Đánh dấu entry đã được vacuum
+                s.vacuumedAt = now;
+            }
+
+            if (totalCompacted > 0) {
+                const payload = JSON.stringify(sessions);
+                if (typeof window.SettingsStore !== 'undefined') {
+                    window.SettingsStore.set('emr_patient_sessions', payload);
+                } else {
+                    localStorage.setItem('emr_patient_sessions', payload);
+                }
+                localStorage.setItem(VACUUM_KEY, String(now));
+                console.info(`[ExamSessionManager] Vacuum hoàn tất: gộp ${totalCompacted} bản ghi cũ (>90 ngày) thành summary.`);
+            } else {
+                // Vẫn đánh dấu đã chạy để không thử lại liên tục
+                localStorage.setItem(VACUUM_KEY, String(now));
+            }
+            return totalCompacted;
+        } catch (e) {
+            console.warn('[ExamSessionManager] Vacuum EMR sessions lỗi (bỏ qua):', e);
+            return 0;
         }
     }
 
@@ -1631,6 +1907,9 @@ if (nmEl) nmEl.disabled = false;
         if (examStatusText) {
             examStatusText.innerHTML = '';
         }
+
+        // Combo Banner: làm mới ngay (ẩn banner khi không còn phiên khám)
+        updateComboBanner();
     }
 
     // Enter fullscreen
@@ -3044,6 +3323,16 @@ document.addEventListener('click', function(e) {
     }
 
     /**
+     * [CẢI THIỆN] Ép timestamp (ms number | chuỗi ISO) → epoch ms.
+     * Trả NaN nếu không phân tích được (bản ghi hỏng).
+     */
+    function _tsMs(ts) {
+        if (ts == null || ts === '') return NaN;
+        const n = (typeof ts === 'number') ? ts : new Date(ts).getTime();
+        return isNaN(n) ? NaN : n;
+    }
+
+    /**
      * Quét EMR của currentPatientId:
      * - Chốt chặng = ngày hoàn thành "Auto Stereo Random Dot" gần nhất.
      * - X = số ngày duy nhất có therapy_records kể từ chốt chặng đến nay.
@@ -3079,58 +3368,146 @@ document.addEventListener('click', function(e) {
             return;
         }
 
-        // Bước 1: Lấy toàn bộ therapy_records của bệnh nhân từ Hard-Write DB
-        // (cache parse — không JSON.parse lại nếu dữ liệu localStorage chưa đổi)
-        const patientSessions = getEmrPatientSessions();
-        const allRecords = [];
-        for (const s of patientSessions) {
-            if (s && s.patientId === patientId && Array.isArray(s.therapy_records)) {
-                allRecords.push(...s.therapy_records);
-            }
-        }
+        // Bước 1: Tính trạng thái banner từ dữ liệu local (emr_patient_sessions)
+        const localPool = _buildComboPool(patientId, getEmrPatientSessions());
+        const localState = _computeComboBannerState([localPool]);
+        renderComboBannerState(localState);
 
-        // Bước 1b: [FIX] Nếu bệnh nhân ĐÃ có lịch sử chuỗi Combo
-        // (có bản ghi tổng hợp "Combo Đánh Giá Nhược Thị" / cờ hasBaseline,
-        // hoặc đã có đủ 4 bài test thuộc chuỗi) → BẮT BUỘC ẩn banner mời Combo.
+        // [CẢI THIỆN #1] Truy vấn Firebase chỉ khi dữ liệu local KHÔNG cho thấy
+        // MỐC COMBO nào (trạng thái 1) — thường xảy ra khi localStorage bị xóa
+        // (đổi máy / dọn dữ liệu) nhưng Firebase vẫn còn lịch sử. Ngược lại
+        // (local có mốc chốt) → bỏ qua để không tốn lượt query lặp sau mỗi lần lưu.
+        if (window.db && localState.lastTestTime === null && localState.comboTestTypesFound.size < 4) {
+            _syncComboBannerFromFirebase(patientId);
+        }
+    }
+
+    // ============================================================
+    //  Combo Banner — [CẢI THIỆN #1] Firebase Fallback
+    // ============================================================
+
+    // Ánh xạ test_id (payload Firebase Sessions) → tên bài test thuộc chuỗi Combo
+    const COMBO_TEST_ID_TO_TYPE = {
+        'far-vision-auto-distance-va': 'Auto Distance VA',
+        'near-vision-auto-near-va': 'Auto Near VA',
+        'retina-auto-contrast-e': 'Auto Contrast E',
+        'binocular-auto-stereo-random-dot': 'Auto Stereo Random Dot'
+    };
+
+    // Cache truy vấn Firebase: tối đa 1 lần / 60 giây / bệnh nhân
+    let _comboFbSyncCache = { pid: null, ts: 0 };
+
+    /**
+     * Gom toàn bộ dữ liệu của bệnh nhân (therapy_records + results) thành pool
+     * để tính trạng thái banner — dùng chung cho nguồn local và Firebase.
+     */
+    function _buildComboPool(patientId, patientSessions) {
+        const pool = { records: [], results: [] };
+        for (const s of patientSessions) {
+            if (!s || s.patientId !== patientId) continue;
+            if (Array.isArray(s.therapy_records)) pool.records.push(...s.therapy_records);
+            if (Array.isArray(s.results)) pool.results.push(...s.results);
+        }
+        return pool;
+    }
+
+    /**
+     * Tính trạng thái banner (thuần túy) từ 1 hoặc nhiều pool dữ liệu.
+     * Hợp nhiều nguồn bằng phép UNION: lastTestTime = max, ngày tập = hợp các
+     * ngày, baseline = OR — đúng cả khi 1 nguồn đã bị xóa mất dữ liệu.
+     * @param {Array<{records:Array,results:Array}>} pools
+     */
+    function _computeComboBannerState(pools) {
         const COMBO_TEST_TYPE_NAMES = [
             'Auto Distance VA',
             'Auto Near VA',
             'Auto Contrast E',
             'Auto Stereo Random Dot'
         ];
+        const allRecords = [];
+        const allResults = [];
+        for (const p of pools || []) {
+            if (!p) continue;
+            if (Array.isArray(p.records)) allRecords.push(...p.records);
+            if (Array.isArray(p.results)) allResults.push(...p.results);
+        }
+
         const hasComboBaseline = allRecords.some(rec => rec && (
             rec.gameName === COMBO_GAME_NAME || rec.hasBaseline === true
         ));
+
         const comboTestTypesFound = new Set();
-        for (const s of patientSessions) {
-            if (!s || s.patientId !== patientId || !Array.isArray(s.results)) continue;
-            for (const r of s.results) {
-                if (r && COMBO_TEST_TYPE_NAMES.includes(r.test_type)) {
-                    comboTestTypesFound.add(r.test_type);
-                }
+        for (const r of allResults) {
+            if (r && COMBO_TEST_TYPE_NAMES.includes(r.test_type)) {
+                comboTestTypesFound.add(r.test_type);
             }
         }
-        if (hasComboBaseline || comboTestTypesFound.size >= 4) {
+
+        let lastTestTime = null;
+        for (const rec of allRecords) {
+            if (!rec || rec.gameName !== COMBO_GAME_NAME || !rec.timestamp) continue;
+            const ts = Number(rec.timestamp);
+            if (!isNaN(ts) && (lastTestTime === null || ts > lastTestTime)) {
+                lastTestTime = ts;
+            }
+        }
+
+        // Đếm ngày tập duy nhất từ các game huấn luyện (M-game) sau mốc chốt
+        const uniqueDays = new Set();
+        for (const rec of allRecords) {
+            if (!rec || !rec.timestamp) continue;
+            const ts = Number(rec.timestamp);
+            if (isNaN(ts)) continue;
+            if (lastTestTime !== null && ts <= lastTestTime) continue;
+
+            const gName = String(rec.gameName || '');
+            if (!(gName.includes('M') || /M\d+:/.test(gName))) continue;
+
+            const key = dayKey(ts);
+            if (key) uniqueDays.add(key);
+        }
+
+        return {
+            hasComboBaseline: hasComboBaseline,
+            comboTestTypesFound: comboTestTypesFound,
+            lastTestTime: lastTestTime,
+            trainedDays: uniqueDays.size
+        };
+    }
+
+    /**
+     * Render banner theo 3 trạng thái (dùng chung cho kết quả local & Firebase).
+     */
+    function renderComboBannerState(state) {
+        const banner = document.getElementById('amblyopia-combo-banner');
+        const textEl = banner ? document.getElementById('amblyopia-combo-banner-text') : null;
+        const subEl = banner ? document.getElementById('amblyopia-combo-banner-sub') : null;
+        const btn = banner ? document.getElementById('amblyopia-combo-start-btn') : null;
+        if (!banner || !textEl || !subEl || !btn) return;
+
+        // Guard Clause: chưa đăng nhập bệnh nhân hoặc chưa mở phiên khám → ẩn banner
+        const patientId = localStorage.getItem('currentPatientId');
+        if (!patientId || !window.__currentExam) {
             banner.style.display = 'none';
             return;
         }
 
-        // Bước 2: Tìm mốc chốt — record "Combo Đánh Giá Nhược Thị" gần nhất
-        let lastTestTime = null;
-        for (const rec of allRecords) {
-            if (rec && rec.gameName === COMBO_GAME_NAME && rec.timestamp) {
-                const ts = Number(rec.timestamp);
-                if (!isNaN(ts) && (lastTestTime === null || ts > lastTestTime)) {
-                    lastTestTime = ts;
-                }
-            }
+        // [FIX REGRESSION] Chỉ ẨN banner khi bệnh nhân đã hoàn thành đánh giá
+        // theo cách KHÔNG có mốc chốt (≥4 bài test chạy lẻ ngoài Combo, chưa bao
+        // giờ có record tổng hợp). Nếu ĐÃ có record Combo (lastTestTime) thì
+        // PHẢI hiện trạng thái 2/3 (đếm ngày tập / đề nghị làm lại sau 10 ngày) —
+        // trước đây hasComboBaseline ẩn vĩnh viễn → banner không bao giờ mời
+        // bệnh nhân làm lại chuỗi 4 bài sau thời gian tập luyện.
+        if (state.lastTestTime === null && state.comboTestTypesFound.size >= 4) {
+            banner.style.display = 'none';
+            return;
         }
 
         banner.style.display = 'block';
         btn.style.display = 'none';
 
-        // Bước 3: Bệnh nhân mới / chưa từng làm Combo → trạng thái 1, KHÔNG đếm ngày
-        if (lastTestTime === null) {
+        // Trạng thái 1: chưa từng làm Combo → mời thực hiện lần đầu, KHÔNG đếm ngày
+        if (state.lastTestTime === null) {
             textEl.textContent = '🧩 Đề nghị thực hiện chuỗi 4 bài test để có số liệu theo dõi tiến trình điều trị.';
             subEl.textContent = 'Chưa có mốc đánh giá. Sau khi hoàn thành lần đầu, hệ thống sẽ theo dõi 10 ngày tập luyện.';
             btn.disabled = false;
@@ -3140,23 +3517,7 @@ document.addEventListener('click', function(e) {
             return;
         }
 
-        // Bước 4: Bệnh nhân cũ — đếm ngày tập duy nhất từ các game huấn luyện (M-game) sau mốc chốt
-        const uniqueDays = new Set();
-        for (const rec of allRecords) {
-            if (!rec || !rec.timestamp) continue;
-            const ts = Number(rec.timestamp);
-            if (isNaN(ts) || ts <= lastTestTime) continue;
-
-            // Chỉ tính game huấn luyện (gameName chứa 'M' hoặc khớp M<digit>:)
-            const gName = String(rec.gameName || '');
-            if (!(gName.includes('M') || /M\d+:/.test(gName))) continue;
-
-            const key = dayKey(ts);
-            if (key) uniqueDays.add(key);
-        }
-
-        const trainedDays = uniqueDays.size;
-
+        const trainedDays = state.trainedDays;
         if (trainedDays < COMBO_TARGET_DAYS) {
             // Trạng thái 2: Đang trong 10 ngày tập
             const remaining = COMBO_TARGET_DAYS - trainedDays;
@@ -3170,6 +3531,61 @@ document.addEventListener('click', function(e) {
             btn.style.opacity = '1';
             btn.style.cursor = 'pointer';
             btn.style.display = 'block';
+        }
+    }
+
+    /**
+     * [CẢI THIỆN #1] Fallback Firebase cho Combo Banner.
+     * Khi localStorage mất dữ liệu (đổi máy / xóa lịch sử trình duyệt) nhưng
+     * Firebase vẫn còn Session → khôi phục trạng thái banner từ Firebase:
+     * - Phát hiện mốc Combo gần nhất (record "Combo Đánh Giá Nhược Thị")
+     * - Đếm ngày tập M-game (cộng gộp union ngày với local)
+     * Throttle 60s/bệnh nhân để tránh query lặp sau mỗi lần lưu bài tập.
+     */
+    async function _syncComboBannerFromFirebase(pid) {
+        try {
+            if (!pid || !window.db) return;
+            const now = Date.now();
+            if (_comboFbSyncCache.pid === pid && now - _comboFbSyncCache.ts < 60000) return;
+            _comboFbSyncCache = { pid: pid, ts: now };
+
+            const snapshot = await window.db.collection("Patients")
+                .doc(pid)
+                .collection("Sessions")
+                .get();
+
+            const fbPool = { records: [], results: [] };
+            snapshot.forEach(doc => {
+                const d = doc.data();
+                if (!d) return;
+
+                let ts = null;
+                if (d.timestamp) {
+                    ts = (typeof d.timestamp.toDate === 'function')
+                        ? d.timestamp.toDate().getTime()
+                        : new Date(d.timestamp).getTime();
+                }
+                if (!ts || isNaN(ts)) return;
+
+                const gName = String(d.gameName || '');
+                // Chỉ cần bản ghi có ảnh hưởng banner: Combo aggregate hoặc M-game
+                if (gName === COMBO_GAME_NAME || gName.includes('M') || /M\d+:/.test(gName)) {
+                    fbPool.records.push({ gameName: gName, timestamp: ts });
+                }
+                // Nhận diện 4 bài test chuỗi Combo qua test_id
+                const mappedType = COMBO_TEST_ID_TO_TYPE[d.test_id];
+                if (mappedType) fbPool.results.push({ test_type: mappedType });
+            });
+
+            if (fbPool.records.length === 0 && fbPool.results.length === 0) return;
+
+            // Gộp union với pool local (đọc LẠI tại thời điểm response để không
+            // mất bản ghi vừa lưu trong lúc chờ mạng) → trạng thái đầy đủ nhất
+            const localPool = _buildComboPool(pid, getEmrPatientSessions());
+            const merged = _computeComboBannerState([localPool, fbPool]);
+            renderComboBannerState(merged);
+        } catch (err) {
+            console.warn('[Combo Banner] Không lấy được dữ liệu Firebase (giữ trạng thái local):', err);
         }
     }
 
@@ -3217,9 +3633,43 @@ document.addEventListener('click', function(e) {
          * @returns {boolean} True if successful, false otherwise
          */
         addTherapyRecord(record) {
+            // [FIX MẤT DỮ LIỆU KHI TẬP NGOÀI GIỜ KHÁM] Nếu chưa có phiên khám đang mở
+            // (vd: vừa "Kết thúc khám" nhưng bệnh nhân vẫn tập tiếp trên máy) → TỰ
+            // ĐỘNG mở phiên "luyện tập" cho bệnh nhân đang đăng nhập thay vì bỏ rơi
+            // record (trước đây trả false + alert → mất toàn bộ kết quả tập).
             if (!window.__currentExam || !window.__currentExam.patientId) {
-                console.error('[Manager] Khong co phien kham de luu ket qua Huấn luyen.');
-                return false;
+                const pid = localStorage.getItem('currentPatientId');
+                if (!pid) {
+                    console.error('[Manager] Khong co phien kham de luu ket qua Huấn luyen.');
+                    return false;
+                }
+                const pName = localStorage.getItem('currentPatientName') || 'Bệnh nhân';
+                const pYob = localStorage.getItem('currentPatientYob') || 'N/A';
+                const pAge = pYob && pYob !== 'N/A' && !isNaN(parseInt(pYob))
+                    ? (new Date().getFullYear() - parseInt(pYob))
+                    : 'N/A';
+                let prevResults = [];
+                let prevTherapyRecords = [];
+                try {
+                    const prevSessions = JSON.parse(localStorage.getItem('emr_patient_sessions') || '[]');
+                    if (Array.isArray(prevSessions)) {
+                        const prevEntry = prevSessions.find(s => s && s.patientId === pid);
+                        if (prevEntry) {
+                            if (Array.isArray(prevEntry.results)) prevResults = prevEntry.results;
+                            if (Array.isArray(prevEntry.therapy_records)) prevTherapyRecords = prevEntry.therapy_records;
+                        }
+                    }
+                } catch (e) { /* bỏ qua */ }
+                window.__currentExam = {
+                    patientName: pName,
+                    patientYOB: pYob,
+                    patientAge: pAge,
+                    patientId: pid,
+                    startTime: Date.now(),
+                    results: prevResults.slice(),
+                    therapy_records: prevTherapyRecords.slice()
+                };
+                try { updateExamUI(); } catch (e) { /* không chặn lưu */ }
             }
 
             // [TỬ HUYẾT 4] Ép kiểu an toàn: đảm bảo mọi chỉ số (Thị lực, Lăng kính,
@@ -3228,26 +3678,79 @@ document.addEventListener('click', function(e) {
             // khi JSON.stringify. Tránh hỏng cấu trúc EMR lưu vào localStorage/Firebase.
             const safeRecord = _sanitizeNumericMetrics(record) || record;
 
+            // [MỤC 4] Ghi updatedAt (epoch ms) cho MỌI bản ghi — không ghi đè
+            // timestamp gốc của bài test (giữ giá trị lâm sàng), chỉ bổ sung
+            // thời điểm CẬP NHẬT để debug + xử lý conflict + vacuum sau này.
+            const _nowMs = Date.now();
+            if (safeRecord && typeof safeRecord === 'object') {
+                safeRecord.updatedAt = _nowMs;
+            }
+
             // 1. Cập nhật vào RAM hiện tại
             if (!window.__currentExam.therapy_records) {
                 window.__currentExam.therapy_records = [];
             }
             window.__currentExam.therapy_records.push(safeRecord);
+
+            // [MỤC 4] Cập nhật updatedAt của PHIÊN khám khi có bản ghi mới
+            if (window.__currentExam && typeof window.__currentExam === 'object') {
+                window.__currentExam.updatedAt = _nowMs;
+            }
             
-            // 2. ÉP GHI CỨNG VÀO LOCALSTORAGE (Hard-Write)
+            // 2. ÉP GHI CỨNG VÀO LOCALSTORAGE (Hard-Write) — CHẾ ĐỘ MERGE:
+            // KHÔNG BAO GIỜ ghi đè entry của bệnh nhân bằng toàn bộ __currentExam
+            // (phiên mới có therapy_records/results rỗng → XÓA SẠCH lịch sử cũ
+            // và banner/biểu đồ/level tụt về 0). Hợp nhất dữ liệu cũ + mới.
             try {
                 // Lấy toàn bộ Database hiện có
                 let sessions = JSON.parse(localStorage.getItem('emr_patient_sessions')) || [];
+                if (!Array.isArray(sessions)) sessions = [];
                 
-                // Tìm vị trí của hồ sơ hiện tại
-                let index = sessions.findIndex(s => s.patientId === window.__currentExam.patientId);
+                const pid = window.__currentExam.patientId;
+                let idx = sessions.findIndex(s => s && s.patientId === pid);
                 
-                if (index !== -1) {
-                    // Nếu đã có, ghi đè toàn bộ object hiện tại (đã chứa therapy_records mới) lên
-                    sessions[index] = window.__currentExam;
+                if (idx === -1) {
+                    // Chưa có entry (chỉ tập mà không khám) — tạo mới từ RAM
+                    sessions.push(JSON.parse(JSON.stringify(window.__currentExam)));
                 } else {
-                    // Nếu chưa có (trường hợp chỉ tập mà không khám), push mới
-                    sessions.push(window.__currentExam);
+                    const entry = sessions[idx];
+                    if (!Array.isArray(entry.results)) entry.results = [];
+                    if (!Array.isArray(entry.therapy_records)) entry.therapy_records = [];
+                    
+                    // Hợp nhất results (dedup theo test_type + timestamp)
+                    const seenResults = new Set();
+                    entry.results.forEach(r => {
+                        if (r && r.timestamp != null) seenResults.add(r.test_type + '|' + r.timestamp);
+                    });
+                    (Array.isArray(window.__currentExam.results) ? window.__currentExam.results : []).forEach(r => {
+                        if (!r || r.timestamp == null) return;
+                        const k = r.test_type + '|' + r.timestamp;
+                        if (!seenResults.has(k)) {
+                            seenResults.add(k);
+                            entry.results.push(r);
+                        }
+                    });
+                    
+                    // Hợp nhất therapy_records (dedup theo id, fallback gameName + timestamp)
+                    const seenRecs = new Set();
+                    entry.therapy_records.forEach(t => {
+                        if (!t) return;
+                        seenRecs.add(t.id || (t.gameName + '|' + t.timestamp));
+                    });
+                    (Array.isArray(window.__currentExam.therapy_records) ? window.__currentExam.therapy_records : []).forEach(t => {
+                        if (!t) return;
+                        const k = t.id || (t.gameName + '|' + t.timestamp);
+                        if (!seenRecs.has(k)) {
+                            seenRecs.add(k);
+                            entry.therapy_records.push(t);
+                        }
+                    });
+                    
+                    // Đồng bộ ngược RAM với entry GỘP — report/banner/dashboard
+                    // luôn thấy toàn bộ lịch sử bệnh nhân, không chỉ phiên hiện tại
+                    window.__currentExam.results = entry.results;
+                    window.__currentExam.therapy_records = entry.therapy_records;
+                    sessions[idx] = entry;
                 }
                 
                  // Đóng gói và lưu lại
@@ -3269,12 +3772,14 @@ document.addEventListener('click', function(e) {
                               : (safeRecord.metrics || {});
 
                            const payload = {
+                               id: safeRecord.id || null,
                                gameName: safeRecord.gameName || "Unknown Module",
                                test_id: safeRecord.test_id || null,
                                durationSeconds: safeRecord.durationSeconds || 0,
                                metrics: _sanitizeNumericMetrics(clinicalMetrics) || {},
                                opticalSettings: safeRecord.opticalSettings || {},
                                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                               updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                                device_userAgent: navigator.userAgent
                            };
 
@@ -3329,6 +3834,43 @@ document.addEventListener('click', function(e) {
     window.updateComboBanner = updateComboBanner;
 
     // ================================================================
+    //  [CẢI THIỆN MULTI-TAB] Đồng bộ dữ liệu giữa các tab
+    //  Sự kiện 'storage' chỉ bắn ở các tab KHÔNG phải tab ghi → tab này làm
+    //  mới RAM từ store dùng chung, để lần ghi SAU của tab này MERGE VÀO dữ
+    //  liệu mới nhất thay vì ghi đè last-writer-wins (mất cập nhật tab kia).
+    // ================================================================
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+        window.addEventListener('storage', (e) => {
+            try {
+                if (e.key === 'emr_patient_sessions') {
+                    if (!window.__currentExam || !window.__currentExam.patientId) return;
+                    const next = JSON.parse(e.newValue || '[]');
+                    const entry = (Array.isArray(next) ? next : [])
+                        .find(s => s && s.patientId === window.__currentExam.patientId);
+                    if (entry) {
+                        if (Array.isArray(entry.results)) window.__currentExam.results = entry.results;
+                        if (Array.isArray(entry.therapy_records)) window.__currentExam.therapy_records = entry.therapy_records;
+                        // Cập nhật banner + dashboard (nếu đang mở) ngay
+                        updateComboBanner();
+                        try {
+                            const dashModal = document.getElementById('progress-dashboard-modal');
+                            if (dashModal && dashModal.style.display === 'block'
+                                && typeof window.openDashboard === 'function') {
+                                window.openDashboard();
+                            }
+                        } catch (_e2) { /* bỏ qua */ }
+                    }
+                } else if (e.key && /^vision-therapy-.*-max-level$/.test(e.key)) {
+                    // Tab khác vừa mở khóa level / sync Firebase → làm mới level-wrap
+                    if (typeof window.refreshTherapyLevelUI === 'function') {
+                        window.refreshTherapyLevelUI();
+                    }
+                }
+            } catch (err) { /* bỏ qua */ }
+        });
+    }
+
+    // ================================================================
     //  GLOBAL CLINICAL RESULT MODAL — Bắt sự kiện kết thúc bài tập
     //  Thay thế alert() thô ráp bằng Modal báo cáo tập trung (Dark theme)
     // ================================================================
@@ -3369,7 +3911,6 @@ document.addEventListener('click', function(e) {
                 </div>
             `;
         } else if (gId === 'M4' || (detail.gameName && detail.gameName.includes('M4'))) {
-            // M4: Vận nhãn nhanh (Saccadic) — hiển thị độ chính xác + độ trễ + Level
             // PassCondition động theo Chặng: dùng đúng logic của game (bang 1: chỉ cần acc, bang cuối: touch<chuột)
             const latency = detail.metrics?.avgLatencyMs ?? detail.metrics?.customData?.avgLatencyMs ?? 0;
             const accuracy = detail.metrics?.accuracy ?? detail.metrics?.customData?.accuracy ?? 0;
@@ -3526,6 +4067,18 @@ document.addEventListener('click', function(e) {
             `;
         } else {
             clinicalText = `Kết quả / Ngưỡng đạt được: <strong style="color: #00e676; font-size: 18px;">${detail.score}</strong>`;
+        }
+
+        // [TỐT NGHIỆP L10] Dòng thông báo tốt nghiệp dùng chung — hiển thị khi
+        // bệnh nhân vượt qua Level 10 ở bất kỳ module gamify nào (đồng bộ M4).
+        const graduatedFlag = detail.metrics?.graduated ?? detail.metrics?.customData?.graduated ?? false;
+        const graduationLine = graduatedFlag
+            ? '<div style="margin-top: 6px; padding: 6px 10px; border-radius: 6px; background: rgba(250,204,21,0.15); border: 1px solid #facc15; text-align: center;">🏆 <strong style="color: #facc15;">TỐT NGHIỆP — Đã chinh phục toàn bộ 10 Level!</strong></div>'
+            : '';
+
+        // Chèn dòng tốt nghiệp vào cuối clinicalText của các module có level
+        if (graduationLine) {
+            clinicalText += graduationLine;
         }
 
         // HIỂN THỊ MODAL GLOBAL

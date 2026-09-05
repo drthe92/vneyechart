@@ -553,8 +553,20 @@ class TherapeuticMenuController {
             if (setting.type === 'levels') {
                 const min = setting.min || 1;
                 const max = setting.max || 10;
-                const stored = parseInt(localStorage.getItem(setting.storageKey || '') || '', 10);
+                // [FIX LEVEL] Đọc theo bệnh nhân (helper tự fallback khóa cũ khi chưa migrate)
+                const modKey = String(setting.storageKey || '')
+                    .replace(/^vision-therapy-/, '')
+                    .replace(/-max-level$/, '')
+                    .toUpperCase() || '';
+                let stored = NaN;
+                if (modKey && typeof window.getTherapyMaxLevel === 'function') {
+                    stored = window.getTherapyMaxLevel(modKey, NaN);
+                } else {
+                    stored = parseInt(localStorage.getItem(setting.storageKey || '') || '', 10);
+                }
                 const maxUnlocked = !isNaN(stored) ? Math.max(min, Math.min(max, stored)) : min;
+                // [CẢI THIỆN SPLASH] Hiển thị trạng thái đang đồng bộ level từ máy chủ
+                const syncPending = window.__levelSyncPending === true;
                 // Ưu tiên Level đang được chọn trước đó trong phiên, mặc định = Level cao nhất đã mở khóa
                 const current = Math.max(min, Math.min(max, maxUnlocked));
 
@@ -574,6 +586,7 @@ class TherapeuticMenuController {
                             ${levelBtns}
                         </div>
                         <input type="hidden" id="${setting.id}" value="${current}">
+                        <p id="${setting.id}-pending" style="display:${syncPending ? 'block' : 'none'};font-size:12px;color:#fbbf24;margin:6px 0 0 0;text-align:center;">⏳ Đang đồng bộ cấp độ từ máy chủ...</p>
                         <p style="font-size:12px;color:#64748b;margin:6px 0 0 0;">${setting.help || ''}</p>
                     </div>
                 `;
@@ -1099,9 +1112,254 @@ const M7_LEVEL_KEY = 'vision-therapy-m7-max-level';
 const M8_LEVEL_KEY = 'vision-therapy-m8-max-level';
 const M11_LEVEL_KEY = 'vision-therapy-m11-max-level';
 
+// ============================================================
+// [FIX MẤT LEVEL] KHÓA LEVEL THEO TỪNG BỆNH NHÂN
+// ============================================================
+// Trước đây level mở khóa lưu ở KHÓA TOÀN CỤC (vision-therapy-mX-max-level)
+// dùng chung cho MỌI bệnh nhân trên cùng thiết bị: bệnh nhân này đăng nhập
+// (sycn Firebase trả về 1 khi chưa có dữ liệu) sẽ GHI ĐÈ level của bệnh nhân
+// kia → người bệnh phải tập lại level đã vượt qua. Từ nay:
+//   - Khóa riêng: vision-therapy-<patientId>-mX-max-level
+//   - Khóa cũ (toàn cục) chỉ là FALLBACK khi bệnh nhân chưa có khóa riêng
+//     (migration 1 lần tại lúc đăng nhập — migrateTherapyLevelsToPatient).
+// [CẢI THIỆN #2] Khóa cũ sau deploy được "CLAIM" bởi ĐÚNG 1 bệnh nhân
+//   (vision_therapy_legacy_claimed_by): bệnh nhân khác KHÔNG được thừa hưởng
+//   level đó (kể cả qua fallback) — dữ liệu đúng của họ phục hồi từ Firebase.
+// Mọi game M1..M12 + Lobby đọc/ghi level QUA 2 helper này.
+
+const LEGACY_LEVEL_CLAIM_KEY = 'vision_therapy_legacy_claimed_by';
+
+function _legacyTherapyLevelKey(moduleKey) {
+    return 'vision-therapy-' + String(moduleKey || '').toLowerCase() + '-max-level';
+}
+
+function _patientTherapyLevelKey(moduleKey) {
+    const pid = localStorage.getItem('currentPatientId');
+    if (!pid) return '';
+    return 'vision-therapy-' + pid + '-' + String(moduleKey).toLowerCase() + '-max-level';
+}
+
+/**
+ * [CẢI THIỆN #2] Fallback khóa cũ chỉ hợp lệ khi chưa ai claim
+ * hoặc chính bệnh nhân hiện tại đã claim — chặn rò rỉ level giữa người bệnh.
+ */
+function _canUseLegacyLevel() {
+    try {
+        const claimedBy = localStorage.getItem(LEGACY_LEVEL_CLAIM_KEY);
+        if (!claimedBy) return true;
+        const pid = localStorage.getItem('currentPatientId');
+        return !pid || claimedBy === pid;
+    } catch (e) {
+        return true; // localStorage không khả dụng → giữ hành vi fallback cũ
+    }
+}
+
+/**
+ * Đọc Level tối đa đã mở khóa của BỆNH NHÂN HIỆN TẠI.
+ * Ưu tiên khóa riêng theo patientId; chưa có → fallback khóa cũ (chỉ khi
+ * chưa có bệnh nhân khác claim khóa cũ đó — xem _canUseLegacyLevel).
+ * @param {string} moduleKey - 'M1', 'M4', 'M10', 'M12'...
+ * @param {number} [fallback=1]
+ * @param {boolean} [excludeLegacy=false] - true: chỉ đọc khóa riêng (dùng khi
+ *        đồng bộ Firebase để tránh ghi level không thuộc bệnh nhân vào khóa riêng).
+ * @returns {number} Level hợp lệ (clamp 1..10)
+ */
+window.getTherapyMaxLevel = function(moduleKey, fallback = 1, excludeLegacy = false) {
+    const pKey = _patientTherapyLevelKey(moduleKey);
+    let v = NaN;
+    if (pKey) v = parseInt(localStorage.getItem(pKey) || '', 10);
+    if (!excludeLegacy && isNaN(v) && _canUseLegacyLevel()) {
+        v = parseInt(localStorage.getItem(_legacyTherapyLevelKey(moduleKey)) || '', 10);
+    }
+    if (isNaN(v)) v = fallback;
+    const n = parseFloat(v);
+    if (isNaN(n)) return fallback;
+    return Math.max(1, Math.min(10, Math.round(n)));
+};
+
+/**
+ * Ghi Level tối đa đã mở khóa cho BỆNH NHÂN HIỆN TẠI (khóa riêng).
+ * @param {string} moduleKey
+ * @param {number} level
+ * @returns {number} Level đã ghi (clamp 1..10)
+ */
+window.setTherapyMaxLevel = function(moduleKey, level) {
+    const pKey = _patientTherapyLevelKey(moduleKey);
+    const lvl = Math.max(1, Math.min(10, parseInt(level, 10) || 1));
+    if (pKey) {
+        localStorage.setItem(pKey, String(lvl));
+    } else {
+        // Chưa có bệnh nhân đăng nhập → giữ hành vi cũ để không phá luồng
+        localStorage.setItem(_legacyTherapyLevelKey(moduleKey), String(lvl));
+    }
+    return lvl;
+};
+
+/**
+ * Migration 1 lần khi bệnh nhân đăng nhập: khóa level TOÀN CỤC cũ → khóa
+ * RIÊNG của bệnh nhân vừa đăng nhập. [CẢI THIỆN #2] Chỉ bệnh nhân ĐẦU TIÊN
+ * sau khi deploy được "claim" khóa cũ (phòng khám thường có 1 bệnh nhân
+ * chính trên mỗi máy); bệnh nhân khác KHÔNG bị thừa hưởng — level đúng của
+ * họ được phục hồi từ Firebase qua syncM12ProgressFromFirebase. KHÔNG bao
+ * giờ hạ level đã có (lấy max 2 nguồn).
+ * @param {string} patientId
+ */
+window.migrateTherapyLevelsToPatient = function(patientId) {
+    try {
+        if (!patientId) return;
+
+        const hasAnyLegacy = ['M1', 'M2', 'M4', 'M5', 'M7', 'M8', 'M9', 'M10', 'M11', 'M12']
+            .some(m => localStorage.getItem(_legacyTherapyLevelKey(m)) !== null);
+        if (!hasAnyLegacy) return;
+
+        // Claim marker: chỉ bệnh nhân đầu tiên (hoặc người đã claim) được nhận
+        const claimedBy = localStorage.getItem(LEGACY_LEVEL_CLAIM_KEY);
+        if (claimedBy && claimedBy !== patientId) {
+            console.warn('[Therapeutic] Khóa level cũ đã thuộc bệnh nhân khác — bỏ qua migration cho', patientId);
+            return;
+        }
+
+        const mods = ['M1', 'M2', 'M4', 'M5', 'M7', 'M8', 'M9', 'M10', 'M11', 'M12'];
+        for (const m of mods) {
+            const legacyKey = _legacyTherapyLevelKey(m);
+            const legacy = parseInt(localStorage.getItem(legacyKey) || '', 10);
+            if (isNaN(legacy)) continue;
+            const pKey = 'vision-therapy-' + patientId + '-' + m.toLowerCase() + '-max-level';
+            const cur = parseInt(localStorage.getItem(pKey) || '', 10);
+            const merged = isNaN(cur) ? legacy : Math.max(legacy, cur);
+            localStorage.setItem(pKey, String(Math.max(1, Math.min(10, merged))));
+            localStorage.removeItem(legacyKey);
+        }
+        localStorage.setItem(LEGACY_LEVEL_CLAIM_KEY, patientId);
+    } catch (e) {
+        console.warn('[Therapeutic] migrateTherapyLevelsToPatient:', e);
+    }
+};
+
+// ============================================================
+// [CẢI THIỆN HIỆU NĂNG] Cache chung 1 truy vấn Sessions cho MỌI module
+// trong 60s. Trước đây mỗi lần đăng nhập / restore là 10 lần đọc TOÀN BỘ
+// collection Sessions (1 lần/module) → chậm và tốn lượt đọc Firestore.
+// [CẢI THIỆN MULTI-TAB][CẢI THIỆN SPLASH] Dedupe cả truy vấn ĐANG CHẠY
+// (10 module sync đồng thời chỉ tốn 1 lượt đọc).
+// ============================================================
+let _fbSessionsCache = { pid: null, ts: 0, snapshot: null };
+let _fbSessionsInflight = null;
+
+async function _getPatientSessionsCached(pid) {
+    const now = Date.now();
+    if (_fbSessionsCache.pid === pid && _fbSessionsCache.snapshot &&
+        now - _fbSessionsCache.ts < 60000) {
+        return _fbSessionsCache.snapshot;
+    }
+    if (!_fbSessionsInflight) {
+        _fbSessionsInflight = window.db.collection("Patients").doc(pid).collection("Sessions").get()
+            .then(snap => {
+                _fbSessionsCache = { pid: pid, ts: Date.now(), snapshot: snap };
+                return snap;
+            })
+            .catch(err => {
+                _fbSessionsCache = { pid: null, ts: 0, snapshot: null };
+                throw err;
+            })
+            .finally(() => {
+                _fbSessionsInflight = null;
+            });
+    }
+    return _fbSessionsInflight;
+}
+
+// Ánh xạ module → id của level-wrap trong Lobby (dùng cho cập nhật UI)
+const THERAPY_LEVEL_WRAP_MAP = {
+    'M1': 'catch-level-wrap', 'M2': 'align-level-wrap', 'M4': 'saccadic-level-wrap',
+    'M5': 'rds-level-wrap', 'M7': 'cam-level-wrap', 'M8': 'anti-crowding-level-wrap',
+    'M9': 'redcone-level-wrap', 'M10': 'okn-level-wrap', 'M11': 'gabor-level-wrap',
+    'M12': 'pursuit-level-wrap'
+};
+const THERAPY_LEVEL_MODULES = ['M12', 'M1', 'M2', 'M4', 'M5', 'M7', 'M8', 'M9', 'M10', 'M11'];
+
+/**
+ * Cập nhật trạng thái khóa/mở khóa của level-wrap nếu Lobby module đang mở.
+ * @param {string} moduleKey
+ * @param {number} maxLevel
+ */
+function updateLevelWrapUI(moduleKey, maxLevel) {
+    const wrapId = THERAPY_LEVEL_WRAP_MAP[moduleKey] || `${String(moduleKey).toLowerCase()}-level-wrap`;
+    const levelWrap = document.getElementById(wrapId);
+    if (!levelWrap) return;
+    levelWrap.querySelectorAll('.pursuit-level-btn').forEach(btn => {
+        const lv = parseInt(btn.dataset.level, 10);
+        const locked = lv > maxLevel;
+        const isCurrent = parseInt(levelWrap.parentElement?.querySelector('input[type=hidden]')?.value || '1', 10) === lv;
+        btn.disabled = locked;
+        btn.style.opacity = locked ? '0.4' : '1';
+        btn.style.cursor = locked ? 'not-allowed' : 'pointer';
+        btn.style.background = isCurrent ? '#3b82f6' : '#0f172a';
+        btn.style.borderColor = isCurrent ? '#3b82f6' : '#475569';
+        btn.style.color = isCurrent ? '#fff' : (locked ? '#475569' : '#e2e8f0');
+    });
+    // Ẩn dòng "Đang đồng bộ cấp độ..." (nếu có) sau khi có dữ liệu chắc chắn
+    const pendingNote = document.getElementById(wrapId.replace(/-wrap$/, '') + '-pending');
+    if (pendingNote) pendingNote.style.display = 'none';
+}
+
+/**
+ * Làm mới MỌI level-wrap đang mở từ localStorage (dùng khi sync hoàn tất
+ * hoặc khi tab khác ghi đè level qua storage event).
+ */
+function refreshAllLevelWraps() {
+    const pid = localStorage.getItem('currentPatientId');
+    if (!pid) return;
+    for (const mod of THERAPY_LEVEL_MODULES) {
+        if (typeof window.getTherapyMaxLevel !== 'function') continue;
+        const maxLevel = window.getTherapyMaxLevel(mod, 1);
+        updateLevelWrapUI(mod, maxLevel);
+    }
+}
+
+// Expose để exam_session_manager (storage event multi-tab) gọi tới
+window.refreshTherapyLevelUI = refreshAllLevelWraps;
+
+// [CẢI THIỆN SPLASH] Cờ trạng thái sync level đang chạy — renderSettingsForm
+// hiển thị dòng "⏳ Đang đồng bộ cấp độ..." khi cờ = true (thiết bị mới /
+// localStorage trống thường thấy level 1 trong vài trăm ms trước khi có dữ
+// liệu Firebase — giờ người dùng hiểu lý do thay vì tưởng mất dữ liệu).
+window.__levelSyncPending = false;
+let _levelSyncAllPromise = null;
+
+/**
+ * Đồng bộ level của MỌI module M1..M12 từ Firebase cho 1 bệnh nhân.
+ * - Dùng chung 1 truy vấn Sessions (cache 60s + dedupe in-flight).
+ * - Bật cờ __levelSyncPending trong lúc chạy, tắt + refresh level-wrap khi xong.
+ * - Nếu đã có lần sync đang chạy → trả về cùng promise (không chạy lại).
+ * @param {string} patientId
+ * @returns {Promise<void>}
+ */
+window.syncAllTherapyLevels = function(patientId) {
+    const pid = patientId || localStorage.getItem('currentPatientId');
+    if (!pid) return Promise.resolve();
+    if (_levelSyncAllPromise) return _levelSyncAllPromise;
+
+    window.__levelSyncPending = true;
+
+    // [CẢI THIỆN MULTI-TAB] Nếu tab khác vừa sync xong (cờ đã tắt + có dữ liệu)
+    // thì vẫn chạy để chắc chắn thiết bị này có dữ liệu mới nhất.
+    _levelSyncAllPromise = Promise.all(
+        THERAPY_LEVEL_MODULES.map(k => window.syncM12ProgressFromFirebase(pid, k))
+    )
+    .catch(err => console.warn('[Therapeutic] syncAllTherapyLevels:', err))
+    .finally(() => {
+        window.__levelSyncPending = false;
+        _levelSyncAllPromise = null;
+        refreshAllLevelWraps();
+    });
+    return _levelSyncAllPromise;
+};
+
 /**
  * Truy vấn Firestore để tìm Level cao nhất mà bệnh nhân đã chinh phục ở module gamify
- * (dùng chung mã Level cho cả thiết bị), sau đó ghi đè localStorage tương ứng.
+ * (dùng chung mã Level cho cả thiết bị), rồi GỘP VỚI level local (lấy MAX) — KHÔNG
+ * bao giờ hạ cấp level đã mở khóa khi Firebase chưa kịp đồng bộ (offline / trễ mạng).
  * Không block luồng — thất bại (mất mạng) sẽ im lặng giữ nguyên dữ liệu cục bộ.
  * @param {string} patientId - Patient ID (đã lưu trong localStorage 'currentPatientId')
  * @param {string} moduleKey - Tên module để lọc ('M1', 'M4', 'M10', 'M12'...)
@@ -1114,56 +1372,56 @@ window.syncM12ProgressFromFirebase = async function(patientId, moduleKey = 'M12'
         'M9': M9_LEVEL_KEY, 'M10': M10_LEVEL_KEY, 'M11': M11_LEVEL_KEY,
         'M12': M12_LEVEL_KEY
     };
-    const LEVEL_KEY = LEVEL_KEY_MAP[moduleKey] || M12_LEVEL_KEY;
+    const LEGACY_LEVEL_KEY = LEVEL_KEY_MAP[moduleKey] || M12_LEVEL_KEY;
     try {
         const pid = patientId || localStorage.getItem('currentPatientId');
-        if (!pid || !window.db) return 1;
+        if (!pid || !window.db) {
+            return (typeof window.getTherapyMaxLevel === 'function')
+                ? window.getTherapyMaxLevel(moduleKey, 1)
+                : (parseInt(localStorage.getItem(LEGACY_LEVEL_KEY) || '1', 10) || 1);
+        }
 
-        const snapshot = await window.db.collection("Patients")
-            .doc(pid)
-            .collection("Sessions")
-            .get();
+        const snapshot = await _getPatientSessionsCached(pid);
 
-        let maxLevel = 1;
+        let firebaseMax = 1;
         snapshot.forEach(doc => {
             const data = doc.data();
-            const gName = data.gameName || '';
-            if (!gName.includes(moduleKey)) return;
+            const gName = String(data.gameName || '');
+            // [FIX RÒ RỈ LEVEL] Khớp ĐÚNG mã module bằng prefix chuẩn 'M<n>:',
+            // KHÔNG dùng includes(moduleKey): 'M1' sẽ khớp nhầm 'M10/M11/M12'
+            // → level của M12 bị rót vào level M1 (mở khóa sai level).
+            const m = gName.match(/M\d+/);
+            if (!m || m[0] !== moduleKey) return;
             // payload lưu metrics = customData (phẳng); đọc an toàn cả 2 cấu trúc
             const lvl = data.metrics?.level ?? data.metrics?.customData?.level;
             const num = parseInt(lvl, 10);
-            if (!isNaN(num) && num > maxLevel) maxLevel = num;
+            if (!isNaN(num) && num > firebaseMax) firebaseMax = num;
         });
 
-        maxLevel = Math.max(1, Math.min(10, maxLevel));
-        localStorage.setItem(LEVEL_KEY, String(maxLevel));
+        // [FIX MẤT LEVEL] Gộp MAX với level local: không bao giờ hạ level.
+        // [CẢI THIỆN #2] excludeLegacy=true khi đọc level local để KHÔNG ghi
+        // level khóa cũ (có thể thuộc bệnh nhân khác chưa claim) vào khóa riêng
+        // của bệnh nhân hiện tại — level đúng của họ lấy từ Firebase.
+        const localMax = (typeof window.getTherapyMaxLevel === 'function')
+            ? window.getTherapyMaxLevel(moduleKey, 1, true)
+            : (parseInt(localStorage.getItem(LEGACY_LEVEL_KEY) || '1', 10) || 1);
+        const maxLevel = Math.max(1, Math.min(10, Math.max(localMax, firebaseMax)));
+
+        // Ghi vào khóa RIÊNG theo bệnh nhân (helper tự xử lý per-patient)
+        if (typeof window.setTherapyMaxLevel === 'function') {
+            window.setTherapyMaxLevel(moduleKey, maxLevel);
+        } else {
+            localStorage.setItem(LEGACY_LEVEL_KEY, String(maxLevel));
+        }
 
         // Nếu Lobby module đang mở, làm mới trạng thái khóa/mở khóa các nút Level
-        const WRAP_ID_MAP = {
-            'M1': 'catch-level-wrap', 'M2': 'align-level-wrap', 'M4': 'saccadic-level-wrap',
-            'M5': 'rds-level-wrap', 'M7': 'cam-level-wrap', 'M8': 'anti-crowding-level-wrap',
-            'M9': 'redcone-level-wrap', 'M10': 'okn-level-wrap', 'M11': 'gabor-level-wrap',
-            'M12': 'pursuit-level-wrap'
-        };
-        const wrapId = WRAP_ID_MAP[moduleKey] || `${moduleKey.toLowerCase()}-level-wrap`;
-        const levelWrap = document.getElementById(wrapId);
-        if (levelWrap) {
-            levelWrap.querySelectorAll('.pursuit-level-btn').forEach(btn => {
-                const lv = parseInt(btn.dataset.level, 10);
-                const locked = lv > maxLevel;
-                const isCurrent = parseInt(levelWrap.parentElement?.querySelector('input[type=hidden]')?.value || '1', 10) === lv;
-                btn.disabled = locked;
-                btn.style.opacity = locked ? '0.4' : '1';
-                btn.style.cursor = locked ? 'not-allowed' : 'pointer';
-                btn.style.background = isCurrent ? '#3b82f6' : '#0f172a';
-                btn.style.borderColor = isCurrent ? '#3b82f6' : '#475569';
-                btn.style.color = isCurrent ? '#fff' : (locked ? '#475569' : '#e2e8f0');
-            });
-        }
+        updateLevelWrapUI(moduleKey, maxLevel);
         return maxLevel;
     } catch (err) {
         console.warn(`[${moduleKey} Progress] Không thể đồng bộ từ Firebase (giữ localStorage hiện tại):`, err);
-        return parseInt(localStorage.getItem(LEVEL_KEY) || '1', 10) || 1;
+        return (typeof window.getTherapyMaxLevel === 'function')
+            ? window.getTherapyMaxLevel(moduleKey, 1)
+            : (parseInt(localStorage.getItem(LEGACY_LEVEL_KEY) || '1', 10) || 1);
     }
 };
 

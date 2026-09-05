@@ -454,13 +454,21 @@ class AntiCrowdingGame extends BinocularGameEngine {
         const isPassed = accuracy >= 85 && spacingPassed;
 
         // --- Mở khóa Level kế tiếp nếu QUA MÀN và chưa phải Level tối đa ---
-        const LEVEL_KEY = 'vision-therapy-m8-max-level';
-        const maxLevel = parseInt(localStorage.getItem(LEVEL_KEY) || '1', 10) || 1;
+        // [FIX LEVEL] Đọc/ghi theo từng bệnh nhân (helper trong therapeutic_menu_controller)
+        const maxLevel = (typeof window.getTherapyMaxLevel === 'function')
+            ? window.getTherapyMaxLevel('M8')
+            : (parseInt(localStorage.getItem('vision-therapy-m8-max-level') || '1', 10) || 1);
         let unlockedNew = false;
         if (isPassed && this.level >= maxLevel && this.level < 10) {
-            localStorage.setItem(LEVEL_KEY, String(this.level + 1));
+            if (typeof window.setTherapyMaxLevel === 'function') {
+                window.setTherapyMaxLevel('M8', this.level + 1);
+            } else {
+                localStorage.setItem('vision-therapy-m8-max-level', String(this.level + 1));
+            }
             unlockedNew = true;
         }
+        // [TỐT NGHIỆP L10] Đồng bộ M4: vượt qua Level 10 = tốt nghiệp module
+        const graduated = isPassed && this.level >= 10;
 
         // Đóng gói customData theo đặc tả
         this.sessionMetrics.customData = {
@@ -470,6 +478,7 @@ class AntiCrowdingGame extends BinocularGameEngine {
             level: this.level,
             passed: isPassed,
             nextLevelUnlocked: unlockedNew,
+            graduated: graduated,
             minimumSpacingReached: `${this._minSratio.toFixed(2)} × T`,
             minSratioReached: Math.round(this._minSratio * 100) / 100,
             finalSpacing: `${this.Sratio.toFixed(2)} × T`
@@ -479,7 +488,7 @@ class AntiCrowdingGame extends BinocularGameEngine {
 
         this.finishSession();
         this.stop();
-        this._showResultOverlay(accuracy, isPassed, unlockedNew);
+        this._showResultOverlay(accuracy, isPassed, unlockedNew, graduated);
     }
 
     /**
@@ -487,11 +496,14 @@ class AntiCrowdingGame extends BinocularGameEngine {
      * @param {number} accuracy - Tỷ lệ chính xác (%)
      * @param {boolean} isPassed - Đạt tiêu chí Level hiện tại hay không
      * @param {boolean} unlockedNew - Có mở khóa Level mới hay không
+     * @param {boolean} graduated - [TỐT NGHIỆP L10] Vượt qua Level 10
      */
-    _showResultOverlay(accuracy, isPassed, unlockedNew) {
+    _showResultOverlay(accuracy, isPassed, unlockedNew, graduated) {
         const evalColor = isPassed ? '#10b981' : '#f87171';
         const evalText = isPassed
-            ? (unlockedNew ? `ĐẠT — Đã mở khóa Level ${this.level + 1}!` : `ĐẠT (Chinh phục Level ${this.level})`)
+            ? (graduated
+                ? '🏆 TỐT NGHIỆP — Bạn đã chinh phục toàn bộ 10 Level!'
+                : (unlockedNew ? `ĐẠT — Đã mở khóa Level ${this.level + 1}!` : `ĐẠT (Chinh phục Level ${this.level})`))
             : `CHƯA ĐẠT (Cần ≥ 85% chính xác và đạt khoảng cách hẹp ≤ ${this._minSratioRequired.toFixed(2)} × T để mở khóa Level kế tiếp)`;
 
         const overlay = document.createElement('div');
@@ -532,7 +544,10 @@ class AntiCrowdingGame extends BinocularGameEngine {
         nextBtn.onmouseout = () => nextBtn.style.background = '#3b82f6';
         nextBtn.onclick = () => {
             document.body.removeChild(overlay);
-            if (document.fullscreenElement) {
+            // Trở về Sảnh game (menu huấn luyện) — closeTherapyModule idempotent
+            if (typeof window.closeTherapyModule === 'function') {
+                window.closeTherapyModule();
+            } else if (document.fullscreenElement) {
                 document.exitFullscreen().catch(() => {});
             }
         };

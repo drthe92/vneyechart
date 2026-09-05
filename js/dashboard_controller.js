@@ -1,4 +1,5 @@
 let chartInstances = [];
+let dayDetailChart = null;
 let dynamicSeries = {};
 
 // Nhãn hiển thị thân thiện cho các chỉ số lâm sàng (Metric Key -> Tiếng Việt)
@@ -165,6 +166,16 @@ window.addEventListener('DOMContentLoaded', () => {
     if (navbarHeader) {
         navbarHeader.insertBefore(docsBtn, navbarHeader.querySelector('#sidebar-title'));
     }
+
+    // Modal chi tiết phiên trong ngày: nút Đóng + click ra ngoài nền
+    const ddClose = document.getElementById('day-detail-close');
+    if (ddClose) ddClose.onclick = _closeDayDetailModal;
+    const ddModal = document.getElementById('day-detail-modal');
+    if (ddModal) {
+        ddModal.addEventListener('click', (e) => {
+            if (e.target === ddModal) _closeDayDetailModal();
+        });
+    }
 });
 
 window.openDashboard = async function() {
@@ -176,6 +187,7 @@ window.openDashboard = async function() {
 
 window.closeDashboard = function() {
     document.getElementById('progress-dashboard-modal').style.display = 'none';
+    _closeDayDetailModal();
 };
 
 // Tương thích ngược với các lời gọi renderChart() cũ
@@ -263,7 +275,8 @@ function _appendPoint(gName, metricKey, num, dateMs, durationSec, fullSessionMet
             dataPoints: [],
             timestamps: [],
             durations: [],
-            sessionMetrics: []
+            sessionMetrics: [],
+            rawSessions: []
         };
     }
     const s = dynamicSeries[seriesKey];
@@ -295,6 +308,9 @@ function _pruneShortSeries() {
  * các lần đo trong ngày đó. Áp dụng CHO TẤT CẢ biểu đồ (Combo / Score / Prism /
  * Level...), không phân biệt nguồn local hay Firebase.
  * - Giữ timestamp đại diện = thời điểm đo đầu tiên trong ngày (để định vị trục X).
+ * - Giữ NGUYÊN các phiên gốc trong ngày (rawSessions) — mỗi phần tử chứa
+ *   { ts, value, duration, metrics } của TỪNG phiên — để tooltip liệt kê từng
+ *   phiên và modal chi tiết vẽ biểu đồ theo phiên khi click vào điểm.
  * - Đếm số lần đo để có thể mở rộng tooltip ("trung bình của N lần").
  */
 function _dayKeyOf(dateMs) {
@@ -308,7 +324,7 @@ function _aggregateByDay() {
         const s = dynamicSeries[key];
         if (!s || !Array.isArray(s.dataPoints) || s.dataPoints.length === 0) continue;
 
-        const buckets = new Map(); // dayKey -> { sum, count, ts, sm, durSum }
+        const buckets = new Map(); // dayKey -> { sum, count, ts, sm, durSum, raw: [] }
         for (let i = 0; i < s.dataPoints.length; i++) {
             const dk = _dayKeyOf(s.timestamps[i]);
             if (!buckets.has(dk)) {
@@ -316,22 +332,28 @@ function _aggregateByDay() {
                     sum: 0, count: 0,
                     ts: s.timestamps[i],
                     sm: s.sessionMetrics[i],
-                    durSum: s.durations[i] || 0
+                    // durSum khởi tạo = 0 (nếu gán = durations[i] thì phiên đầu
+                    // bị cộng ĐÔI ở dòng b.durSum += bên dưới — sai thời lượng TB)
+                    durSum: 0,
+                    raw: []
                 });
             }
             const b = buckets.get(dk);
             b.sum += s.dataPoints[i];
             b.count += 1;
             b.durSum += (s.durations[i] || 0);
+            b.raw.push({
+                ts: s.timestamps[i],
+                value: s.dataPoints[i],
+                duration: s.durations[i] || 0,
+                metrics: s.sessionMetrics[i] || {}
+            });
         }
-
-        // Không có ngày nào trùng → không cần gộp
-        if (buckets.size === s.dataPoints.length) continue;
 
         const ordered = Array.from(buckets.values())
             .sort((a, b) => a.ts - b.ts);
 
-        const labels = [], dataPoints = [], timestamps = [], durations = [], sessionMetrics = [];
+        const labels = [], dataPoints = [], timestamps = [], durations = [], sessionMetrics = [], rawSessions = [];
         for (const b of ordered) {
             const avg = b.count > 0 ? b.sum / b.count : b.sum;
             labels.push(new Date(b.ts).toLocaleDateString('vi-VN'));
@@ -339,6 +361,8 @@ function _aggregateByDay() {
             timestamps.push(b.ts);
             durations.push(b.count > 0 ? b.durSum / b.count : 0);
             sessionMetrics.push(b.sm);
+            // Phiên trong ngày sắp theo thời gian thực tế (sớm → muộn)
+            rawSessions.push(b.raw.slice().sort((x, y) => x.ts - y.ts));
         }
 
         s.labels = labels;
@@ -346,6 +370,7 @@ function _aggregateByDay() {
         s.timestamps = timestamps;
         s.durations = durations;
         s.sessionMetrics = sessionMetrics;
+        s.rawSessions = rawSessions;
     }
 }
 
@@ -400,10 +425,119 @@ function VISION_TEST_GROUPS_VISION(tid) {
 }
 
 
+// [CẢI THIỆN #3] Ánh xạ test_type của kết quả khám lâm sàng (trong EMR History)
+// → test_id chuẩn để _captureVisionMetricsByTestId vẽ được điểm Thị lực Xa/Gần.
+const HISTORY_TEST_TYPE_TO_ID = {
+    'Auto Distance VA': 'far-vision-auto-distance-va',
+    'Auto Near VA': 'near-vision-auto-near-va',
+    'Tumbling E': 'far-vision-tumbling-e',
+    'Near LogMAR': 'near-vision-logmar'
+};
+
+/**
+ * [CẢI THIỆN #3] Ép 1 kết quả khám lâm sàng (exam.results trong EMR History)
+ * thành bản ghi thị lực để vẽ biểu đồ Combo. Dedup theo khóa 'vision-<tid>-<ts>'
+ * khớp đúng id therapy-record thị lực ('vision-<test_id>-<timestamp>') — nếu
+ * cùng lần đo đã có therapy record thì bỏ qua để không vẽ điểm trùng.
+ */
+function _ingestHistoryResult(r, seenVisionKeys) {
+    if (!r || !r.test_type || !r.timestamp) return;
+    const tid = HISTORY_TEST_TYPE_TO_ID[r.test_type];
+    if (!tid) return;
+
+    const dateMs = typeof r.timestamp === 'number'
+        ? r.timestamp
+        : new Date(r.timestamp).getTime();
+    if (isNaN(dateMs)) return;
+
+    const visionKey = 'vision-' + tid + '-' + dateMs;
+    if (seenVisionKeys.has(visionKey)) return;
+    seenVisionKeys.add(visionKey);
+
+    const rec = {
+        test_id: tid,
+        clinical_metrics: (r.clinical_metrics && typeof r.clinical_metrics === 'object') ? r.clinical_metrics : {}
+    };
+    const sessionMetrics = {};
+    for (const [key, val] of Object.entries(rec.clinical_metrics)) {
+        const num = _coerceNumeric(val);
+        if (num !== null) sessionMetrics[key] = num;
+    }
+    if (Object.keys(sessionMetrics).length === 0) return;
+
+    _captureVisionMetricsByTestId(rec, dateMs, 0, sessionMetrics);
+}
+
+/**
+ * Ép 1 therapy_record (local hoặc EMR History) vào biểu đồ.
+ * Dedup nội bộ theo id (ưu tiên) hoặc gameName+timestamp cho bản ghi không id.
+ * @param {Object} rec
+ * @param {Map} localTimestampsBySeries - ghi nhận timestamp theo series (chống trùng Firebase)
+ * @param {Set} localIds - id bản ghi local (dedup với Firebase)
+ * @param {Set} seenRecordKeys - dedup giữa emr_patient_sessions và vision_emr_history_v1
+ * @param {Set} seenVisionKeys - dedup điểm thị lực Xa/Gần giữa therapy-record và results
+ */
+function _ingestLocalTherapyRecord(rec, localTimestampsBySeries, localIds, seenRecordKeys, seenVisionKeys) {
+    if (!rec) return;
+
+    // [VACUUM] Bản ghi TỔNG HỢP (isSummary) — không có timestamp, thay bằng lastTimestamp
+    const isSummary = rec.isSummary === true;
+    const tsRaw = (isSummary ? rec.lastTimestamp : rec.timestamp);
+    if (tsRaw == null) return;
+
+    // Dedup giữa 2 cửa sổ lưu trữ local (sessions & history có thể chứa cùng record)
+    const recKey = rec.id || ((rec.gameName || '') + '|' + tsRaw);
+    if (seenRecordKeys.has(recKey)) return;
+    seenRecordKeys.add(recKey);
+
+    const dateMs = typeof tsRaw === 'number'
+        ? tsRaw
+        : new Date(tsRaw).getTime();
+    if (isNaN(dateMs)) return;
+
+    // [P#3] Ghi nhận id bản ghi local để dedup chính xác với Firebase (không
+    // phụ thuộc vào chênh lệch đồng hồ server/local).
+    if (localIds && rec.id) localIds.add(rec.id);
+    // [CẢI THIỆN #3] Ghi nhận khóa thị lực để results khác không vẽ điểm trùng
+    if (rec.id && String(rec.id).indexOf('vision-') === 0) seenVisionKeys.add(rec.id);
+
+    const gName = rec.gameName || 'Bài tập';
+    const durationSec = Number(rec.durationSeconds) || 0;
+
+    // Bản ghi local lưu metrics dạng { customData: {...} } — bóc lớp customData.
+    // Với SUMMARY: dùng trực tiếp rec.summary (đã là object avg các chỉ số).
+    const rawMetrics = isSummary
+        ? (rec.summary && typeof rec.summary === 'object' ? rec.summary : {})
+        : ((rec.metrics && typeof rec.metrics === 'object') ? rec.metrics : {});
+    const metricSource = (rawMetrics.customData && typeof rawMetrics.customData === 'object')
+        ? rawMetrics.customData
+        : rawMetrics;
+
+    const sessionMetrics = {};
+    for (const [key, val] of Object.entries(metricSource)) {
+        const num = _coerceNumeric(val);
+        if (num !== null) sessionMetrics[key] = num;
+    }
+
+    // Capture chỉ số thị lực Xa/Gần theo test_id → trục Y Decimal (y-va)
+    _captureVisionMetricsByTestId(rec, dateMs, durationSec, sessionMetrics);
+
+    for (const [key, num] of Object.entries(sessionMetrics)) {
+        const seriesKey = `${gName}_${key}`;
+        if (!localTimestampsBySeries.has(seriesKey)) {
+            localTimestampsBySeries.set(seriesKey, []);
+        }
+        localTimestampsBySeries.get(seriesKey).push(dateMs);
+        _appendPoint(gName, key, num, dateMs, durationSec, sessionMetrics);
+    }
+}
+
 /**
  * PWA OFFline-FIRST: đọc EMR từ localStorage (emr_patient_sessions) trước.
  * - Lọc session thuộc currentPatientId.
  * - Ghi nhận timestamp local theo từng series để chống trùng lặp khi merge Firebase.
+ * - [CẢI THIỆN #3] Bổ sung nguồn vision_emr_history_v1 (snapshot khi kết thúc
+ *   phiên khám) — không bỏ sót điểm dữ liệu chỉ nằm trong lịch sử phiên.
  */
 function _loadLocalEmr(patientId, localTimestampsBySeries, localIds) {
     let sessions = [];
@@ -413,48 +547,43 @@ function _loadLocalEmr(patientId, localTimestampsBySeries, localIds) {
         sessions = [];
     }
 
+    const seenRecordKeys = new Set();
+    const seenVisionKeys = new Set();
+
     for (const s of sessions) {
         if (!s || s.patientId !== patientId) continue;
         const records = Array.isArray(s.therapy_records) ? s.therapy_records : [];
-
         for (const rec of records) {
-            if (!rec || !rec.timestamp) continue;
-            const dateMs = typeof rec.timestamp === 'number'
-                ? rec.timestamp
-                : new Date(rec.timestamp).getTime();
-            if (isNaN(dateMs)) continue;
+            _ingestLocalTherapyRecord(rec, localTimestampsBySeries, localIds, seenRecordKeys, seenVisionKeys);
+        }
+    }
 
-            // [P#3] Ghi nhận id bản ghi local để dedup chính xác với Firebase (không
-            // phụ thuộc vào chênh lệch đồng hồ server/local).
-            if (localIds && rec.id) localIds.add(rec.id);
+    // [CẢI THIỆN #3] Hydrate thêm từ EMR History (lưu khi "Kết thúc khám").
+    // Trước đây dashboard chỉ đọc emr_patient_sessions — các bản ghi chỉ nằm
+    // trong history (phiên cũ trước Hard-Write / backup) bị bỏ sót trên biểu đồ.
+    try {
+        const history = JSON.parse(localStorage.getItem('vision_emr_history_v1') || '[]');
+        if (Array.isArray(history)) {
+            for (const h of history) {
+                if (!h || h.patientId !== patientId) continue;
 
-            const gName = rec.gameName || 'Bài tập';
-            const durationSec = Number(rec.durationSeconds) || 0;
-
-            // Bản ghi local lưu metrics dạng { customData: {...} } — bóc lớp customData
-            const rawMetrics = (rec.metrics && typeof rec.metrics === 'object') ? rec.metrics : {};
-            const metricSource = (rawMetrics.customData && typeof rawMetrics.customData === 'object')
-                ? rawMetrics.customData
-                : rawMetrics;
-
-            const sessionMetrics = {};
-            for (const [key, val] of Object.entries(metricSource)) {
-                const num = _coerceNumeric(val);
-                if (num !== null) sessionMetrics[key] = num;
-            }
-
-            // Capture chỉ số thị lực Xa/Gần theo test_id → trục Y Decimal (y-va)
-            _captureVisionMetricsByTestId(rec, dateMs, durationSec, sessionMetrics);
-
-            for (const [key, num] of Object.entries(sessionMetrics)) {
-                const seriesKey = `${gName}_${key}`;
-                if (!localTimestampsBySeries.has(seriesKey)) {
-                    localTimestampsBySeries.set(seriesKey, []);
+                if (Array.isArray(h.therapy_records)) {
+                    for (const rec of h.therapy_records) {
+                        _ingestLocalTherapyRecord(rec, localTimestampsBySeries, localIds, seenRecordKeys, seenVisionKeys);
+                    }
                 }
-                localTimestampsBySeries.get(seriesKey).push(dateMs);
-                _appendPoint(gName, key, num, dateMs, durationSec, sessionMetrics);
+
+                // Kết quả khám lâm sàng (results) chưa có therapy-record tương ứng
+                // (phiên khám cũ) → ép thành bản ghi thị lực để vẽ điểm Xa/Gần
+                if (Array.isArray(h.results)) {
+                    for (const r of h.results) {
+                        _ingestHistoryResult(r, seenVisionKeys);
+                    }
+                }
             }
         }
+    } catch (e) {
+        console.warn('[Dashboard] Không đọc được EMR History:', e);
     }
 }
 
@@ -532,6 +661,17 @@ async function fetchFirebaseData() {
     _pruneShortSeries();
 }
 
+/**
+ * Đếm TỔNG số phiên tập của 1 series (sau khi gộp theo ngày, mỗi điểm là
+ * trung bình của nhiều phiên — đếm qua rawSessions thay vì dataPoints).
+ */
+function _countSessions(s) {
+    if (!s || !Array.isArray(s.rawSessions) || s.rawSessions.length === 0) {
+        return s && Array.isArray(s.dataPoints) ? s.dataPoints.length : 0;
+    }
+    return s.rawSessions.reduce((acc, raw) => acc + (Array.isArray(raw) ? raw.length : 0), 0);
+}
+
 function buildModuleDropdown() {
     const select = document.getElementById('dashboard-module-select');
     if (!select) return;
@@ -540,9 +680,13 @@ function buildModuleDropdown() {
     const modules = {};
     Object.values(dynamicSeries).forEach(s => {
         if (!modules[s.groupKey]) {
-            modules[s.groupKey] = { label: s.groupLabel, sessions: 0 };
+            modules[s.groupKey] = { label: s.groupLabel, sessions: 0, days: 0 };
         }
-        modules[s.groupKey].sessions = Math.max(modules[s.groupKey].sessions, s.dataPoints.length);
+        const m = modules[s.groupKey];
+        // Nhiều series cùng 1 module (mỗi chỉ số 1 series) — mỗi phiên đóng góp
+        // 1 điểm cho TỪNG series nên dùng max để không đếm trùng.
+        m.sessions = Math.max(m.sessions, _countSessions(s));
+        m.days = Math.max(m.days, s.dataPoints.length);
     });
 
     const keys = Object.keys(modules);
@@ -565,7 +709,9 @@ function buildModuleDropdown() {
     keys.forEach(k => {
         const opt = document.createElement('option');
         opt.value = k;
-        opt.text = `${modules[k].label} (${modules[k].sessions} phiên)`;
+        // "N phiên · M ngày tập": trong 1 ngày có thể có nhiều phiên nên
+        // hiển thị rõ cả 2 con số thay vì gộp nhầm thành 1.
+        opt.text = `${modules[k].label} (${modules[k].sessions} phiên · ${modules[k].days} ngày tập)`;
         select.appendChild(opt);
     });
 }
@@ -584,7 +730,7 @@ function _pickModuleWithMostData() {
     if (!dynamicSeries || Object.keys(dynamicSeries).length === 0) return null;
     const byGroup = {};
     for (const s of Object.values(dynamicSeries)) {
-        byGroup[s.groupKey] = (byGroup[s.groupKey] || 0) + s.dataPoints.length;
+        byGroup[s.groupKey] = (byGroup[s.groupKey] || 0) + _countSessions(s);
     }
     if (byGroup['Combo Đánh Giá Nhược Thị'] && byGroup['Combo Đánh Giá Nhược Thị'] > 0) {
         return 'Combo Đánh Giá Nhược Thị';
@@ -601,6 +747,7 @@ window.renderDashboard = function(moduleKey) {
     if (!container) return;
 
     _destroyCharts();
+    _closeDayDetailModal();
     container.innerHTML = '';
 
     const moduleId = moduleKey || _getSelectedModuleId();
@@ -660,7 +807,7 @@ function _renderPrismChart(cfg, seriesList, groupLabel) {
         return;
     }
 
-    const { labels, aligned } = _buildTimeline(usable.map(x => x.series));
+    const { labels, aligned, timestamps: tsSorted } = _buildTimeline(usable.map(x => x.series));
 
     const datasets = usable.map((x, i) => ({
         label: `${x.seriesDef.label}`,
@@ -682,6 +829,7 @@ function _renderPrismChart(cfg, seriesList, groupLabel) {
         options: _baseOptions('Prism Diopter (Δ)', true)
     });
     chartInstances.push(chart);
+    _attachDayDetail(chart, usable.map(x => x.series), tsSorted, (s, i) => usable[i].seriesDef.label);
 }
 
 function _renderLevelChart(cfg, seriesList, groupLabel) {
@@ -696,7 +844,7 @@ function _renderLevelChart(cfg, seriesList, groupLabel) {
         return;
     }
 
-    const { labels, aligned } = _buildTimeline(present);
+    const { labels, aligned, timestamps: tsSorted } = _buildTimeline(present);
     const datasets = [];
     let idx = 0;
 
@@ -735,6 +883,8 @@ function _renderLevelChart(cfg, seriesList, groupLabel) {
         options: _levelOptions()
     });
     chartInstances.push(chart);
+    _attachDayDetail(chart, present, tsSorted,
+        (s) => (s.metricKey === cfg.bar.key ? cfg.bar.label : cfg.line.label));
 }
 
 function _renderScoreChart(cfg, seriesList, groupLabel) {
@@ -747,7 +897,7 @@ function _renderScoreChart(cfg, seriesList, groupLabel) {
 
     const canvas = _createChartCard(`${groupLabel} — Điểm số: ${metricLabel}`);
 
-    const { labels, aligned } = _buildTimeline([primary]);
+    const { labels, aligned, timestamps: tsSorted } = _buildTimeline([primary]);
     const data = aligned[0];
 
     // Metadata theo từng mốc thời gian để hiển thị Tooltip chi tiết
@@ -774,6 +924,26 @@ function _renderScoreChart(cfg, seriesList, groupLabel) {
     };
 
     const options = _baseOptions(null, true);
+    const scoreAfterBody = (items) => {
+        if (!items.length) return [];
+        const metaItem = meta[items[0].dataIndex];
+        if (!metaItem) return [];
+        const lines = [];
+        const m = metaItem.metrics || {};
+        if (metaItem.duration > 0) {
+            lines.push(`Thời lượng: ${_fmtDuration(metaItem.duration)}`);
+        }
+        if (typeof m.totalStrikes === 'number') {
+            lines.push(`Số lần vỡ hình: ${m.totalStrikes}`);
+        }
+        const others = [];
+        for (const [k, v] of Object.entries(m)) {
+            if (k === primary.metricKey || typeof v !== 'number') continue;
+            others.push(`${METRIC_LABELS[k] || k}: ${_fmtNum(v)}`);
+        }
+        if (others.length > 0) lines.push(...others.slice(0, 8));
+        return lines;
+    };
     options.plugins.tooltip.callbacks = {
         title: (items) => items.length ? items[0].label : '',
         label: (item) => {
@@ -781,26 +951,7 @@ function _renderScoreChart(cfg, seriesList, groupLabel) {
             if (v === null || v === undefined) return '';
             return ` ${metricLabel}: ${_fmtNum(v)}`;
         },
-        afterBody: (items) => {
-            if (!items.length) return [];
-            const metaItem = meta[items[0].dataIndex];
-            if (!metaItem) return [];
-            const lines = [];
-            const m = metaItem.metrics || {};
-            if (metaItem.duration > 0) {
-                lines.push(`Thời lượng: ${_fmtDuration(metaItem.duration)}`);
-            }
-            if (typeof m.totalStrikes === 'number') {
-                lines.push(`Số lần vỡ hình: ${m.totalStrikes}`);
-            }
-            const others = [];
-            for (const [k, v] of Object.entries(m)) {
-                if (k === primary.metricKey || typeof v !== 'number') continue;
-                others.push(`${METRIC_LABELS[k] || k}: ${_fmtNum(v)}`);
-            }
-            if (others.length > 0) lines.push(...others.slice(0, 8));
-            return lines;
-        }
+        afterBody: scoreAfterBody
     };
 
     const chart = new Chart(canvas.getContext('2d'), {
@@ -809,6 +960,7 @@ function _renderScoreChart(cfg, seriesList, groupLabel) {
         options: options
     });
     chartInstances.push(chart);
+    _attachDayDetail(chart, [primary], tsSorted, () => metricLabel, null, scoreAfterBody);
 }
 
 /**
@@ -902,7 +1054,7 @@ function _renderComboChart(cfg, seriesList, groupLabel) {
         if (usable.length === 0) continue;
 
         const canvas = _createChartCard(g.title);
-        const { labels, aligned } = _buildTimeline(usable.map(x => x.series));
+        const { labels, aligned, timestamps: tsSorted } = _buildTimeline(usable.map(x => x.series));
 
         const datasets = usable.map((x, i) => {
             let data = aligned[i];
@@ -951,6 +1103,11 @@ function _renderComboChart(cfg, seriesList, groupLabel) {
             }
         });
         chartInstances.push(chart);
+        _attachDayDetail(chart, usable.map(x => x.series), tsSorted,
+            (s, i) => usable[i].def.label,
+            (v, s) => (s.metricKey === 'contrast_OD' || s.metricKey === 'contrast_OS')
+                ? Math.round(100 * Math.pow(10, -v) * 10) / 10
+                : v);
         rendered++;
     }
 
@@ -1074,7 +1231,8 @@ function _filterSeriesByRange(series, fromMs, toMs) {
         dataPoints: [],
         timestamps: [],
         durations: [],
-        sessionMetrics: []
+        sessionMetrics: [],
+        rawSessions: []
     };
     for (let i = 0; i < series.timestamps.length; i++) {
         const t = series.timestamps[i];
@@ -1085,6 +1243,7 @@ function _filterSeriesByRange(series, fromMs, toMs) {
         filtered.timestamps.push(t);
         filtered.durations.push(series.durations[i] || 0);
         filtered.sessionMetrics.push(series.sessionMetrics[i] || {});
+        filtered.rawSessions.push((series.rawSessions && series.rawSessions[i]) || []);
     }
     return filtered;
 }
@@ -1099,7 +1258,7 @@ function _buildTimeline(seriesList) {
         s.timestamps.forEach((t, i) => map.set(t, s.dataPoints[i]));
         return sorted.map(t => (map.has(t) ? map.get(t) : null));
     });
-    return { labels, aligned };
+    return { labels, aligned, timestamps: sorted };
 }
 
 function _moduleNumberFromGameName(gName) {
@@ -1119,4 +1278,167 @@ function _fmtDuration(sec) {
     const m = Math.floor(sec / 60);
     const s = sec % 60;
     return m > 0 ? `${m} phút ${s}s` : `${s}s`;
+}
+
+function _fmtTime(ts) {
+    return new Date(ts).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+}
+
+/**
+ * [CHI TIẾT THEO PHIÊN TRONG NGÀY] Gắn vào 1 biểu đồ Chart.js:
+ * 1. Hover (tooltip): giữ nguyên dòng chi tiết hiện có, bổ sung liệt kê từng
+ *    phiên trong ngày (điểm đang hiển thị là TRUNG BÌNH của các phiên đó).
+ * 2. Click vào điểm sáng: mở modal chi tiết ngày — danh sách đầy đủ từng phiên
+ *    (giờ, giá trị, thời lượng, chỉ số phụ) + biểu đồ mini theo phiên nếu
+ *    ngày đó có ≥ 2 phiên.
+ * @param {Chart} chart - biểu đồ Chart.js đã tạo
+ * @param {Array} seriesList - danh sách series theo ĐÚNG thứ tự dataset của chart
+ * @param {Array<number>} tsSorted - trục X chung (timestamps đã sắp xếp)
+ * @param {Function} [labelOf] - (series, datasetIndex) => nhãn hiển thị của chỉ số
+ * @param {Function} [transform] - (value, series) => giá trị hiển thị (vd LogCS→%)
+ * @param {Function} [baseAfterBody] - afterBody có sẵn của chart (giữ nguyên + bổ sung sau)
+ */
+function _attachDayDetail(chart, seriesList, tsSorted, labelOf, transform, baseAfterBody) {
+    const tr = transform || ((v) => v);
+
+    // rawSessions theo từng dataset (index = dataIndex trên trục X chung)
+    const rawBySeries = seriesList.map(s => {
+        const m = new Map();
+        (s.timestamps || []).forEach((t, i) => m.set(t, (s.rawSessions && s.rawSessions[i]) || []));
+        return m;
+    });
+
+    // Clone callbacks: nhiều sub-chart (vd Combo) có thể dùng chung object
+    // callbacks → nếu gán thẳng sẽ ghi đè/xích chồng lẫn nhau.
+    const tooltip = (chart.options.plugins && chart.options.plugins.tooltip) || {};
+    tooltip.callbacks = Object.assign({}, tooltip.callbacks || {});
+    tooltip.callbacks.afterBody = (items) => {
+        const base = baseAfterBody ? (baseAfterBody(items) || []) : [];
+        if (!items || !items.length) return base;
+        const it = items[0];
+        const series = seriesList[it.datasetIndex];
+        const raw = (rawBySeries[it.datasetIndex] || new Map()).get(tsSorted[it.dataIndex]) || [];
+        if (raw.length === 0 || !series) return base;
+        const lines = base.slice();
+        if (raw.length === 1) {
+            lines.push(`Phiên duy nhất lúc ${_fmtTime(raw[0].ts)}: ${_fmtNum(tr(raw[0].value, series))}`);
+        } else {
+            lines.push(`Gồm ${raw.length} phiên trong ngày (điểm = trung bình):`);
+            const shown = raw.slice(0, 5);
+            for (const r of shown) {
+                lines.push(`  ${_fmtTime(r.ts)} → ${_fmtNum(tr(r.value, series))}`);
+            }
+            if (raw.length > shown.length) {
+                lines.push(`  … và ${raw.length - shown.length} phiên khác`);
+            }
+            lines.push('Click vào điểm để xem biểu đồ chi tiết theo phiên.');
+        }
+        return lines;
+    };
+
+    chart.options.onClick = (evt, elements) => {
+        if (!elements || elements.length === 0) return;
+        const it = elements[0];
+        const series = seriesList[it.datasetIndex];
+        if (!series) return;
+        // Chart.js v4: active elements (options.onClick) dùng thuộc tính 'index'
+        // (tooltip mới có 'dataIndex') — đọc cả 2 để chắc chắn khớp trục X.
+        const di = (it.dataIndex !== undefined && it.dataIndex !== null) ? it.dataIndex : it.index;
+        const raw = (rawBySeries[it.datasetIndex] || new Map()).get(tsSorted[di]) || [];
+        if (raw.length === 0) return;
+        const label = labelOf ? labelOf(series, it.datasetIndex) : (METRIC_LABELS[series.metricKey] || series.metricKey);
+        const transformed = raw.map(r => ({ ...r, value: tr(r.value, series) }));
+        _openDayDetailModal(series, transformed, label);
+    };
+}
+
+function _openDayDetailModal(series, rawSessions, metricLabel) {
+    const modal = document.getElementById('day-detail-modal');
+    if (!modal) return;
+
+    const label = metricLabel || (METRIC_LABELS[series.metricKey] || series.metricKey);
+    const dateLabel = new Date(rawSessions[0].ts).toLocaleDateString('vi-VN');
+    const titleEl = document.getElementById('day-detail-title');
+    if (titleEl) titleEl.textContent = `${series.gameName} — ${label} — ${dateLabel}`;
+
+    const values = rawSessions.map(r => r.value);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+
+    let html = `<div class="day-detail-summary">`;
+    html += `<span><b>${rawSessions.length} phiên</b> trong ngày</span>`;
+    html += `<span>Trung bình: <b>${_fmtNum(avg)}</b></span>`;
+    html += `<span>Cao nhất: <b>${_fmtNum(max)}</b></span>`;
+    html += `<span>Thấp nhất: <b>${_fmtNum(min)}</b></span>`;
+    html += `</div>`;
+
+    // Biểu đồ chi tiết chỉ vẽ khi ngày đó có ≥ 2 phiên tập
+    if (rawSessions.length >= 2) {
+        html += `<div class="day-detail-chart-box"><canvas id="day-detail-chart-canvas"></canvas></div>`;
+    }
+
+    html += `<div class="day-detail-list">`;
+    rawSessions.forEach((r, i) => {
+        const m = r.metrics || {};
+        const extra = [];
+        if (r.duration > 0) extra.push(`Thời lượng: ${_fmtDuration(r.duration)}`);
+        if (typeof m.totalStrikes === 'number') extra.push(`Số lần vỡ hình: ${m.totalStrikes}`);
+        const others = [];
+        for (const [k, v] of Object.entries(m)) {
+            if (k === series.metricKey || typeof v !== 'number') continue;
+            others.push(`${METRIC_LABELS[k] || k}: ${_fmtNum(v)}`);
+        }
+        extra.push(...others.slice(0, 8));
+        html += `<div class="day-detail-row">`;
+        html += `<div class="day-detail-row-head">`;
+        html += `<span class="day-detail-idx">Phiên ${i + 1}</span>`;
+        html += `<span class="day-detail-time">${_fmtTime(r.ts)}</span>`;
+        html += `<span class="day-detail-value"><b>${_fmtNum(r.value)}</b></span>`;
+        html += `</div>`;
+        if (extra.length) html += `<div class="day-detail-extra">${extra.join(' · ')}</div>`;
+        html += `</div>`;
+    });
+    html += `</div>`;
+
+    const body = document.getElementById('day-detail-body');
+    if (body) body.innerHTML = html;
+    modal.style.display = 'flex';
+
+    if (rawSessions.length >= 2) {
+        const canvas = document.getElementById('day-detail-chart-canvas');
+        if (canvas && typeof Chart !== 'undefined') {
+            if (dayDetailChart) {
+                try { dayDetailChart.destroy(); } catch (e) { /* noop */ }
+            }
+            dayDetailChart = new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: rawSessions.map(r => _fmtTime(r.ts)),
+                    datasets: [{
+                        label: label,
+                        data: values,
+                        borderColor: CHART_COLORS[0],
+                        backgroundColor: CHART_COLORS[0] + '22',
+                        borderWidth: 3,
+                        pointRadius: 6,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: CHART_COLORS[0],
+                        pointBorderWidth: 2,
+                        tension: 0.3
+                    }]
+                },
+                options: _baseOptions(label, true)
+            });
+        }
+    }
+}
+
+function _closeDayDetailModal() {
+    const modal = document.getElementById('day-detail-modal');
+    if (modal) modal.style.display = 'none';
+    if (dayDetailChart) {
+        try { dayDetailChart.destroy(); } catch (e) { /* noop */ }
+        dayDetailChart = null;
+    }
 }

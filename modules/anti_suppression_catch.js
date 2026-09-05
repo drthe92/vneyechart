@@ -218,13 +218,21 @@ class CatchGame extends BinocularGameEngine {
         const completionRate = totalAttempts > 0 ? (this.hits / totalAttempts * 100) : 0;
 
         // --- Mở khóa Level kế tiếp nếu đạt ≥ 80% và chưa phải Level tối đa ---
-        const LEVEL_KEY = 'vision-therapy-m1-max-level';
-        const maxLevel = parseInt(localStorage.getItem(LEVEL_KEY) || '1', 10) || 1;
+        // [FIX LEVEL] Đọc/ghi theo từng bệnh nhân (helper trong therapeutic_menu_controller)
+        const maxLevel = (typeof window.getTherapyMaxLevel === 'function')
+            ? window.getTherapyMaxLevel('M1')
+            : (parseInt(localStorage.getItem('vision-therapy-m1-max-level') || '1', 10) || 1);
         let unlockedNew = false;
         if (completionRate >= 80 && this.level >= maxLevel && this.level < 10) {
-            localStorage.setItem(LEVEL_KEY, String(this.level + 1));
+            if (typeof window.setTherapyMaxLevel === 'function') {
+                window.setTherapyMaxLevel('M1', this.level + 1);
+            } else {
+                localStorage.setItem('vision-therapy-m1-max-level', String(this.level + 1));
+            }
             unlockedNew = true;
         }
+        // [TỐT NGHIỆP L10] Đồng bộ M4: vượt qua Level 10 = tốt nghiệp module
+        const graduated = completionRate >= 80 && this.level >= 10;
 
         // --- Đóng gói sessionMetrics trước khi stop ---
         this.sessionMetrics.score = this.score;
@@ -234,7 +242,8 @@ class CatchGame extends BinocularGameEngine {
             level: this.level,
             completionRate: completionRate,
             finalAlpha: this.healthyAlpha,
-            nextLevelUnlocked: unlockedNew
+            nextLevelUnlocked: unlockedNew,
+            graduated: graduated
         };
         this.finishSession();
 
@@ -259,7 +268,9 @@ class CatchGame extends BinocularGameEngine {
 
         const evalColor = completionRate >= 80 ? '#10b981' : '#f87171';
         const evalText = completionRate >= 80
-            ? (unlockedNew ? `ĐẠT — Đã mở khóa Level ${this.level + 1}!` : 'ĐẠT (Hứng hạt ổn định)')
+            ? (graduated
+                ? '🏆 TỐT NGHIỆP — Bạn đã chinh phục toàn bộ 10 Level!'
+                : (unlockedNew ? `ĐẠT — Đã mở khóa Level ${this.level + 1}!` : 'ĐẠT (Hứng hạt ổn định)'))
             : 'CHƯA ĐẠT (Cần hứng trúng ≥ 80% để mở khóa Level kế tiếp)';
 
         // ============================================
@@ -313,9 +324,15 @@ class CatchGame extends BinocularGameEngine {
             // Xóa overlay
             document.body.removeChild(overlay);
 
-            // Thoát fullscreen để về lại workspace Phòng tập
-            if (document.fullscreenElement) {
-                document.exitFullscreen().catch(() => {});
+            // Trở về Sảnh game (menu huấn luyện) — dùng chung closeTherapyModule:
+            // dừng game nếu còn chạy, dọn canvas, thoát fullscreen và vẽ lại Lobby.
+            if (typeof window.closeTherapyModule === 'function') {
+                window.closeTherapyModule();
+            } else {
+                // Fallback an toàn: thoát fullscreen (fullscreenchange tự về Lobby)
+                if (document.fullscreenElement) {
+                    document.exitFullscreen().catch(() => {});
+                }
             }
         };
     }

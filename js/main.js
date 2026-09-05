@@ -1990,15 +1990,22 @@ function init() {
     };
 
     // Delegate to ExamSessionManager for storage
+    let success = true;
     if (window.examSessionManager && typeof window.examSessionManager.addTherapyRecord === 'function') {
-        const success = window.examSessionManager.addTherapyRecord(therapyRecord);
+        success = window.examSessionManager.addTherapyRecord(therapyRecord);
         if (!success) {
             alert('Vui long tao phien kham truoc khi luu ket qua!');
         }
     } else {
         console.error('[EMR CORE] Khong tim thay instance cua ExamSessionManager.');
         alert('Loi he thong: Khong tim thay quan ly phiem kham. Vui long refresh trang.');
+        success = false;
     }
+
+    // [CHỈ HIỂN THỊ MODAL KHI ĐÃ LƯU THÀNH CÔNG] Nếu lưu thất bại, KHÔNG hiện
+    // modal "Xác nhận & Lưu hồ sơ" (nút gây hiểu nhầm rằng đã lưu) — game phải
+    // chặn sớm đã có alert; tránh người dùng bấm nút giữa lúc chưa có dữ liệu.
+    if (!success) return;
 
     // Phát sự kiện kết thúc bài tập để Global Result Modal hiển thị
     // (Chuẩn hóa payload từ mọi game M1..M12 — chỉ hiển thị khi đã lưu thành công)

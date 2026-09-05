@@ -327,13 +327,21 @@ class OKNStimulationGame extends BinocularGameEngine {
             : 0;
 
         // --- Mở khóa Level kế tiếp nếu đạt ≥ 80% và chưa phải Level tối đa ---
-        const LEVEL_KEY = 'vision-therapy-m10-max-level';
-        const maxLevel = parseInt(localStorage.getItem(LEVEL_KEY) || '1', 10) || 1;
+        // [FIX LEVEL] Đọc/ghi theo từng bệnh nhân (helper trong therapeutic_menu_controller)
+        const maxLevel = (typeof window.getTherapyMaxLevel === 'function')
+            ? window.getTherapyMaxLevel('M10')
+            : (parseInt(localStorage.getItem('vision-therapy-m10-max-level') || '1', 10) || 1);
         let unlockedNew = false;
         if (accuracy >= 80 && this.level >= maxLevel && this.level < 10) {
-            localStorage.setItem(LEVEL_KEY, String(this.level + 1));
+            if (typeof window.setTherapyMaxLevel === 'function') {
+                window.setTherapyMaxLevel('M10', this.level + 1);
+            } else {
+                localStorage.setItem('vision-therapy-m10-max-level', String(this.level + 1));
+            }
             unlockedNew = true;
         }
+        // [TỐT NGHIỆP L10] Đồng bộ M4: vượt qua Level 10 = tốt nghiệp module
+        const graduated = accuracy >= 80 && this.level >= 10;
 
         // Đóng gói customData theo đặc tả
         this.sessionMetrics.customData = {
@@ -346,7 +354,8 @@ class OKNStimulationGame extends BinocularGameEngine {
             targetsHit: this.targetsHit,
             accuracy: accuracy,
             avgReactionTimeMs: avgReactionTimeMs,
-            nextLevelUnlocked: unlockedNew
+            nextLevelUnlocked: unlockedNew,
+            graduated: graduated
         };
         this.sessionMetrics.hits = this.targetsHit;
         this.sessionMetrics.misses = this.targetsSpawned - this.targetsHit;

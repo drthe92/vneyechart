@@ -1554,6 +1554,117 @@
     }
 }
 
+/* ============================================================
+   MODAL CHI TIẾT PHIÊN TẬP TRONG NGÀY (Dashboard)
+   Mở khi click vào 1 điểm của biểu đồ tiến triển: liệt kê từng
+   phiên + biểu đồ mini theo phiên (khi ngày đó có ≥ 2 phiên).
+   ============================================================ */
+#day-detail-modal {
+    z-index: 2000;
+    background: rgba(10, 14, 23, 0.75);
+}
+
+#day-detail-modal .exam-modal-content {
+    background: #1e1e32;
+    border: 1px solid #334155;
+    max-width: 620px;
+    width: 94%;
+    color: #e2e8f0;
+}
+
+#day-detail-modal .exam-modal-header {
+    background: #1a1a2e;
+    border-bottom: 1px solid #334155;
+    padding: 16px 22px;
+}
+
+#day-detail-modal .exam-modal-header h3 {
+    color: #4da6ff;
+    font-size: 16px;
+    word-break: break-word;
+}
+
+#day-detail-modal .exam-modal-close {
+    background: #2a2a3e;
+    border-color: #444;
+    color: #cbd5e1;
+}
+
+#day-detail-modal .exam-modal-body {
+    padding: 20px 22px;
+}
+
+.day-detail-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    background: #1a1a2e;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #94a3b8;
+}
+
+.day-detail-summary b {
+    color: #e2e8f0;
+}
+
+.day-detail-chart-box {
+    position: relative;
+    height: 220px;
+    margin-bottom: 14px;
+}
+
+.day-detail-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 40vh;
+    overflow-y: auto;
+}
+
+.day-detail-row {
+    background: #1a1a2e;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 8px 12px;
+}
+
+.day-detail-row-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+}
+
+.day-detail-idx {
+    color: #4da6ff;
+    font-weight: 600;
+    min-width: 58px;
+}
+
+.day-detail-time {
+    color: #94a3b8;
+    font-size: 13px;
+    min-width: 52px;
+}
+
+.day-detail-value {
+    margin-left: auto;
+    color: #e2e8f0;
+}
+
+.day-detail-extra {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #94a3b8;
+    line-height: 1.5;
+    border-top: 1px dashed #334155;
+    padding-top: 6px;
+}
+
 /* Nhãn nguồn dữ liệu thị lực trong khối tổng hợp báo cáo */
 .vision-src {
     font-size: 0.85em;

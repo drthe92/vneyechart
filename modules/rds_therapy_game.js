@@ -533,13 +533,21 @@ class RDSTherapyGame extends BinocularGameEngine {
         const isPassed = this.consecutiveMinHits >= 5;
 
         // C3. Mở khóa Level kế tiếp nếu QUA MÀN và chưa phải Level tối đa
-        const LEVEL_KEY = 'vision-therapy-m5-max-level';
-        const maxLevel = parseInt(localStorage.getItem(LEVEL_KEY) || '1', 10) || 1;
+        // [FIX LEVEL] Đọc/ghi theo từng bệnh nhân (helper trong therapeutic_menu_controller)
+        const maxLevel = (typeof window.getTherapyMaxLevel === 'function')
+            ? window.getTherapyMaxLevel('M5')
+            : (parseInt(localStorage.getItem('vision-therapy-m5-max-level') || '1', 10) || 1);
         let unlockedNew = false;
         if (isPassed && this.level >= maxLevel && this.level < 10) {
-            localStorage.setItem(LEVEL_KEY, String(this.level + 1));
+            if (typeof window.setTherapyMaxLevel === 'function') {
+                window.setTherapyMaxLevel('M5', this.level + 1);
+            } else {
+                localStorage.setItem('vision-therapy-m5-max-level', String(this.level + 1));
+            }
             unlockedNew = true;
         }
+        // [TỐT NGHIỆP L10] Đồng bộ M4: vượt qua Level 10 = tốt nghiệp module
+        const graduated = isPassed && this.level >= 10;
 
         // C. Đóng gói sessionMetrics
         this.sessionMetrics.score = this.hits;
@@ -554,6 +562,7 @@ class RDSTherapyGame extends BinocularGameEngine {
             level: this.level,
             passed: isPassed,
             nextLevelUnlocked: unlockedNew,
+            graduated: graduated,
             targetArcsec: this.targetArcsec
         };
         this.finishSession();
@@ -591,11 +600,13 @@ class RDSTherapyGame extends BinocularGameEngine {
         // Thông báo kết quả TẬP TRUNG vào mục tiêu Level:
         // - Đạt → "Đạt mục tiêu Level X — Đã mở khóa Level Y"
         // - Chưa đạt → chỉ nhắc mục tiêu còn lại (KHÔNG giải thích suy giảm thị giác nổi)
-        const passText = isPassed && unlockedNew
-            ? `ĐẠT MỤC TIÊU — Đã mở khóa Level ${this.level + 1}`
-            : isPassed
-                ? `ĐẠT MỤC TIÊU LEVEL ${this.level} — Đã chinh phục toàn bộ mục tiêu`
-                : `Chưa đạt mục tiêu Level ${this.level}: cần trúng LIÊN TIẾP 5 lần ở độ khó ${this.targetArcsec} arcsec`;
+        const passText = isPassed && graduated
+            ? `🏆 TỐT NGHIỆP — Đã chinh phục toàn bộ 10 Level!`
+            : isPassed && unlockedNew
+                ? `ĐẠT MỤC TIÊU — Đã mở khóa Level ${this.level + 1}`
+                : isPassed
+                    ? `ĐẠT MỤC TIÊU LEVEL ${this.level} — Đã chinh phục toàn bộ mục tiêu`
+                    : `Chưa đạt mục tiêu Level ${this.level}: cần trúng LIÊN TIẾP 5 lần ở độ khó ${this.targetArcsec} arcsec`;
 
         overlay.innerHTML = `
             <div style="background: #1e293b; border-radius: 12px; padding: 30px; max-width: 650px; width: 90%; box-shadow: 0 4px 24px rgba(0,0,0,0.5);">
@@ -642,10 +653,14 @@ class RDSTherapyGame extends BinocularGameEngine {
         const finishBtn = document.getElementById('btn-finish-m5');
         if (finishBtn) {
             finishBtn.onclick = () => {
-                if (document.fullscreenElement) {
+                overlay.remove();
+                // Trở về Sảnh game (menu huấn luyện) — closeTherapyModule idempotent:
+                // dừng game, dọn canvas, thoát fullscreen và vẽ lại Lobby.
+                if (typeof window.closeTherapyModule === 'function') {
+                    window.closeTherapyModule();
+                } else if (document.fullscreenElement) {
                     document.exitFullscreen().catch(() => {});
                 }
-                overlay.remove();
             };
         }
     }

@@ -502,13 +502,21 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
             && this.currentLogCS >= (this._startLogCS - 0.05);
 
         // --- Mở khóa Level kế tiếp nếu QUA MÀN và chưa phải Level tối đa ---
-        const LEVEL_KEY = 'vision-therapy-m11-max-level';
-        const maxLevel = parseInt(localStorage.getItem(LEVEL_KEY) || '1', 10) || 1;
+        // [FIX LEVEL] Đọc/ghi theo từng bệnh nhân (helper trong therapeutic_menu_controller)
+        const maxLevel = (typeof window.getTherapyMaxLevel === 'function')
+            ? window.getTherapyMaxLevel('M11')
+            : (parseInt(localStorage.getItem('vision-therapy-m11-max-level') || '1', 10) || 1);
         let unlockedNew = false;
         if (isPassed && this.level >= maxLevel && this.level < 10) {
-            localStorage.setItem(LEVEL_KEY, String(this.level + 1));
+            if (typeof window.setTherapyMaxLevel === 'function') {
+                window.setTherapyMaxLevel('M11', this.level + 1);
+            } else {
+                localStorage.setItem('vision-therapy-m11-max-level', String(this.level + 1));
+            }
             unlockedNew = true;
         }
+        // [TỐT NGHIỆP L10] Đồng bộ M4: vượt qua Level 10 = tốt nghiệp module
+        const graduated = isPassed && this.level >= 10;
 
         // Đóng gói customData theo đặc tả cầu thang
         this.sessionMetrics.customData = {
@@ -521,7 +529,8 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
             avgReactionTimeMs: avgReactionTimeMs,
             level: this.level,
             passed: isPassed,
-            nextLevelUnlocked: unlockedNew
+            nextLevelUnlocked: unlockedNew,
+            graduated: graduated
         };
         this.sessionMetrics.hits = this.correctAnswers;
         this.sessionMetrics.misses = this.totalTrials - this.correctAnswers;
@@ -581,7 +590,10 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
         nextBtn.onmouseout = () => nextBtn.style.background = '#3b82f6';
         nextBtn.onclick = () => {
             document.body.removeChild(overlay);
-            if (document.fullscreenElement) {
+            // Trở về Sảnh game (menu huấn luyện) — closeTherapyModule idempotent
+            if (typeof window.closeTherapyModule === 'function') {
+                window.closeTherapyModule();
+            } else if (document.fullscreenElement) {
                 document.exitFullscreen().catch(() => {});
             }
         };

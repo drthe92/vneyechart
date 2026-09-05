@@ -238,13 +238,21 @@ class CamVisualStimulatorGame extends BinocularGameEngine {
         const isPassed = accuracyRate >= 85 && avgRt > 0 && avgRt <= this._maxReactionMs;
 
         // --- Mở khóa Level kế tiếp nếu QUA MÀN và chưa phải Level tối đa ---
-        const LEVEL_KEY = 'vision-therapy-m7-max-level';
-        const maxLevel = parseInt(localStorage.getItem(LEVEL_KEY) || '1', 10) || 1;
+        // [FIX LEVEL] Đọc/ghi theo từng bệnh nhân (helper trong therapeutic_menu_controller)
+        const maxLevel = (typeof window.getTherapyMaxLevel === 'function')
+            ? window.getTherapyMaxLevel('M7')
+            : (parseInt(localStorage.getItem('vision-therapy-m7-max-level') || '1', 10) || 1);
         let unlockedNew = false;
         if (isPassed && this.level >= maxLevel && this.level < 10) {
-            localStorage.setItem(LEVEL_KEY, String(this.level + 1));
+            if (typeof window.setTherapyMaxLevel === 'function') {
+                window.setTherapyMaxLevel('M7', this.level + 1);
+            } else {
+                localStorage.setItem('vision-therapy-m7-max-level', String(this.level + 1));
+            }
             unlockedNew = true;
         }
+        // [TỐT NGHIỆP L10] Đồng bộ M4: vượt qua Level 10 = tốt nghiệp module
+        const graduated = isPassed && this.level >= 10;
 
         this.sessionMetrics.customData = {
             totalHits: this.totalHits,
@@ -256,14 +264,15 @@ class CamVisualStimulatorGame extends BinocularGameEngine {
             stripeWidth: this._stripeWidth,
             level: this.level,
             passed: isPassed,
-            nextLevelUnlocked: unlockedNew
+            nextLevelUnlocked: unlockedNew,
+            graduated: graduated
         };
         this.sessionMetrics.hits = this.totalHits;
         this.sessionMetrics.misses = this.totalMisses;
 
         this.finishSession();
         this.stop();
-        this._showResultOverlay(accuracyRate, avgRt, isPassed, unlockedNew);
+        this._showResultOverlay(accuracyRate, avgRt, isPassed, unlockedNew, graduated);
     }
 
     /**
@@ -272,11 +281,14 @@ class CamVisualStimulatorGame extends BinocularGameEngine {
      * @param {number} avgRt - Phản xạ trung bình (ms)
      * @param {boolean} isPassed - Đạt tiêu chí Level hiện tại hay không
      * @param {boolean} unlockedNew - Có mở khóa Level mới hay không
+     * @param {boolean} graduated - [TỐT NGHIỆP L10] Vượt qua Level 10
      */
-    _showResultOverlay(accuracyRate, avgRt, isPassed, unlockedNew) {
+    _showResultOverlay(accuracyRate, avgRt, isPassed, unlockedNew, graduated) {
         const evalColor = isPassed ? '#10b981' : '#f87171';
         const evalText = isPassed
-            ? (unlockedNew ? `ĐẠT — Đã mở khóa Level ${this.level + 1}!` : `ĐẠT (Chinh phục Level ${this.level})`)
+            ? (graduated
+                ? '🏆 TỐT NGHIỆP — Bạn đã chinh phục toàn bộ 10 Level!'
+                : (unlockedNew ? `ĐẠT — Đã mở khóa Level ${this.level + 1}!` : `ĐẠT (Chinh phục Level ${this.level})`))
             : `CHƯA ĐẠT (Cần ≥ 85% chính xác và phản xạ ≤ ${this._maxReactionMs} ms để mở khóa Level kế tiếp)`;
 
         const overlay = document.createElement('div');
@@ -318,7 +330,10 @@ class CamVisualStimulatorGame extends BinocularGameEngine {
         nextBtn.onmouseout = () => nextBtn.style.background = '#3b82f6';
         nextBtn.onclick = () => {
             document.body.removeChild(overlay);
-            if (document.fullscreenElement) {
+            // Trở về Sảnh game (menu huấn luyện) — closeTherapyModule idempotent
+            if (typeof window.closeTherapyModule === 'function') {
+                window.closeTherapyModule();
+            } else if (document.fullscreenElement) {
                 document.exitFullscreen().catch(() => {});
             }
         };
