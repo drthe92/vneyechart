@@ -380,6 +380,8 @@ function persistComboRecord() {
     id: Date.now().toString(),
     timestamp: Date.now(),
     gameName: 'Combo Đánh Giá Nhược Thị',
+    test_id: 'combo-amblyopia-assessment',
+    sub_test_ids: COMBO_TEST_IDS.slice(),
     durationSeconds: durationSeconds,
     metrics: { customData: window.__comboResults },
     opticalSettings: 'N/A'
@@ -2095,6 +2097,7 @@ function formatTherapyClinicalResult(input) {
     if (gameName && gameName.includes('M11')) {
         let logCS = metrics?.customData?.finalLogCS || 0;
         let revs = metrics?.customData?.reversals || 0;
+        let lv = metrics?.customData?.level;
 
         // Chuyển đổi LogCS sang % tương phản
         let contrastPct = (Math.pow(10, -logCS) * 100).toFixed(1);
@@ -2111,7 +2114,7 @@ function formatTherapyClinicalResult(input) {
             interpretation = "Chưa đạt ngưỡng tối thiểu (Cần đạt ≥ 1.0 LogCS)";
         }
 
-        return `LogCS: <b>${logCS.toFixed(2)}</b> (Tương phản: <b>${contrastPct}%</b>) | Đảo chiều: ${revs}<br><small><i>Diễn giải: ${interpretation}</i></small>`;
+        return `LogCS: <b>${logCS.toFixed(2)}</b> (Tương phản: <b>${contrastPct}%</b>) | Đảo chiều: ${revs}${ lv ? ` | Level ${ lv }` : '' }<br><small><i>Diễn giải: ${interpretation}</i></small>`;
     }
 
     // Module 12: Dichoptic Smooth Pursuit — tracking accuracy & out-of-bounds
@@ -2162,8 +2165,9 @@ function formatTherapyClinicalResult(input) {
     // Module 5: Global Stereopsis (RDS) — Arcsec
     if (gameName.startsWith('M5:') || metrics?.moduleType === 5) {
         const finalArcsec = metrics.customData?.finalArcsec;
+        const lv = metrics.customData?.level;
         if (finalArcsec !== undefined && finalArcsec !== null) {
-            return `Ngưỡng thị giác nổi (Stereoacuity): ${ finalArcsec } Arcsec`;
+            return `Ngưỡng thị giác nổi (Stereoacuity): ${ finalArcsec } Arcsec${ lv ? ` | Level ${ lv }` : '' }`;
         }
     }
 
@@ -2189,8 +2193,9 @@ function formatTherapyClinicalResult(input) {
     if (gameName.includes('M7')) {
         const acc = metrics.customData?.accuracyRate;
         const rt = metrics.customData?.avgReactionTimeMs;
+        const lv = metrics.customData?.level;
         if (acc !== undefined && acc !== null && rt !== undefined && rt !== null) {
-            return `Tỷ lệ chính xác: ${ acc.toFixed(0) }% | Phản xạ: ${ rt.toFixed(0) } ms`;
+            return `Tỷ lệ chính xác: ${ acc.toFixed(0) }% | Phản xạ: ${ rt.toFixed(0) } ms${ lv ? ` | Level ${ lv }` : '' }`;
         }
     }
 
@@ -2198,8 +2203,9 @@ function formatTherapyClinicalResult(input) {
     if (gameName.includes('M8')) {
         const acc = metrics.customData?.accuracy;
         const minSpacing = metrics.customData?.minimumSpacingReached;
+        const lv = metrics.customData?.level;
         if (acc !== undefined && acc !== null) {
-            return `Chính xác: ${ acc.toFixed(0) }% | Khoảng cách hẹp nhất: ${ minSpacing !== undefined ? minSpacing : 'N/A' }`;
+            return `Chính xác: ${ acc.toFixed(0) }% | Khoảng cách hẹp nhất: ${ minSpacing !== undefined ? minSpacing : 'N/A' }${ lv ? ` | Level ${ lv }` : '' }`;
         }
     }
 
@@ -2324,15 +2330,24 @@ function generateTherapyReportHTML(patientId, recordsOverride = null) {
                 isPassed = acc > 90 && rt > 0 && rt <= t;
             }
         } else if (record.gameName.includes('M5')) {
-            isPassed = (cd.finalArcsec ?? 0) > 0 && (cd.finalArcsec ?? 0) <= 40;
+            // M5: QUA MÀN khi đạt ≥ 10 Hits VÀ chinh phục Đích arcsec của Level
+            // (fallback bản ghi cũ: ngưỡng 40 arcsec)
+            isPassed = (cd.passed ?? false) === true
+                || ((cd.passed === undefined) && (cd.finalArcsec ?? 0) > 0 && (cd.finalArcsec ?? 0) <= 40);
         } else if (record.gameName.includes('M13')) {
             isPassed = (cd.maxDiopter ?? 0) >= (cd.targetDiopter ?? 15);
         } else if (record.gameName.includes('M6')) {
             isPassed = (cd.maxDiopter ?? 0) >= (cd.targetDiopter ?? 8);
         } else if (record.gameName.includes('M7')) {
-            isPassed = (cd.accuracyRate ?? 0) >= 80 && (cd.avgReactionTimeMs ?? 0) <= 800;
+            // M7: QUA MÀN khi đạt tiêu chí Level (≥ 85% chính xác + phản xạ theo Level)
+            // (fallback bản ghi cũ: ≥ 80% chính xác + phản xạ ≤ 800ms)
+            isPassed = (cd.passed ?? false) === true
+                || ((cd.passed === undefined) && (cd.accuracyRate ?? 0) >= 80 && (cd.avgReactionTimeMs ?? 0) <= 800);
         } else if (record.gameName.includes('M8')) {
-            isPassed = (cd.accuracy ?? 0) >= 75;
+            // M8: QUA MÀN khi đạt tiêu chí Level (chính xác ≥ 85% + khoảng cách hẹp theo Level)
+            // (fallback bản ghi cũ: chính xác ≥ 75%)
+            isPassed = (cd.passed ?? false) === true
+                || ((cd.passed === undefined) && (cd.accuracy ?? 0) >= 75);
         } else if (record.gameName.includes('M9')) {
             // M9: Chính xác > 85% VÀ Phản xạ < 1200ms (nới lỏng hơn M4 — mắt lười Giai đoạn 1)
             isPassed = (cd.accuracy ?? 0) > 85 && (cd.avgReactionTimeMs ?? 0) > 0 && (cd.avgReactionTimeMs ?? 0) < 1200;
@@ -2342,7 +2357,10 @@ function generateTherapyReportHTML(patientId, recordsOverride = null) {
             // M12: Accuracy bám đuôi > 85%
             isPassed = (cd.trackingAccuracy ?? 0) > 85;
         } else if (record.gameName.includes('M11')) {
-            isPassed = (cd.finalLogCS ?? 0) >= 1.0 && (cd.reversals ?? 0) >= 4;
+            // M11: QUA MÀN khi hội tụ đủ đảo chiều Level + ngưỡng đạt mức xuất phát Level
+            // (fallback bản ghi cũ: LogCS ≥ 1.0 và ≥ 4 đảo chiều)
+            isPassed = (cd.passed ?? false) === true
+                || ((cd.passed === undefined) && (cd.finalLogCS ?? 0) >= 1.0 && (cd.reversals ?? 0) >= 4);
         }
 
         const statusHTML = isComboRecord

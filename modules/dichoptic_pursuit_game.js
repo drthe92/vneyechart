@@ -72,7 +72,7 @@ class DichopticPursuitGame extends BinocularGameEngine {
         this.pathWidthPx = 80;    // Độ rộng băng đường ray (px)
         this.speedFactor = 1.0;   // Tốc độ trôi (rad/s cho timeOffset)
         this.waveform = 'sine';   // Dạng sóng: 'sine' (chữ S) | 'zigzag' (zic-zac)
-        this.durationMs = 180000; // Thời lượng cố định (180s = 3 phút)
+        this.durationMs = 90000; // Thời lượng cố định (90s = 1.5 phút)
 
         // --- Trạng thái đánh giá ---
         this.totalFrames = 0;
@@ -133,8 +133,8 @@ class DichopticPursuitGame extends BinocularGameEngine {
         // --- Ánh xạ Level → Thông số vật lý (thay thế dropdown rời rạc) ---
         this.level = this._applyLevel(config && config.level);
 
-        // --- Thời lượng cố định: 180 giây (3 phút) ---
-        this.durationMs = 180000;
+        // --- Thời lượng cố định: 90 giây (1.5 phút) ---
+        this.durationMs = 90000;
 
         // --- Khóa cứng tọa độ Y của Tàu ở nửa dưới màn hình ---
         this.targetY = this.canvas.height * 0.75;
@@ -416,7 +416,7 @@ class DichopticPursuitGame extends BinocularGameEngine {
         const speedLabel = this.speedFactor <= 0.6 ? 'Chậm' : (this.speedFactor >= 1.8 ? 'Nhanh' : 'Vừa');
         const widthLabel = this.pathWidthPx >= 140 ? 'Rộng' : (this.pathWidthPx <= 40 ? 'Rất hẹp' : 'Vừa');
         const waveLabel = this.waveform === 'zigzag' ? 'Zic-zac' : (this.amplitudePx <= 60 ? 'Thoải' : 'Chữ S');
-        const difficulty = `Level ${this.level} | Tốc độ: ${speedLabel} | Đường ray: ${widthLabel} | Dạng sóng: ${waveLabel} | 180s`;
+        const difficulty = `Level ${this.level} | Tốc độ: ${speedLabel} | Đường ray: ${widthLabel} | Dạng sóng: ${waveLabel} | 90s`;
 
         // 4. Đóng gói customData gửi cho EMR Core
         this.sessionMetrics.customData = {

@@ -183,7 +183,9 @@ class SaccadicTrackingGame extends BinocularGameEngine {
         if (this.canvas && this._boundClickHandler) {
             this.canvas.removeEventListener('click', this._boundClickHandler);
         }
-        this.canvas.style.cursor = 'default';
+        if (this.canvas) {
+            this.canvas.style.cursor = 'default';
+        }
         super.stop();
     }
 

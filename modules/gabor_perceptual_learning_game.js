@@ -24,6 +24,23 @@
 
 import BinocularGameEngine from './binocular_game_engine.js';
 
+// Bảng độ khó 10 mức (M11_LEVELS) — gamify giống M1/M2/M4/M9/M10/M12:
+// Level càng cao → điểm xuất phát Cầu thang (startLogCS) càng gần ngưỡng của
+// người bình thường, thời gian flash (flashMs) càng ngắn, số đảo chiều cần hội
+// tụ (targetReversals) càng nhiều để đảm bảo ngưỡng đo được đáng tin cậy.
+const M11_LEVELS = [
+    { level: 1,  startLogCS: 0.0,  flashMs: 500, targetReversals: 4 },
+    { level: 2,  startLogCS: 0.1,  flashMs: 500, targetReversals: 4 },
+    { level: 3,  startLogCS: 0.22, flashMs: 400, targetReversals: 5 },
+    { level: 4,  startLogCS: 0.3,  flashMs: 400, targetReversals: 5 },
+    { level: 5,  startLogCS: 0.4,  flashMs: 300, targetReversals: 6 },
+    { level: 6,  startLogCS: 0.5,  flashMs: 300, targetReversals: 6 },
+    { level: 7,  startLogCS: 0.6,  flashMs: 250, targetReversals: 6 },
+    { level: 8,  startLogCS: 0.7,  flashMs: 200, targetReversals: 7 },
+    { level: 9,  startLogCS: 0.82, flashMs: 150, targetReversals: 7 },
+    { level: 10, startLogCS: 1.0,  flashMs: 100, targetReversals: 8 }
+];
+
 class GaborPerceptualLearningGame extends BinocularGameEngine {
     constructor() {
         super(); // Khởi tạo cha: kiểm tra hiệu chuẩn, tạo canvas, bind SPA listener
@@ -46,6 +63,11 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
         this.FIXATE_MIN = 400;           // Thời gian giữ dấu (+) tối thiểu (ms)
         this.FIXATE_JITTER = 400;        // Độ nhiễu thêm (ms) -> 400–800ms
         this.REACT_LIMIT_MS = 8000;      // Quá hạn phản xạ (coi như sai) (ms)
+
+        // --- Cấp độ gamify (1..10) ---
+        this.level = 1;                  // Cấp độ hiện tại (1..10) — gamify
+        this._startLogCS = 0.0;          // Điểm xuất phát Cầu thang theo Level
+        this._targetReversals = 6;       // Số đảo chiều cần hội tụ theo Level
 
         // --- Trạng thái thuật toán Cầu thang (hệ quy chiếu LogCS) ---
         // LogCS = -log10(C). LogCS 0.0 => C=1.0 (tương phản tối đa).
@@ -112,16 +134,41 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
     }
 
     /**
+     * Ánh xạ Level (1..10) → Cấu hình độ khó theo bảng M11_LEVELS.
+     * Level càng cao: xuất phát Cầu thang gần ngưỡng bình thường hơn,
+     * flash ngắn hơn, số đảo chiều cần hội tụ nhiều hơn.
+     * @param {number|string} level - Cấp độ người dùng chọn (mặc định 1)
+     * @returns {number} Level hợp lệ (clamp 1..10)
+     */
+    _applyLevel(level) {
+        const lvl = Math.max(1, Math.min(10, parseInt(level, 10) || 1));
+        const cfg = M11_LEVELS.find(l => l.level === lvl) || M11_LEVELS[0];
+        this.level = lvl;
+        this._startLogCS = cfg.startLogCS;
+        this._flashMs = cfg.flashMs;
+        this._targetReversals = cfg.targetReversals;
+        return lvl;
+    }
+
+    /**
      * Khởi chạy game với cấu hình từ Lobby
-     * @param {Object} config - { flashDuration: '200' | '500' }
+     * @param {Object} config - { level } hoặc legacy { flashDuration: '200' | '500' }
      */
     start(config = {}) {
-        // Cấu hình thời gian flash
-        const flashDuration = (config && config.flashDuration) ? config.flashDuration : '200';
-        this._flashMs = (flashDuration === '500') ? 500 : 200;
+        if (config && config.level != null) {
+            // Gamify: áp dụng Level 1..10 từ Lobby
+            this._applyLevel(config.level);
+        } else {
+            // Legacy: cấu hình thời gian flash thủ công
+            const flashDuration = (config && config.flashDuration) ? config.flashDuration : '200';
+            this._flashMs = (flashDuration === '500') ? 500 : 200;
+            this.level = 1;
+            this._startLogCS = 0.0;
+            this._targetReversals = this.TARGET_REVERSALS;
+        }
 
         // Reset trạng thái phiên & cầu thang
-        this.currentLogCS = 0.0;
+        this.currentLogCS = this._startLogCS;
         this._consecutiveCorrect = 0;
         this.reversals = 0;
         this._lastStepDir = null;
@@ -224,7 +271,7 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
         this.totalTrials += 1;
 
         // Dừng khi đủ số đảo chiều (hội tụ ngưỡng)
-        if (this.reversals >= this.TARGET_REVERSALS) {
+        if (this.reversals >= this._targetReversals) {
             this.endGame();
         } else {
             this._startTrial();
@@ -396,7 +443,7 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
         ctx.font = 'bold 20px monospace';
         ctx.textBaseline = 'top';
         ctx.textAlign = 'left';
-        ctx.fillText(`Tiến độ: ${this.reversals}/${this.TARGET_REVERSALS}`, 16, 16);
+        ctx.fillText(`Level ${this.level}/10 | Tiến độ: ${this.reversals}/${this._targetReversals}`, 16, 16);
         ctx.textAlign = 'left';
     }
 
@@ -448,20 +495,96 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
             ? Math.round(this._reactionTimes.reduce((a, b) => a + b, 0) / this._reactionTimes.length)
             : 0;
 
+        // --- Tiêu chí qua màn theo Level: ngưỡng hội tụ ≥ xuất phát Level
+        // (bệnh nhân đạt được độ nhạy tương phản mà Level yêu cầu) VÀ đủ số
+        // đảo chiều hội tụ của Level ---
+        const isPassed = this.reversals >= this._targetReversals
+            && this.currentLogCS >= (this._startLogCS - 0.05);
+
+        // --- Mở khóa Level kế tiếp nếu QUA MÀN và chưa phải Level tối đa ---
+        const LEVEL_KEY = 'vision-therapy-m11-max-level';
+        const maxLevel = parseInt(localStorage.getItem(LEVEL_KEY) || '1', 10) || 1;
+        let unlockedNew = false;
+        if (isPassed && this.level >= maxLevel && this.level < 10) {
+            localStorage.setItem(LEVEL_KEY, String(this.level + 1));
+            unlockedNew = true;
+        }
+
         // Đóng gói customData theo đặc tả cầu thang
         this.sessionMetrics.customData = {
             finalLogCS: this.currentLogCS,
+            startLogCS: this._startLogCS,
             reversals: this.reversals,
             totalTrials: this.totalTrials,
             correctAnswers: this.correctAnswers,
             accuracy: accuracy,
-            avgReactionTimeMs: avgReactionTimeMs
+            avgReactionTimeMs: avgReactionTimeMs,
+            level: this.level,
+            passed: isPassed,
+            nextLevelUnlocked: unlockedNew
         };
         this.sessionMetrics.hits = this.correctAnswers;
         this.sessionMetrics.misses = this.totalTrials - this.correctAnswers;
 
         this.finishSession();
         this.stop();
+        this._showResultOverlay(isPassed, unlockedNew);
+    }
+
+    /**
+     * Hiển thị overlay kết quả phiên (kèm trạng thái mở khóa Level kế tiếp)
+     * @param {boolean} isPassed - Đạt tiêu chí Level hiện tại hay không
+     * @param {boolean} unlockedNew - Có mở khóa Level mới hay không
+     */
+    _showResultOverlay(isPassed, unlockedNew) {
+        const contrastPct = (Math.pow(10, -this.currentLogCS) * 100);
+        const evalColor = isPassed ? '#10b981' : '#f87171';
+        const evalText = isPassed
+            ? (unlockedNew ? `ĐẠT — Đã mở khóa Level ${this.level + 1}!` : `ĐẠT (Chinh phục Level ${this.level})`)
+            : `CHƯA ĐẠT (Cần ngưỡng hội tụ ≥ ${this._startLogCS.toFixed(2)} LogCS và đủ ${this._targetReversals} đảo chiều để mở khóa Level kế tiếp)`;
+
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed; inset: 0; z-index: 10000;
+            background: rgba(15, 23, 42, 0.95);
+            color: white;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; padding: 30px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        `;
+
+        overlay.innerHTML = `
+            <h1 style="font-size: 32px; color: ${evalColor}; margin-bottom: 20px;">
+                ✅ ${isPassed ? 'BÁO CÁO LÂM SÀNG: ĐẠT MỤC TIÊU' : 'BÁO CÁO LÂM SÀNG: HOÀN THÀNH PHIÊN TẬP'}
+            </h1>
+
+            <div style="max-width: 600px; background: rgba(255,255,255,0.05); border-radius: 12px; padding: 25px; margin-bottom: 25px;">
+                <p style="font-size: 20px; margin: 8px 0;"><strong>⭐ Cấp độ đã chinh phục:</strong> <span style="color: #fbbf24;">Level ${this.level}</span></p>
+                <p style="font-size: 20px; margin: 8px 0;"><strong>🔬 Ngưỡng tương phản hội tụ:</strong> <span style="color: #60a5fa;">${this.currentLogCS.toFixed(2)} LogCS (${contrastPct.toFixed(1)}%)</span></p>
+                <p style="font-size: 20px; margin: 8px 0;"><strong>🔄 Số đảo chiều:</strong> <span style="color: #22d3ee;">${this.reversals} / ${this._targetReversals}</span></p>
+                <p style="font-size: 20px; margin: 8px 0;"><strong>📊 Chính xác:</strong> <span style="color: #10b981;">${this.totalTrials > 0 ? (this.correctAnswers / this.totalTrials * 100).toFixed(1) : 0}%</span> (${this.correctAnswers}/${this.totalTrials})</p>
+            </div>
+
+            <p style="font-size: 18px; color: ${evalColor}; margin: 0 0 20px 0; font-weight: bold;">${evalText}</p>
+
+            <button id="btn-next-module" style="
+                padding: 15px 40px; font-size: 18px; cursor: pointer;
+                background: #3b82f6; color: white; border: none; border-radius: 8px;
+                font-weight: bold; transition: background 0.3s;
+            ">Trở về Lobby</button>
+        `;
+
+        document.body.appendChild(overlay);
+
+        const nextBtn = document.getElementById('btn-next-module');
+        nextBtn.onmouseover = () => nextBtn.style.background = '#2563eb';
+        nextBtn.onmouseout = () => nextBtn.style.background = '#3b82f6';
+        nextBtn.onclick = () => {
+            document.body.removeChild(overlay);
+            if (document.fullscreenElement) {
+                document.exitFullscreen().catch(() => {});
+            }
+        };
     }
 
     /**

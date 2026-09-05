@@ -11,6 +11,30 @@
 
 import BinocularGameEngine from './binocular_game_engine.js';
 
+// Bảng độ khó 10 mức (M5_LEVELS) — gamify giống M1/M2/M4/M9/M10/M12:
+// Level càng cao → Disparity khởi đầu (startArcsec) càng nhỏ (bắt đầu gần
+// ngưỡng khó hơn), Đích phải chinh phục (targetArcsec) càng khắt khe, ô vuông
+// nổi (squareSize) càng nhỏ.
+// LƯU Ý (arcsec NHỎ = KHÓ hơn!):
+// - targetArcsec vừa là ĐÍCH hiển thị vừa là SÀN của Cầu thang: "chạm sàn" =
+//   "trúng ở đúng mức khó nhất của Level", nhất quán với lâm sàng
+//   (L9: 40" = ngưỡng bình thường, L10: 20" = thị lực nổi siêu tinh).
+// - QUA MÀN = trúng LIÊN TIẾP 5 lần ở sàn (early-exit, consecutiveMinHits >= 5).
+//   KHÔNG dùng hits >= 10 vì cầu thang ×0.75 từ 1200" chỉ cho perfect play
+//   4 (xuống sàn) + 5 (sàn) = 9 hits — không bao giờ đủ 10 (lỗi kẹt vĩnh viễn).
+const M5_LEVELS = [
+    { level: 1,  startArcsec: 1200, targetArcsec: 600, squareSize: 140 },
+    { level: 2,  startArcsec: 1000, targetArcsec: 500, squareSize: 130 },
+    { level: 3,  startArcsec: 800,  targetArcsec: 400, squareSize: 120 },
+    { level: 4,  startArcsec: 600,  targetArcsec: 300, squareSize: 110 },
+    { level: 5,  startArcsec: 500,  targetArcsec: 240, squareSize: 100 },
+    { level: 6,  startArcsec: 400,  targetArcsec: 180, squareSize: 90  },
+    { level: 7,  startArcsec: 300,  targetArcsec: 120, squareSize: 80  },
+    { level: 8,  startArcsec: 200,  targetArcsec: 80,  squareSize: 70  },
+    { level: 9,  startArcsec: 120,  targetArcsec: 40,  squareSize: 60  },
+    { level: 10, startArcsec: 60,   targetArcsec: 20,  squareSize: 50  }
+];
+
 class RDSTherapyGame extends BinocularGameEngine {
     /**
      * Khởi tạo Game Logic RDS Therapy
@@ -22,10 +46,12 @@ class RDSTherapyGame extends BinocularGameEngine {
         this.gameName = 'M5: Huấn luyện Thị giác nổi (RDS)';
 
         // --- Cấu hình Disadaptive Difficulty ---
-        this.currentArcsec = 1200;       // Bắt đầu rất dễ (Stereo-Lock nhanh)
-        this.minArcsec = 20;             // Ngưỡng khó nhất
-        this.maxArcsec = 2000;           // Ngưỡng dễ nhất
-        this.history = [];               // Mảng lưu các mốc Arcsec đã trúng
+        this.level = 1;                // Cấp độ hiện tại (1..10) — gamify
+        this.targetArcsec = 600;       // Đích phải chinh phục để qua màn Level (arcsec nhỏ = khó)
+        this.currentArcsec = 1200;     // Bắt đầu rất dễ (Stereo-Lock nhanh)
+        this.minArcsec = 600;          // SÀN Cầu thang = Đích Level (clamp khi TRÚNG)
+        this.maxArcsec = 2000;         // Ngưỡng dễ nhất (clamp khi TRƯỢT)
+        this.history = [];             // Mảng lưu các mốc Arcsec đã trúng
 
         // --- Cấu hình mục tiêu ẩn (Hình vuông nổi) ---
         // KHÔNG gọi _randomizeTargetPosition() ở đây — trì hoãn đến khi Canvas có kích thước vật lý
@@ -58,10 +84,45 @@ class RDSTherapyGame extends BinocularGameEngine {
     }
 
     /**
+     * Ánh xạ Level (1..10) → Cấu hình độ khó theo bảng M5_LEVELS.
+     * Level càng cao: khởi đầu càng khó (startArcsec nhỏ), Đích = SÀN Cầu thang
+     * càng thấp — bệnh nhân phải TRÚNG LIÊN TIẾP 5 lần ở mức arcsec của Level
+     * mới qua màn (early-exit) — arcsec nhỏ = khó hơn.
+     * @param {number|string} level - Cấp độ người dùng chọn (mặc định 1)
+     * @returns {number} Level hợp lệ (clamp 1..10)
+     */
+    _applyLevel(level) {
+        const lvl = Math.max(1, Math.min(10, parseInt(level, 10) || 1));
+        const cfg = M5_LEVELS.find(l => l.level === lvl) || M5_LEVELS[0];
+        this.level = lvl;
+        this.currentArcsec = cfg.startArcsec;
+        this.minArcsec = cfg.targetArcsec;   // SÀN Cầu thang = Đích Level
+        this.targetArcsec = cfg.targetArcsec; // Đích phải chinh phục (trúng liên tiếp 5 lần)
+        this.targetRect.size = cfg.squareSize;
+        return lvl;
+    }
+
+    /**
      * Bắt đầu game
      * Gọi super.start(), lắng nghe click
+     * @param {Object} config - { level } (gamify) hoặc {} (legacy mặc định)
      */
-    start() {
+    start(config = {}) {
+        if (config && config.level != null) {
+            this._applyLevel(config.level);
+        } else {
+            // Legacy: giữ nguyên cấu hình mặc định (Level 1 mở rộng)
+            this.level = 1;
+            this.currentArcsec = M5_LEVELS[0].startArcsec;
+            this.minArcsec = M5_LEVELS[0].targetArcsec;
+            this.targetArcsec = M5_LEVELS[0].targetArcsec;
+            this.targetRect.size = M5_LEVELS[0].squareSize;
+        }
+        this.history = [];
+        this.hits = 0;
+        this.misses = 0;
+        this.consecutiveMinHits = 0;
+
         super.start();
         this.isRunning = true;
         this.sessionMetrics.startTime = Date.now();
@@ -80,7 +141,12 @@ class RDSTherapyGame extends BinocularGameEngine {
      */
     stop() {
         this.isRunning = false;
-        this.canvas.removeEventListener('click', this._clickHandler);
+        // Guard: canvas có thể đã bị _forceClean() xóa khi stop() được gọi lần 2
+        // qua stopCurrentGame() trên fullscreenchange — tránh TypeError làm kẹt
+        // màn hình trắng (không khôi phục được Lobby).
+        if (this.canvas) {
+            this.canvas.removeEventListener('click', this._clickHandler);
+        }
         if (this._timerInterval) {
             clearInterval(this._timerInterval);
             this._timerInterval = null;
@@ -286,7 +352,7 @@ class RDSTherapyGame extends BinocularGameEngine {
         ctx.font = 'bold 18px Arial, sans-serif';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        ctx.fillText(`Độ khó: ${Math.round(this.currentArcsec)} arcsec`, 20, 20);
+        ctx.fillText(`Level ${this.level}/10 | Độ khó: ${Math.round(this.currentArcsec)} arcsec`, 20, 20);
 
         // Số Hits
         ctx.fillText(`Hits: ${this.hits}/${this.maxHits}`, 20, 45);
@@ -458,16 +524,37 @@ class RDSTherapyGame extends BinocularGameEngine {
             ? top5.reduce((sum, val) => sum + val, 0) / top5.length
             : this.currentArcsec;
 
+        // C2. Tiêu chí qua màn theo Level: CHINH PHỤC ĐÍCH — trúng LIÊN TIẾP
+        // 5 lần ở mức khó nhất của Level (early-exit, consecutiveMinHits >= 5).
+        // Đây là bằng chứng bệnh nhân GIỮ VỮNG được ngưỡng arcsec của Level.
+        // KHÔNG đòi hits >= 10 vì cầu thang ×0.75 từ 1200" chỉ cho perfect play
+        // 4 (xuống sàn) + 5 (sàn) = 9 hits — không bao giờ đủ 10 (lỗi kẹt vĩnh viễn).
+        const bestArcsec = sorted.length > 0 ? sorted[0] : null;
+        const isPassed = this.consecutiveMinHits >= 5;
+
+        // C3. Mở khóa Level kế tiếp nếu QUA MÀN và chưa phải Level tối đa
+        const LEVEL_KEY = 'vision-therapy-m5-max-level';
+        const maxLevel = parseInt(localStorage.getItem(LEVEL_KEY) || '1', 10) || 1;
+        let unlockedNew = false;
+        if (isPassed && this.level >= maxLevel && this.level < 10) {
+            localStorage.setItem(LEVEL_KEY, String(this.level + 1));
+            unlockedNew = true;
+        }
+
         // C. Đóng gói sessionMetrics
         this.sessionMetrics.score = this.hits;
         this.sessionMetrics.hits = this.hits;
         this.sessionMetrics.misses = this.misses;
         this.sessionMetrics.customData = {
             finalArcsec: Math.round(avgTherapyArcsec),
-            bestArcsec: sorted.length > 0 ? sorted[0] : null,
+            bestArcsec: bestArcsec,
             totalHits: this.hits,
             totalMisses: this.misses,
-            difficultyHistory: this.history
+            difficultyHistory: this.history,
+            level: this.level,
+            passed: isPassed,
+            nextLevelUnlocked: unlockedNew,
+            targetArcsec: this.targetArcsec
         };
         this.finishSession();
 
@@ -481,7 +568,8 @@ class RDSTherapyGame extends BinocularGameEngine {
         const overlay = document.createElement('div');
         overlay.style.cssText = 'position: fixed; inset: 0; z-index: 2147483647; background: #0f172a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: sans-serif;';
 
-        // Đánh giá kết quả stereopsis
+        // Đánh giá kết quả stereopsis (chỉ hiển thị mô tả, KHÔNG gắn ĐẠT/CHƯA ĐẠT
+        // — trạng thái đạt mục tiêu đã do Level quyết định ở passText)
         let stereoLevel = '';
         let stereoEval = '';
         if (avgTherapyArcsec <= 40) {
@@ -489,14 +577,25 @@ class RDSTherapyGame extends BinocularGameEngine {
             stereoEval = '<span style="color:#4ade80">Rất tốt — Thị giác nổi vượt trội</span>';
         } else if (avgTherapyArcsec <= 60) {
             stereoLevel = 'Tốt (Fine)';
-            stereoEval = '<span style="color:#4ade80">ĐẠT (Bình thường)</span>';
+            stereoEval = '<span style="color:#4ade80">Bình thường</span>';
         } else if (avgTherapyArcsec <= 100) {
             stereoLevel = 'Trung bình (Coarse)';
-            stereoEval = '<span style="color:#fbbf24">ĐẠT (Yếu hơn bình thường)</span>';
+            stereoEval = '<span style="color:#fbbf24">Yếu hơn bình thường</span>';
         } else {
             stereoLevel = 'Kém (Stereoblindness risk)';
-            stereoEval = '<span style="color:#f87171">CHƯA ĐẠT (Suy giảm thị giác nổi)</span>';
+            stereoEval = '<span style="color:#f87171">Thị giác nổi yếu, cần tiếp tục luyện tập</span>';
         }
+
+        const passColor = isPassed ? '#10b981' : '#f87171';
+
+        // Thông báo kết quả TẬP TRUNG vào mục tiêu Level:
+        // - Đạt → "Đạt mục tiêu Level X — Đã mở khóa Level Y"
+        // - Chưa đạt → chỉ nhắc mục tiêu còn lại (KHÔNG giải thích suy giảm thị giác nổi)
+        const passText = isPassed && unlockedNew
+            ? `ĐẠT MỤC TIÊU — Đã mở khóa Level ${this.level + 1}`
+            : isPassed
+                ? `ĐẠT MỤC TIÊU LEVEL ${this.level} — Đã chinh phục toàn bộ mục tiêu`
+                : `Chưa đạt mục tiêu Level ${this.level}: cần trúng LIÊN TIẾP 5 lần ở độ khó ${this.targetArcsec} arcsec`;
 
         overlay.innerHTML = `
             <div style="background: #1e293b; border-radius: 12px; padding: 30px; max-width: 650px; width: 90%; box-shadow: 0 4px 24px rgba(0,0,0,0.5);">
@@ -504,7 +603,10 @@ class RDSTherapyGame extends BinocularGameEngine {
                     KẾT QUẢ HUẤN LUYỆN THỊ GIÁC NỔI
                 </h2>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                <div style="background: rgba(251, 191, 36, 0.1); border: 1px solid #fbbf24; border-radius: 8px; padding: 10px; margin-bottom: 15px; text-align: center;">
+                    <p style="font-size: 15px; margin: 0;"><strong style="color: #fbbf24;">Level ${this.level}/10</strong> | Đích Level: <strong style="color: #e2e8f0;">${this.targetArcsec} arcsec</strong> | <span style="color: ${passColor}; font-weight: bold;">${passText}</span></p>
+                </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
                     <div style="background: rgba(56, 189, 248, 0.1); border: 1px solid #38bdf8; border-radius: 8px; padding: 15px; text-align: center;">
                         <p style="font-size: 14px; color: #94a3b8; margin: 0 0 8px 0;">Tổng Hits</p>
                         <p style="font-size: 28px; color: #38bdf8; margin: 0; font-weight: bold;">${this.hits}</p>

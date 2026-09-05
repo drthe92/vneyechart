@@ -178,16 +178,20 @@ class BinocularGameEngine {
         const result = { pixelsPerMm: 0, viewingDistanceCm: 0 };
         const ccPxPerMm = localStorage.getItem('vision-therapy-cc-pxpermm');
         if (ccPxPerMm && parseFloat(ccPxPerMm) > 0) result.pixelsPerMm = parseFloat(ccPxPerMm);
-        const distanceM = localStorage.getItem('vision-therapy-calibrate-distance-m');
-        if (distanceM && parseFloat(distanceM) > 0) result.viewingDistanceCm = parseFloat(distanceM) * 100;
+        // [CỰ LY GẦN] MỌI game huấn luyện (M1-M13) chơi ở cự ly gần — fallback
+        // phải đọc cấu hình Nhìn Gần vĩnh viễn (vision_distance_near_m, mặc định
+        // 0.4m = 40cm), KHÔNG đọc key legacy 'vision-therapy-calibrate-distance-m'
+        // (key này đang giữ khoảng cách "active cuối cùng" — có thể là Nhìn Xa 4m).
+        const nearM = localStorage.getItem('vision_distance_near_m');
+        if (nearM && parseFloat(nearM) > 0) result.viewingDistanceCm = parseFloat(nearM) * 100;
 
         // Fallback: hiệu chuẩn toàn cục (khớp thứ tự ưu tiên trong main.js)
         if (typeof window !== 'undefined' && window.__calibrator) {
             const cal = window.__calibrator;
-            // [CỰ LY KHÁM] distanceM "đang hoạt động" trên window.__calibrator
-            // LUÔN được ưu tiên hơn giá trị localStorage: main.js /
-            // startTherapyModule() tự chuyển đổi cự ly theo nhóm bài, đảm bảo
-            // game huấn luyện (M1-M13) dùng mốc Nhìn Gần (40cm), không phải 4m.
+            // [CỰ LY GẦN] distanceM "đang hoạt động" trên window.__calibrator:
+            // main.js / startTherapyModule() / _startFullscreenGame() đều ép
+            // distanceM = distanceNearM (mặc định 40cm) trước khi khởi tạo game
+            // M1-M13 — vì MỌI game huấn luyện đều chơi ở cự ly gần.
             if (cal.distanceM > 0) {
                 result.viewingDistanceCm = cal.distanceM * 100;
             }
@@ -351,6 +355,13 @@ class BinocularGameEngine {
      * Bắt đầu render loop
      */
     start() {
+        // [P#5] Re-entrancy guard: nếu đã chạy thì không khởi tạo lại (tránh nhân
+        // bản listener onWorkspaceChanged / SPA, rò rỉ trạng thái khi gọi start() 2 lần).
+        if (this._running) {
+            console.warn('[BinocularGameEngine] start() bị gọi khi đang chạy — bỏ qua để tránh leak listener.');
+            return;
+        }
+
         this.sessionMetrics.startTime = Date.now();
         this._running = true;
 
@@ -400,6 +411,12 @@ class BinocularGameEngine {
      * Dừng render loop và dọn dẹp
      */
     stop() {
+        // [CHỐNG TRẮNG MÀN] Idempotent: nếu phiên đã kết thúc (finishSession)
+        // và engine đã dừng, mọi lần stop() sau (vd stopCurrentGame() gọi lại
+        // trên fullscreenchange) đều no-op — bảo vệ subclass không truy cập
+        // canvas đã bị _forceClean() xóa.
+        if (!this._running && this._sessionFinished) return;
+
         // [A2] Chống thất thoát dữ liệu EMR:
         // Nếu phiên đang chạy mà chưa từng finishSession() → tự đóng gói
         // dữ liệu dở dang với cờ interrupted = true trước khi hủy.
@@ -432,6 +449,87 @@ class BinocularGameEngine {
         if (this.exitButton && this.exitButton.parentNode) {
             this.exitButton.parentNode.removeChild(this.exitButton);
         }
+
+        // ===== [TỬ HUYẾT 2] FORCE CLEAN: triệt tiêu rò rỉ trạng thái toàn cục =====
+        // Gọi ngay cả khi subclass throw ở trên → đảm bảo không còn rác trạng thái
+        // (Event Listener / Timer / biến window) gây nhiễu vật lý cho game sau.
+        try {
+            this._forceClean();
+        } catch (err) {
+            console.error('[BinocularGameEngine] Lỗi trong _forceClean:', err);
+        }
+    }
+
+    /**
+     * [TỬ HUYẾT 2] Dọn dẹp bắt buộc mọi rò rỉ trạng thái toàn cục khi kết thúc phiên.
+     * Được gọi cuối hàm stop() (bọc trong try/catch).
+     * Mục tiêu: chuyển M1 → M4 (hoặc bất kỳ module nào) không để lại:
+     *  - Event Listener gắn trên window/document (phím ESC/SPACE, mousemove...)
+     *  - Timer / Interval (setInterval setStatus, setTimeout trễ...)
+     *  - Biến toàn cục window.currentTherapy trỏ tới instance cũ
+     *  - Tham chiếu bộ nhớ tạm (canvas/ctx/calibration) gây duplicate listener
+     * @private
+     */
+    _forceClean() {
+        // 1) Hủy mọi Timer / Interval đã đăng ký qua helper của engine
+        if (Array.isArray(this._timers)) {
+            this._timers.forEach(t => {
+                clearTimeout(t);
+                clearInterval(t);
+            });
+            this._timers = [];
+        }
+        // 1b) Timer interval thường gặp ở một số subclass (vd rds_therapy_game)
+        if (this._timerInterval) {
+            clearInterval(this._timerInterval);
+            this._timerInterval = null;
+        }
+        // 1c) Bất kỳ rAF phụ nào không phải vòng lặp chính
+        if (this._rafId && this._rafId !== this._animationFrameId) {
+            cancelAnimationFrame(this._rafId);
+            this._rafId = null;
+        }
+
+        // 2) Gỡ bỏ các listener phím (ESC / SPACE) gắn trên window mà subclass lưu ref.
+        //    Quét theo TÊN HANDLER phổ biến để chống nhân bản listener khi đổi game.
+        const keyHandlerProps = ['handleSpacebar', '_spaceHandler', '_onKeyDown', '_escHandler', '_handleEsc', '_boundKeydown'];
+        keyHandlerProps.forEach(prop => {
+            if (typeof this[prop] === 'function') {
+                window.removeEventListener('keydown', this[prop]);
+                document.removeEventListener('keydown', this[prop]);
+            }
+        });
+
+        // 3) Xóa tham chiếu phiên trị liệu toàn cục nếu đang trỏ về instance này
+        if (window.currentTherapy === this) window.currentTherapy = null;
+
+        // 4) Giải phóng bộ nhớ tạm — ngăn vật lý game trước rò rỉ sang game sau
+        this.sessionMetrics = null;
+        this.calibration = null;
+        this.canvas = null;
+        this.ctx = null;
+        this.exitButton = null;
+        this.colors = null;
+    }
+
+    /**
+     * [TỬ HUYẾT 2] Đăng ký Timer/Interval an toàn — subclass GHI ĐÈ nên dùng helper này
+     * thay vì gọi trực tiếp setInterval/setTimeout, để _forceClean tự hủy khi stop().
+     * @returns {number} id của timer (để clear thủ công nếu cần)
+     */
+    _trackTimer(fn, delay, asInterval = false) {
+        if (!Array.isArray(this._timers)) this._timers = [];
+        const id = asInterval ? setInterval(fn, delay) : setTimeout(fn, delay);
+        this._timers.push(id);
+        return id;
+    }
+
+    /**
+     * [TỬ HUYẾT 2] Đăng ký listener trên window/document an toàn — _forceClean sẽ tự gỡ.
+     * (Dùng cho subclass muốn bắt ESC/SPACE một cách phòng thủ tuyệt đối.)
+     */
+    _trackGlobalListener(target, type, handler, opts) {
+        target.addEventListener(type, handler, opts);
     }
 
     /**

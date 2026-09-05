@@ -171,8 +171,12 @@
                     window.syncM12ProgressFromFirebase(patientId, 'M12');
                     window.syncM12ProgressFromFirebase(patientId, 'M1');
                     window.syncM12ProgressFromFirebase(patientId, 'M2');
+                    window.syncM12ProgressFromFirebase(patientId, 'M5');
+                    window.syncM12ProgressFromFirebase(patientId, 'M7');
+                    window.syncM12ProgressFromFirebase(patientId, 'M8');
                     window.syncM12ProgressFromFirebase(patientId, 'M9');
                     window.syncM12ProgressFromFirebase(patientId, 'M10');
+                    window.syncM12ProgressFromFirebase(patientId, 'M11');
                     window.syncM12ProgressFromFirebase(patientId, 'M4');
                 }
                 startExam(nameInput, yearInput);
@@ -210,8 +214,12 @@ if (nmEl) nmEl.disabled = false;
                         window.syncM12ProgressFromFirebase(patientId, 'M12');
                         window.syncM12ProgressFromFirebase(patientId, 'M1');
                         window.syncM12ProgressFromFirebase(patientId, 'M2');
+                        window.syncM12ProgressFromFirebase(patientId, 'M5');
+                        window.syncM12ProgressFromFirebase(patientId, 'M7');
+                        window.syncM12ProgressFromFirebase(patientId, 'M8');
                         window.syncM12ProgressFromFirebase(patientId, 'M9');
                         window.syncM12ProgressFromFirebase(patientId, 'M10');
+                        window.syncM12ProgressFromFirebase(patientId, 'M11');
                         window.syncM12ProgressFromFirebase(patientId, 'M4');
                     }
                     startExam(nameInput, yearInput);
@@ -464,7 +472,6 @@ if (nmEl) nmEl.disabled = false;
                 </div>
                 <div class="exam-modal-body">
                     <p>Bạn muốn thực hiện hành động nào?</p>
-                    <div id="end-exam-vision-summary"></div>
                     <div class="form-actions">
                         <button type="button" class="exam-btn print-btn" id="print-report-btn">In Hồ Sơ</button>
                         <button type="button" class="exam-btn export-pdf-btn" id="btn-export-pdf">Xuất PDF</button>
@@ -510,17 +517,14 @@ if (nmEl) nmEl.disabled = false;
     }
 
     /**
-     * Nạp tổng hợp Thị lực Nhìn Xa / Nhìn Gần (2 hàng OD/OS/OU riêng biệt)
-     * vào Modal Kết thúc phiên khám trước khi hiển thị.
+     * [ĐÃ VÔ HIỆU HÓA] Trước đây hàm này nạp khối tổng hợp Thị lực Nhìn Xa / Nhìn Gần
+     * (màu xanh) vào Modal Kết thúc khám. Theo yêu cầu mới, kết quả thị lực Xa/Gần
+     * được đưa về định dạng bảng tiêu chuẩn (.results-table) trong Báo cáo EMR,
+     * không còn khối UI ngoại lệ. Giữ lại hàm để tránh lỗi tham chiếu ngược.
      */
     function populateEndExamVisionSummary() {
-        const container = document.getElementById('end-exam-vision-summary');
-        if (!container) return;
-        if (!window.__currentExam) {
-            container.innerHTML = '';
-            return;
-        }
-        container.innerHTML = buildVisionSummaryHTML(window.__currentExam, false);
+        /* no-op: UI ngoại lệ đã bị gỡ bỏ */
+        return;
     }
 
     // Create Report Modal
@@ -591,147 +595,6 @@ if (nmEl) nmEl.disabled = false;
                 .join('<br>');
         }
         return escapeHtml(metrics);
-    }
-
-    // ================================================================
-    //  PHÂN LOẠI THỊ LỰC NHÌN XA / NHÌN GẦN — tách riêng trong Báo cáo
-    // ================================================================
-
-    // Ánh xạ tên bài test (test_type trong exam.results) về nhóm khoảng cách.
-    const VISION_TEST_GROUPS = {
-        FAR: [
-            'LogMAR Distance VA',
-            'ETDRS Distance VA',
-            'Snellen Chart',
-            'Number Chart',
-            'Landolt C',
-            'HOTV Letters',
-            'Tumbling E',
-            'Sloan Letters',
-            'Lea Symbols Circle',
-            'Lea Symbols Heart',
-            'Lea Symbols House',
-            'Lea Symbols Square',
-            'Auckland LogMAR',
-            'Auto Distance VA',
-            'Auto BCVA (Crowding Eval)'
-        ],
-        NEAR: [
-            'Near LogMAR',
-            'Near Lea Symbols',
-            'Near N-Point',
-            'Auto Near VA'
-        ]
-    };
-
-    /**
-     * Phân loại 1 kết quả lâm sàng (exam.results) theo nhóm Nhìn Xa / Nhìn Gần
-     * dựa vào ID/tên bài test, đồng thời trích OD / OS / OU từ clinical_metrics.
-     * @param {Object} result - phần tử trong exam.results
-     * @returns {Object|null} { group: 'FAR'|'NEAR', od, os, ou, timestamp }
-     */
-    function classifyVisionResult(result) {
-        if (!result || !result.test_type) return null;
-        const type = String(result.test_type).trim().toLowerCase();
-
-        let group = null;
-        if (VISION_TEST_GROUPS.FAR.some(n => n.toLowerCase() === type)) {
-            group = 'FAR';
-        } else if (VISION_TEST_GROUPS.NEAR.some(n => n.toLowerCase() === type)) {
-            group = 'NEAR';
-        }
-        if (!group) return null;
-
-        const metrics = result.clinical_metrics || {};
-        let od = null, os = null, ou = null;
-        Object.entries(metrics).forEach(([key, value]) => {
-            const k = String(key).toUpperCase();
-            if (k.startsWith('OU') || k.includes('HAI MẮT') || k.includes('CẢ HAI') || k.includes('CẢ 2 MẮT')) {
-                ou = value;
-            } else if (k.startsWith('OD') || k.includes('MẮT PHẢI')) {
-                od = value;
-            } else if (k.startsWith('OS') || k.includes('MẮT TRÁI')) {
-                os = value;
-            }
-        });
-
-        return { group, od, os, ou, test_type: result.test_type, timestamp: result.timestamp || 0 };
-    }
-
-    /**
-     * Gộp toàn bộ exam.results thành 2 mục: Thị lực Nhìn Xa và Nhìn Gần.
-     * Mỗi mắt (OD/OS/OU) gắn kèm NGUỒN dữ liệu (tên bài test + timestamp),
-     * ưu tiên bản ghi có timestamp MỚI NHẤT cho từng mắt của từng nhóm.
-     * @param {Object} exam
-     * @returns {{ FAR: {od,os,ou}, NEAR: {od,os,ou} }}
-     *          od/os/ou = { value, test_type, timestamp } | null
-     */
-    function buildVisionSummary(exam) {
-        const summary = {
-            FAR: { od: null, os: null, ou: null },
-            NEAR: { od: null, os: null, ou: null }
-        };
-        const results = (exam && Array.isArray(exam.results)) ? exam.results : [];
-
-        const applyLatest = (slot, key, value, c) => {
-            if (value === null || value === undefined || value === '') return;
-            if (!slot[key] || (c.timestamp || 0) >= (slot[key].timestamp || 0)) {
-                slot[key] = {
-                    value: value,
-                    test_type: c.test_type || '',
-                    timestamp: c.timestamp || 0
-                };
-            }
-        };
-
-        for (const r of results) {
-            const c = classifyVisionResult(r);
-            if (!c) continue;
-            const slot = summary[c.group];
-            applyLatest(slot, 'od', c.od, c);
-            applyLatest(slot, 'os', c.os, c);
-            applyLatest(slot, 'ou', c.ou, c);
-        }
-        return summary;
-    }
-
-    /**
-     * Sinh HTML khối "Thị lực Nhìn Xa / Nhìn Gần" — 2 hàng thông tin riêng biệt,
-     * kèm nguồn dữ liệu (tên bài test + giờ đo).
-     * @param {Object} exam
-     * @param {boolean} isPrintMode
-     * @returns {string} HTML (rỗng nếu không có dữ liệu thị lực)
-     */
-    function buildVisionSummaryHTML(exam, isPrintMode) {
-        const summary = buildVisionSummary(exam);
-
-        const formatRow = (label, data) => {
-            const parts = [];
-            if (data.od) parts.push(`OD: ${escapeHtml(data.od.value)}`);
-            if (data.os) parts.push(`OS: ${escapeHtml(data.os.value)}`);
-            if (data.ou) parts.push(`OU: ${escapeHtml(data.ou.value)}`);
-            if (!parts.length) return null;
-
-            // Nguồn: lấy từ mắt có timestamp mới nhất trong hàng
-            const latest = [data.od, data.os, data.ou]
-                .filter(Boolean)
-                .sort((a, b) => b.timestamp - a.timestamp)[0];
-            let source = '';
-            if (latest && latest.test_type) {
-                const srcTime = latest.timestamp
-                    ? new Date(latest.timestamp).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-                    : '';
-                source = `<span class="vision-src">(Nguồn: ${escapeHtml(latest.test_type)}${srcTime ? ' — ' + srcTime : ''})</span>`;
-            }
-            return `<strong>${label}:</strong> ${parts.join(', ')} ${source}`;
-        };
-
-        const farRow = formatRow('Thị lực Nhìn Xa', summary.FAR);
-        const nearRow = formatRow('Thị lực Nhìn Gần', summary.NEAR);
-        if (!farRow && !nearRow) return '';
-
-        const cls = isPrintMode ? 'print-vision-summary' : 'report-vision-summary';
-        return `<div class="${cls}">${[farRow, nearRow].filter(Boolean).join('<br>')}</div>`;
     }
 
     /**
@@ -833,9 +696,6 @@ if (nmEl) nmEl.disabled = false;
 
         let html = '';
 
-        // Tổng hợp Thị lực Nhìn Xa / Nhìn Gần (2 hàng riêng biệt) từ exam.results
-        const visionSummaryHTML = buildVisionSummaryHTML(exam, isPrintMode);
-
         if (isPrintMode) {
             // Print mode HTML structure
             html += `<div class="print-report">`;
@@ -860,7 +720,6 @@ if (nmEl) nmEl.disabled = false;
                 <div class="print-results">
                     <!-- PHẦN I: KHÁM & CHẨN ĐOÁN -->
                     <h3 style="font-size: 18px; font-weight: bold; color: #1e293b; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #10b981;">PHẦN I: KHÁM & CHẨN ĐOÁN</h3>
-                    ${visionSummaryHTML}
             `;
         } else {
             // Modal view HTML structure
@@ -880,14 +739,25 @@ if (nmEl) nmEl.disabled = false;
                 <div class="report-results">
                     <!-- PHẦN I: KHÁM & CHẨN ĐOÁN -->
                     <h4 style="font-size: 16px; font-weight: bold; color: #1e293b; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #10b981;">PHẦN I: KHÁM & CHẨN ĐOÁN</h4>
-                    ${visionSummaryHTML}
             `;
         }
 
         // [FIX] Guard legacy: phiên khám cũ có thể không có mảng results
         const examResults = Array.isArray(exam.results) ? exam.results : [];
 
-        if (examResults.length === 0) {
+        // [P#4] Sắp xếp kết quả theo thứ tự lâm sàng chuẩn để Báo cáo EMR liền mạch:
+        // 1) Thị lực Nhìn Xa → 2) Nhìn Gần → 3) Tương phản → 4) Hình nổi → 5) còn lại
+        const CLINICAL_ORDER = {
+            'Auto Distance VA': 1, 'Auto BCVA (Crowding Eval)': 1, 'Tumbling E': 1,
+            'LogMAR Distance VA': 1, 'ETDRS Distance VA': 1, 'Snellen Chart': 1,
+            'Auto Near VA': 2, 'Near LogMAR': 2, 'Near Lea Symbols': 2,
+            'Auto Contrast E': 3, 'Retina Pelli-Robson': 3, 'Retina Contrast': 3,
+            'Auto Stereo Random Dot': 4, 'Worth 4 Dot': 4
+        };
+        const _clinicalRank = (r) => (r && CLINICAL_ORDER[r.test_type] != null) ? CLINICAL_ORDER[r.test_type] : 5;
+        const orderedResults = examResults.slice().sort((a, b) => _clinicalRank(a) - _clinicalRank(b));
+
+        if (orderedResults.length === 0) {
             html += '<p>Chưa có kết quả bài test nào.</p>';
         } else {
             if (isPrintMode) {
@@ -908,7 +778,7 @@ if (nmEl) nmEl.disabled = false;
                 `;
             }
 
-            examResults.forEach((result, index) => {
+            orderedResults.forEach((result, index) => {
                 const resultTime = new Date(result.timestamp);
                 const timeStr = resultTime.toLocaleTimeString('vi-VN', {
                     hour: '2-digit',
@@ -951,9 +821,9 @@ if (nmEl) nmEl.disabled = false;
                 </div>
                 <!-- PHẦN I: KHÁM & CHẨN ĐOÁN - Header already added above results table -->
                 
-                <!-- PHẦN II: HUẤN LUYỆN PHÂN THỊ (DICHOPTIC THERAPY) -->
+                <!-- PHẦN II: HUẤN LUYỆN THỊ GIÁC (VISION THERAPY) -->
                 <div class="therapy-report-section" style="margin-top: 30px; page-break-inside: avoid;">
-                    <h3 style="font-size: 18px; font-weight: bold; color: #1e293b; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">PHẦN II: HUẤN LUYỆN PHÂN THỊ (DICHOPTIC THERAPY)</h3>
+                    <h3 style="font-size: 18px; font-weight: bold; color: #1e293b; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">PHẦN II: HUẤN LUYỆN THỊ GIÁC (VISION THERAPY)</h3>
                     ${window.generateTherapyReportHTML ? window.generateTherapyReportHTML(exam.patientId || '', exam.therapy_records) : '<p style="font-style: italic; color: #64748b;">Không có dữ liệu huấn luyện.</p>'}
                 </div>
                 
@@ -968,9 +838,9 @@ if (nmEl) nmEl.disabled = false;
                 </div>
                 <!-- PHẦN I: KHÁM & CHẨN ĐOÁN - Header already added above results table -->
                 
-                <!-- PHẦN II: HUẤN LUYỆN PHÂN THỊ (DICHOPTIC THERAPY) -->
+                <!-- PHẦN II: HUẤN LUYỆN THỊ GIÁC (VISION THERAPY) -->
                 <div class="therapy-report-section" style="margin-top: 30px;">
-                    <h4 style="font-size: 16px; font-weight: bold; color: #1e293b; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">PHẦN II: HUẤN LUYỆN PHÂN THỊ (DICHOPTIC THERAPY)</h4>
+                    <h4 style="font-size: 16px; font-weight: bold; color: #1e293b; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">PHẦN II: HUẤN LUYỆN THỊ GIÁC (VISION THERAPY)</h4>
                     ${window.generateTherapyReportHTML ? window.generateTherapyReportHTML(exam.patientId || '', exam.therapy_records) : '<p style="font-style: italic; color: #64748b;">Không có dữ liệu huấn luyện.</p>'}
                 </div>
             </div>
@@ -1026,8 +896,12 @@ if (nmEl) nmEl.disabled = false;
                     window.syncM12ProgressFromFirebase(localStorage.getItem('currentPatientId'), 'M12');
                     window.syncM12ProgressFromFirebase(localStorage.getItem('currentPatientId'), 'M1');
                     window.syncM12ProgressFromFirebase(localStorage.getItem('currentPatientId'), 'M2');
+                    window.syncM12ProgressFromFirebase(localStorage.getItem('currentPatientId'), 'M5');
+                    window.syncM12ProgressFromFirebase(localStorage.getItem('currentPatientId'), 'M7');
+                    window.syncM12ProgressFromFirebase(localStorage.getItem('currentPatientId'), 'M8');
                     window.syncM12ProgressFromFirebase(localStorage.getItem('currentPatientId'), 'M9');
                     window.syncM12ProgressFromFirebase(localStorage.getItem('currentPatientId'), 'M10');
+                    window.syncM12ProgressFromFirebase(localStorage.getItem('currentPatientId'), 'M11');
                     window.syncM12ProgressFromFirebase(localStorage.getItem('currentPatientId'), 'M4');
                 }
             }
@@ -1270,14 +1144,13 @@ if (nmEl) nmEl.disabled = false;
             });
         }
 
-        if (endExamBtn) {
-            endExamBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                // Nạp tổng hợp Thị lực Nhìn Xa / Nhìn Gần (2 hàng riêng biệt)
-                populateEndExamVisionSummary();
-                showModal(endExamModal);
-            });
-        }
+            if (endExamBtn) {
+                endExamBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    // [ĐÃ GỠ] Không còn nạp khối Summary Thị lực Xa/Gần (UI ngoại lệ)
+                    showModal(endExamModal);
+                });
+            }
     }
 
     // Setup vision test completed listener
@@ -1296,6 +1169,22 @@ if (nmEl) nmEl.disabled = false;
 
             // Auto-save session after adding new result
             saveSession();
+
+            // [P#2 - PUSH NGAY] Lưu từng kết quả thị lực Xa/Gần ngay khi hoàn thành,
+            // ghi ĐỒNG THỜI vào emr_patient_sessions (local) và Firebase Sessions,
+            // để Dashboard cập nhật ngay cả khi chưa kết thúc phiên khám.
+            // Chỉ bỏ qua nếu test này ĐANG nằm trong hàng đợi Combo (window.__comboQueue)
+            // — lúc đó persistComboRecord sẽ gộp toàn bộ vào một bản ghi aggregate,
+            // tránh trùng điểm. Các bài chạy lẻ (kể cả khi queue Combo tồn tại lưu)
+            // vẫn được lưu đầy đủ, không bao giờ mất dữ liệu.
+            const _inComboQueue = Array.isArray(window.__comboQueue) &&
+                window.__comboQueue.includes(VISION_TYPE_TO_TEST_ID[testResult.test_type]);
+            if (!_inComboQueue) {
+                const vr = _captureSingleVisionRecord(testResult);
+                if (vr && typeof window.examSessionManager.addTherapyRecord === 'function') {
+                    window.examSessionManager.addTherapyRecord(vr);
+                }
+            }
 
             // Show toast notification
             showToast(`Đã lưu kết quả ${testResult.test_type}`);
@@ -1523,10 +1412,22 @@ if (nmEl) nmEl.disabled = false;
         element.className = 'print-report-container';
         element.innerHTML = generateReportHTML(true, exam);
 
-        // [FIX] Phải gắn element vào DOM off-screen — html2canvas cần layout thực
-        // để đo kích thước; element rời sẽ cho ra PDF trắng/hỏng.
-        element.style.cssText = 'position: fixed; top: 0; left: -9999px; width: 794px; padding: 24px; color: #000; background: #fff; font-family: "Times New Roman", serif; z-index: -1; box-sizing: border-box;';
-        document.body.appendChild(element);
+        // [FIX] PDF trắng tinh: html2canvas (bundle html2pdf 0.10.1) đo sai chiều
+        // cao = 0 khi phần tử được chụp có position: fixed/absolute. Phải giữ phần
+        // tử ở flow tĩnh (position: static) với height:auto để chụp TRỌN nội dung
+        // (kể cả báo cáo nhiều trang), rồi đặt nó vào wrapper off-screen để không
+        // hiện flash khi đang render.
+        // [FIX] Header/tên phòng khám bị cụt phía phải: html2pdf giới hạn chiều rộng
+        // chụp đúng bằng vùng in được (A4 210mm − 2×margin 10mm = 190mm ≈ 719px);
+        // phần tử rộng hơn (794px) sẽ bị CẮT BỎ phần thừa bên phải (chữ canh phải
+        // như tên phòng khám/bác sĩ mất trước tiên). Nên đặt đúng width 190mm.
+        element.style.cssText = 'position: static; width: 190mm; height: auto; overflow: visible; ' +
+            'padding: 24px; margin: 0; color: #000; background: #fff; ' +
+            'font-family: "Times New Roman", serif; box-sizing: border-box;';
+        const printWrapper = document.createElement('div');
+        printWrapper.style.cssText = 'position: absolute; top: 0; left: -9999px; width: 190mm; pointer-events: none;';
+        printWrapper.appendChild(element);
+        document.body.appendChild(printWrapper);
 
         // Create safe filename from patient name and date
         const date = new Date(exam.startTime);
@@ -1556,10 +1457,73 @@ if (nmEl) nmEl.disabled = false;
             showToast('Lỗi: Không thể tạo file PDF');
         }).finally(() => {
             // Dọn DOM sau khi xong (kể cả lỗi) — chống rò rỉ phần tử
-            if (element.parentNode) {
-                element.parentNode.removeChild(element);
+            if (printWrapper.parentNode) {
+                printWrapper.parentNode.removeChild(printWrapper);
             }
         });
+    }
+
+    /**
+     * [P#2] Trích OD/OS (Decimal) từ clinical_metrics của 1 kết quả thị lực.
+     * Quét key chứa OD / MẮT PHẢI (và OS / MẮT TRÁI, OU / HAI MẮT).
+     */
+    function _extractODOS(metrics) {
+        let od = null, os = null;
+        for (const [k, v] of Object.entries(metrics || {})) {
+            const ku = String(k).toUpperCase();
+            const num = (typeof v === 'number')
+                ? (isFinite(v) ? v : null)
+                : (v != null ? (parseFloat(String(v)) || null) : null);
+            if (num === null) continue;
+            if (ku.includes('OD') || ku.includes('MẮT PHẢI')) od = num;
+            else if (ku.includes('OS') || ku.includes('MẮT TRÁI')) os = num;
+            else if (ku.includes('OU') || ku.includes('HAI MẮT') || ku.includes('CẢ HAI') || ku.includes('CẢ 2 MẮT')) { od = num; os = num; }
+        }
+        return { od, os };
+    }
+
+    /**
+     * [P#2] Xây dựng các bản ghi thị lực (Xa/Gần) từ exam.results thành therapy-record
+     * chuẩn, để có thể đẩy qua addTherapyRecord (ghi ĐỒNG THỜI vào emr_patient_sessions
+     * local VÀ Firebase Sessions — hoạt động cả khi offline).
+     * Gộp vào nhóm "Combo Đánh Giá Nhược Thị", truyền clinical_metrics thô (OD/OS)
+     * để _captureVisionMetricsByTestId bắt theo test_id và ánh xạ vào trục y-va.
+     */
+    const VISION_TYPE_TO_TEST_ID = {
+        'Auto Distance VA': 'far-vision-auto-distance-va',
+        'Auto Near VA': 'near-vision-auto-near-va',
+        'Auto BCVA (Crowding Eval)': 'far-vision-auto-bcva-crowding',
+        'Tumbling E': 'far-vision-tumbling-e',
+        'Near LogMAR': 'near-vision-logmar'
+    };
+
+    /**
+     * Trả về therapy-record thị lực (Xa/Gần) cho MỘT kết quả khám lâm sàng,
+     * hoặc null nếu test_type không phải thị lực hoặc thiếu OD/OS.
+     * Dùng chung cho push ngay (visionTestCompleted) và saveToHistory (P#2).
+     */
+    function _captureSingleVisionRecord(r) {
+        if (!r || !r.test_type || !VISION_TYPE_TO_TEST_ID[r.test_type]) return null;
+        const { od, os } = _extractODOS(r.clinical_metrics);
+        if (od === null && os === null) return null;
+        return {
+            id: 'vision-' + VISION_TYPE_TO_TEST_ID[r.test_type] + '-' + (r.timestamp || Date.now()),
+            timestamp: r.timestamp || Date.now(),
+            gameName: 'Combo Đánh Giá Nhược Thị',
+            test_id: VISION_TYPE_TO_TEST_ID[r.test_type],
+            durationSeconds: 0,
+            metrics: { customData: { 'OD (Mắt phải)': od, 'OS (Mắt trái)': os } },
+            opticalSettings: {}
+        };
+    }
+
+    function _buildVisionTherapyRecords(results) {
+        const out = [];
+        (Array.isArray(results) ? results : []).forEach(r => {
+            const vr = _captureSingleVisionRecord(r);
+            if (vr) out.push(vr);
+        });
+        return out;
     }
 
     /**
@@ -1593,6 +1557,27 @@ if (nmEl) nmEl.disabled = false;
                 window.SettingsStore.set(EMR_HISTORY_KEY, payload);
             } else {
                 localStorage.setItem(EMR_HISTORY_KEY, payload);
+            }
+
+            // [P#2] Đồng bộ kết quả thị lực lẻ (ngoài Combo) vào store EMR + Firebase
+            // để vẽ biểu đồ — định tuyến qua addTherapyRecord (ghi CẢ local
+            // emr_patient_sessions LẪN Firebase Sessions, hoạt động cả khi offline).
+            // Nếu đã có bản tổng hợp Combo thì bỏ qua để tránh điểm trùng lặp.
+            // Loại bỏ các bản ghi đã được push ngay lúc visionTestCompleted (cùng id)
+            // để không tạo điểm trùng.
+            const hasCombo = Array.isArray(exam.therapy_records) &&
+                exam.therapy_records.some(t => t.test_id === 'combo-amblyopia-assessment');
+            if (!hasCombo && window.examSessionManager &&
+                typeof window.examSessionManager.addTherapyRecord === 'function') {
+                const already = new Set(
+                    (Array.isArray(exam.therapy_records) ? exam.therapy_records : [])
+                        .map(t => t && t.id).filter(Boolean)
+                );
+                _buildVisionTherapyRecords(exam.results).forEach(vr => {
+                    if (!already.has(vr.id)) {
+                        window.examSessionManager.addTherapyRecord(vr);
+                    }
+                });
             }
         } catch (e) {
             console.error('[ExamSessionManager] Failed to save to history:', e);
@@ -3189,6 +3174,39 @@ document.addEventListener('click', function(e) {
     }
 
     // ================================================================
+    //  [TỬ HUYẾT 4] Sanitize chỉ số EMR → Number an toàn
+    // ================================================================
+
+    /**
+     * Đệ quy ép kiểu/an toàn hóa cấu trúc chỉ số EMR trước khi lưu.
+     * - Chuỗi chỉ chứa số ("0.8", "120") → Number (tránh lưu sai kiểu String).
+     * - Object/Array lồng nhau → clone sâu (JSON.stringify không bao giờ sinh
+     *   chuỗi "[object Object]" vì ta không dùng phép cộng chuỗi).
+     * - Giá trị khác (tên bài test, ISO timestamp...) → giữ nguyên.
+     * @param {*} input
+     * @returns {*}
+     */
+    function _sanitizeNumericMetrics(input) {
+        if (input === null || input === undefined) return input;
+        if (typeof input !== 'object') {
+            if (typeof input === 'string') {
+                const t = input.trim();
+                if (t !== '') {
+                    const n = Number(t);
+                    if (isFinite(n) && !isNaN(n)) return n;
+                }
+            }
+            return input;
+        }
+        if (input instanceof Date) return input;
+        const out = Array.isArray(input) ? [] : {};
+        for (const key of Object.keys(input)) {
+            out[key] = _sanitizeNumericMetrics(input[key]);
+        }
+        return out;
+    }
+
+    // ================================================================
     //  Public API — Expose ExamSessionManager methods globally
     // ================================================================
     window.examSessionManager = {
@@ -3203,12 +3221,18 @@ document.addEventListener('click', function(e) {
                 console.error('[Manager] Khong co phien kham de luu ket qua Huấn luyen.');
                 return false;
             }
-            
+
+            // [TỬ HUYẾT 4] Ép kiểu an toàn: đảm bảo mọi chỉ số (Thị lực, Lăng kính,
+            // Thời gian...) được lưu dưới dạng Number; chuỗi số ("0.8") → 0.8,
+            // object lồng nhau được clone an toàn (không bao giờ thành "[object Object]")
+            // khi JSON.stringify. Tránh hỏng cấu trúc EMR lưu vào localStorage/Firebase.
+            const safeRecord = _sanitizeNumericMetrics(record) || record;
+
             // 1. Cập nhật vào RAM hiện tại
             if (!window.__currentExam.therapy_records) {
                 window.__currentExam.therapy_records = [];
             }
-            window.__currentExam.therapy_records.push(record);
+            window.__currentExam.therapy_records.push(safeRecord);
             
             // 2. ÉP GHI CỨNG VÀO LOCALSTORAGE (Hard-Write)
             try {
@@ -3238,18 +3262,21 @@ document.addEventListener('click', function(e) {
                  const currentPatientId = localStorage.getItem("currentPatientId");
                  if (currentPatientId && window.db) {
                      try {
-                         const sessionsRef = window.db.collection("Patients").doc(currentPatientId).collection("Sessions");
-                         
-                         const clinicalMetrics = (record.metrics && record.metrics.customData) ? record.metrics.customData : {};
-                         
-                         const payload = {
-                             gameName: record.gameName || "Unknown Module",
-                             durationSeconds: record.durationSeconds || 0,
-                             metrics: clinicalMetrics,
-                             opticalSettings: record.opticalSettings || {},
-                             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                             device_userAgent: navigator.userAgent
-                         };
+                          const sessionsRef = window.db.collection("Patients").doc(currentPatientId).collection("Sessions");
+
+                          const clinicalMetrics = (safeRecord.metrics && safeRecord.metrics.customData)
+                              ? safeRecord.metrics.customData
+                              : (safeRecord.metrics || {});
+
+                           const payload = {
+                               gameName: safeRecord.gameName || "Unknown Module",
+                               test_id: safeRecord.test_id || null,
+                               durationSeconds: safeRecord.durationSeconds || 0,
+                               metrics: _sanitizeNumericMetrics(clinicalMetrics) || {},
+                               opticalSettings: safeRecord.opticalSettings || {},
+                               timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                               device_userAgent: navigator.userAgent
+                           };
 
                          sessionsRef.add(payload)
                              .catch(err => console.error("[Firebase Sync] Lỗi ghi dữ liệu:", err));
@@ -3260,10 +3287,22 @@ document.addEventListener('click', function(e) {
                  }
                  // KẾT THÚC: ĐỒNG BỘ LÊN FIREBASE
 
-                 // Cập nhật Combo Banner ngay sau khi có phiên tập mới
-                 updateComboBanner();
+                  // Cập nhật Combo Banner ngay sau khi có phiên tập mới
+                  updateComboBanner();
 
-                 return true;
+                  // [P#2] Nếu Dashboard đang mở, làm mới biểu đồ ngay để điểm thị lực
+                  // Xa/Gần lẻ (Auto Distance/Near VA...) hiện lên lập tức mà không cần
+                  // đóng/mở lại tab Tiến triển.
+                  try {
+                      const dashModal = (typeof document !== 'undefined')
+                          ? document.getElementById('progress-dashboard-modal') : null;
+                      if (dashModal && dashModal.style.display === 'block'
+                          && typeof window.openDashboard === 'function') {
+                          window.openDashboard();
+                      }
+                  } catch (_e) { /* không ảnh hưởng lưu trữ */ }
+
+                  return true;
             } catch (err) {
                 console.error('[Manager] Loi khi ghi cung vao Database:', err);
                 return false;
@@ -3395,6 +3434,67 @@ document.addEventListener('click', function(e) {
             clinicalText = `
                 <div style="font-size: 15px; line-height: 1.8; text-align: left; padding: 0 10px;">
                     Chuỗi khớp: <strong style="color: #fff;">${streak}/5 liên tiếp</strong> (${evalPass})<br>
+                    Level đã chinh phục: <strong style="color: #22d3ee;">Level ${level}</strong>
+                </div>
+            `;
+        } else if (gId === 'M7' || (detail.gameName && detail.gameName.includes('M7'))) {
+            // M7: CAM Stimulator — độ chính xác + phản xạ + Level đã chinh phục
+            const accuracy = detail.metrics?.accuracyRate ?? detail.metrics?.customData?.accuracyRate ?? 0;
+            const rt = detail.metrics?.avgReactionTimeMs ?? detail.metrics?.customData?.avgReactionTimeMs ?? 0;
+            const level = detail.metrics?.level ?? detail.metrics?.customData?.level ?? '-';
+            const passed = detail.metrics?.passed ?? detail.metrics?.customData?.passed ?? false;
+            const evalPass = passed
+                ? '<span style="color: #00e676; font-weight: bold;">ĐẠT</span>'
+                : '<span style="color: #f87171; font-weight: bold;">CHƯA ĐẠT (cần ≥ 85% & phản xạ theo Level)</span>';
+            clinicalText = `
+                <div style="font-size: 15px; line-height: 1.8; text-align: left; padding: 0 10px;">
+                    Chính xác: <strong style="color: #fff;">${accuracy.toFixed(1)}%</strong> | Phản xạ: <strong style="color: #fff;">${rt.toFixed(0)} ms</strong> (${evalPass})<br>
+                    Level đã chinh phục: <strong style="color: #22d3ee;">Level ${level}</strong>
+                </div>
+            `;
+        } else if (gId === 'M8' || (detail.gameName && detail.gameName.includes('M8'))) {
+            // M8: Khử chen chúc — độ chính xác + khoảng cách hẹp + Level đã chinh phục
+            const accuracy = detail.metrics?.accuracy ?? detail.metrics?.customData?.accuracy ?? 0;
+            const minSpacing = detail.metrics?.minimumSpacingReached ?? detail.metrics?.customData?.minimumSpacingReached ?? 'N/A';
+            const level = detail.metrics?.level ?? detail.metrics?.customData?.level ?? '-';
+            const passed = detail.metrics?.passed ?? detail.metrics?.customData?.passed ?? false;
+            const evalPass = passed
+                ? '<span style="color: #00e676; font-weight: bold;">ĐẠT</span>'
+                : '<span style="color: #f87171; font-weight: bold;">CHƯA ĐẠT (cần ≥ 85% & đạt khoảng cách Level)</span>';
+            clinicalText = `
+                <div style="font-size: 15px; line-height: 1.8; text-align: left; padding: 0 10px;">
+                    Chính xác: <strong style="color: #fff;">${accuracy.toFixed(1)}%</strong> | Khoảng cách hẹp nhất: <strong style="color: #fff;">${minSpacing}</strong> (${evalPass})<br>
+                    Level đã chinh phục: <strong style="color: #22d3ee;">Level ${level}</strong>
+                </div>
+            `;
+        } else if (gId === 'M5' || (detail.gameName && detail.gameName.includes('M5'))) {
+            // M5: RDS Therapy — ngưỡng stereopsis + Level đã chinh phục
+            const finalArcsec = detail.metrics?.finalArcsec ?? detail.metrics?.customData?.finalArcsec ?? 0;
+            const bestArcsec = detail.metrics?.bestArcsec ?? detail.metrics?.customData?.bestArcsec ?? null;
+            const level = detail.metrics?.level ?? detail.metrics?.customData?.level ?? '-';
+            const passed = detail.metrics?.passed ?? detail.metrics?.customData?.passed ?? false;
+            const evalPass = passed
+                ? '<span style="color: #00e676; font-weight: bold;">ĐẠT</span>'
+                : '<span style="color: #f87171; font-weight: bold;">CHƯA ĐẠT (cần ≥ 10 Hits & chinh phục Đích Level)</span>';
+            clinicalText = `
+                <div style="font-size: 15px; line-height: 1.8; text-align: left; padding: 0 10px;">
+                    Ngưỡng thị giác nổi: <strong style="color: #fff;">${finalArcsec} arcsec</strong>${bestArcsec !== null ? ` | Tốt nhất: <strong style="color: #fff;">${bestArcsec} arcsec</strong>` : ''} (${evalPass})<br>
+                    Level đã chinh phục: <strong style="color: #22d3ee;">Level ${level}</strong>
+                </div>
+            `;
+        } else if (gId === 'M11' || (detail.gameName && detail.gameName.includes('M11'))) {
+            // M11: Gabor — ngưỡng tương phản hội tụ + Level đã chinh phục
+            const logCS = detail.metrics?.finalLogCS ?? detail.metrics?.customData?.finalLogCS ?? 0;
+            const revs = detail.metrics?.reversals ?? detail.metrics?.customData?.reversals ?? 0;
+            const level = detail.metrics?.level ?? detail.metrics?.customData?.level ?? '-';
+            const passed = detail.metrics?.passed ?? detail.metrics?.customData?.passed ?? false;
+            const contrastPct = (Math.pow(10, -logCS) * 100).toFixed(1);
+            const evalPass = passed
+                ? '<span style="color: #00e676; font-weight: bold;">ĐẠT</span>'
+                : '<span style="color: #f87171; font-weight: bold;">CHƯA ĐẠT (cần hội tụ theo Level)</span>';
+            clinicalText = `
+                <div style="font-size: 15px; line-height: 1.8; text-align: left; padding: 0 10px;">
+                    Ngưỡng tương phản: <strong style="color: #fff;">${logCS.toFixed(2)} LogCS (${contrastPct}%)</strong> | Đảo chiều: <strong style="color: #fff;">${revs}</strong> (${evalPass})<br>
                     Level đã chinh phục: <strong style="color: #22d3ee;">Level ${level}</strong>
                 </div>
             `;
