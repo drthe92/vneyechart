@@ -160,7 +160,7 @@ window.addEventListener('DOMContentLoaded', () => {
         docsBtn.onmouseover = () => docsBtn.style.background = 'rgba(77, 166, 255, 0.2)';
         docsBtn.onmouseout = () => docsBtn.style.background = 'rgba(77, 166, 255, 0.1)';
         docsBtn.onclick = () => {
-            window.open('https://dev.matcauvong.com/docs/index.html', '_blank', 'noopener');
+            window.open('/docs/index.html', '_blank', 'noopener');
         };
     }
     if (navbarHeader) {

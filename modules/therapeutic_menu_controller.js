@@ -920,7 +920,7 @@ window.startTherapyModule = function(id) {
  * @param {HTMLElement} container - Phần tử chứa (menu-therapeutic)
  */
 window.renderTherapeuticLobby = function(container) {
-    const protocol = localStorage.getItem("currentProtocol") || "amblyopia";
+    const protocol = localStorage.getItem("currentProtocol") || "exam";
 
     // Phòng mọi đường gọi trực tiếp (init/renderSidebar): chỉ hiển thị menu
     // Huấn luyện, ẩn menu Khám để tránh chia đôi sidebar.
@@ -1043,9 +1043,20 @@ window.refreshTherapeuticMenu = function() {
     const container = document.getElementById('menu-therapeutic');
     if (!container) return null;
 
+    const diagnosticMenu = document.getElementById('menu-diagnostic');
+    const protocol = localStorage.getItem('currentProtocol') || 'exam';
+
+    // Chế độ "Test thị giác" (mặc định): GIỮ sidebar Khám (menu-diagnostic),
+    // ẩn Lobby phác đồ — người bệnh chỉ cần bảng khám thị giác. Lobby vẫn
+    // render bình thường nếu người dùng chủ động bấm toggle sang Huấn luyện.
+    if (protocol === 'exam') {
+        if (diagnosticMenu) diagnosticMenu.style.display = 'grid';
+        container.style.display = 'none';
+        return container;
+    }
+
     // Chỉ hiển thị menu Huấn luyện: ẩn menu Khám (display:none) để tránh hai menu
     // cùng lúc xếp dọc chia đôi sidebar sau khi đăng nhập bệnh nhân.
-    const diagnosticMenu = document.getElementById('menu-diagnostic');
     if (diagnosticMenu) diagnosticMenu.style.display = 'none';
 
     // Đảm bảo controller đã khởi tạo (gắn menuContainer/workspaceContainer +

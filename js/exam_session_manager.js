@@ -123,7 +123,7 @@
         let phone = document.getElementById("input_phone") ? document.getElementById("input_phone").value.trim() : "";
         let name = document.getElementById("patient-name") ? document.getElementById("patient-name").value.trim() : "";
         let yob = document.getElementById("patient-yob") ? document.getElementById("patient-yob").value.trim() : "";
-        const protocolInput = document.getElementById("input_protocol") ? document.getElementById("input_protocol").value : "amblyopia";
+        const protocolInput = document.getElementById("input_protocol") ? document.getElementById("input_protocol").value : "exam";
 
         // Kiểm tra trạng thái nút Khám ẩn danh
         const isAnonymous = document.getElementById("anonymous-check") ? document.getElementById("anonymous-check").checked : false;
@@ -413,6 +413,7 @@ if (nmEl) nmEl.disabled = false;
                         <div class="form-group" style="margin-top: 10px;">
                             <label for="input_protocol">Phác đồ điều trị:</label>
                             <select id="input_protocol" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;">
+                                <option value="exam" selected>Test thị giác</option>
                                 <option value="amblyopia">Nhược thị</option>
                                 <option value="strabismus_postop">Hậu phẫu Lác (Không bịt mắt)</option>
                             </select>

@@ -412,6 +412,7 @@ button {
   background: var(--main-bg);
   overflow: hidden;                /* NO SCROLL */
   position: relative;
+  z-index: 1;                      /* stacking context: module overlays stay below #sidebar (z-index 50) */
 }
 
 /* -- Display Board (centered content container) -- */
