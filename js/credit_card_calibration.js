@@ -164,6 +164,12 @@ class CreditCardCalibrator {
       } else {
         localStorage.setItem(CC_STORAGE_KEY, value);
       }
+      // Ghi fingerprint màn hình lúc hiệu chuẩn — dùng phát hiện đổi màn hình/TV.
+      if (typeof window !== 'undefined' &&
+          typeof window.getCalibrationScreenFingerprint === 'function') {
+        localStorage.setItem('vision-therapy-cc-fingerprint',
+          window.getCalibrationScreenFingerprint());
+      }
     } catch (e) {}
 
     // Đồng bộ ngay vào global __calibrator (kể cả khi chưa truyền instance calibrator)

@@ -693,6 +693,33 @@ if (nmEl) nmEl.disabled = false;
      * @param {Object|null} examData - Optional exam data object. Defaults to window.__currentExam
      * @returns {string}
      */
+    /**
+     * Badge cảnh báo "Chưa hiệu chuẩn màn hình" trên báo cáo (modal + PDF).
+     * Hiện khi: chưa có pxPerMm, hoặc đang ở chế độ demo (bỏ qua hiệu chỉnh),
+     * hoặc màn hình hiện tại khác lúc hiệu chuẩn.
+     * @returns {string} HTML (rỗng nếu đã hiệu chuẩn đúng)
+     */
+    function generateUncalibratedBadge() {
+        try {
+            const isDemo = sessionStorage.getItem('vision-demo-uncalibrated') === '1';
+            const valid = (typeof window.isCalibrationValid === 'function')
+                ? window.isCalibrationValid()
+                : (parseFloat(localStorage.getItem('vision-therapy-cc-pxpermm') || '0') > 0);
+            if (valid && !isDemo) return '';
+            const why = isDemo
+                ? 'Đang xem demo (bỏ qua hiệu chuẩn trong phiên này)'
+                : 'Màn hình chưa được hiệu chuẩn thẻ tín dụng';
+            return `
+                <div style="background:#fef3c7; border:2px solid #f59e0b; color:#92400e; border-radius:8px;
+                            padding:10px 14px; margin:12px 0; font-size:13px; font-weight:600; text-align:center;">
+                    ⚠️ ${why} — Kết quả đo có thể KHÔNG chính xác về mặt lâm sàng.
+                </div>
+            `;
+        } catch (e) {
+            return '';
+        }
+    }
+
     function generateReportHTML(isPrintMode, examData = null) {
         const exam = examData || window.__currentExam;
         const startDate = new Date(exam.startTime);
@@ -759,6 +786,7 @@ if (nmEl) nmEl.disabled = false;
                     <h1>PHÒNG KHÁM NHÃN KHOA</h1>
                     <h2>BÁO CÁO KẾT QUẢ KHÁM MẮT</h2>
                 </div>
+                ${generateUncalibratedBadge()}
                 <div class="print-patient-info">
                     <h3>THÔNG TIN BỆNH NHÂN</h3>
                     <table class="print-table">
@@ -784,6 +812,7 @@ if (nmEl) nmEl.disabled = false;
                         ${patientInfoRows}
                     </table>
                 </div>
+                ${generateUncalibratedBadge()}
                 <div class="report-results">
                     <!-- PHẦN I: KHÁM & CHẨN ĐOÁN -->
                     <h4 style="font-size: 16px; font-weight: bold; color: #1e293b; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #10b981;">PHẦN I: KHÁM & CHẨN ĐOÁN</h4>

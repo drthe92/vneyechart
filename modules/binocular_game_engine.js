@@ -27,8 +27,29 @@ class BinocularGameEngine {
 
         // Bẫy lỗi: Bắt buộc phải có dữ liệu hiệu chuẩn màn hình và khoảng cách khám.
         // Không cho phép chạy phác đồ nếu chưa hiệu chuẩn (yêu cầu nghiêm ngặt).
+        // [POPUP THAY THẾ THROW] Hiện dialog hướng dẫn tới nút hiệu chuẩn thay vì
+        // alert/exception thô — giữ nguyên hành vi chặn (không khởi động game).
         if (!calibration.pixelsPerMm || !calibration.viewingDistanceCm) {
-            throw new Error("[LỖI Y KHOA NGHIÊM TRỌNG]: Vui lòng hiệu chuẩn phần cứng màn hình (Pixel/mm) và Khoảng cách khám trước khi khởi chạy phác đồ.");
+            if (typeof window !== 'undefined' && typeof window.showGlobalConfirm === 'function') {
+                const openCC = () => {
+                    if (window.__ccCal) window.__ccCal.showModal();
+                };
+                window.showGlobalConfirm(
+                    'Bài tập huấn luyện bắt buộc có hiệu chuẩn màn hình (px/mm) và khoảng cách khám ' +
+                    'để tính góc thị giác và lăng kính chính xác.\n\n' +
+                    'Vui lòng hiệu chỉnh thẻ tín dụng và cài đặt khoảng cách khám trước khi bắt đầu.',
+                    {
+                        title: 'Bắt buộc hiệu chuẩn trước khi tập',
+                        confirmText: '▶ Hiệu chỉnh ngay',
+                        cancelText: 'Đóng',
+                        type: 'warning',
+                        onConfirm: openCC
+                    }
+                );
+            } else {
+                alert("[LỖI Y KHOA NGHIÊM TRỌNG]: Vui lòng hiệu chuẩn phần cứng màn hình (Pixel/mm) và Khoảng cách khám trước khi khởi chạy phác đồ.");
+            }
+            throw new Error("CALIBRATION_REQUIRED");
         }
         // Gán đối tượng hiệu chuẩn toàn cục vào instance
         this.calibration = calibration;

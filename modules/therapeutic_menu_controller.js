@@ -885,6 +885,12 @@ class TherapeuticMenuController {
 
             this.currentGame.start(config);
         } catch (error) {
+            // [HIỆU CHUẨN] Lỗi CALIBRATION_REQUIRED đã được BinocularGameEngine
+            // xử lý bằng popup chuyên nghiệp — đóng Lobby + không đè alert thô.
+            if (error && error.message === 'CALIBRATION_REQUIRED') {
+                this.workspaceContainer.innerHTML = '';
+                return;
+            }
             console.error("[LỖI ENGINE NGHIÊM TRỌNG]:", error);
             const msg = (error && error.message) ? error.message : "Không thể khởi động bài tập. Vui lòng xem Console.";
             const container = document.getElementById('display-board');

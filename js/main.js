@@ -75,6 +75,36 @@ const state = {
  * @param {Array}  steps
  */
 function loadTest(testId, steps) {
+  // [CHẶN MỀM HIỆU CHUẨN] Bài test THUỘC NHÓM ĐO (FAR/NEAR) bắt buộc hiệu
+  // chỉnh thẻ tín dụng hợp lệ (pxPerMm > 0, đúng màn hình). Bấm "Hiệu chỉnh
+  // ngay" → mở modal hiệu chuẩn; bấm "Xem demo" → vẫn mở test (kết quả sẽ được
+  // đánh dấu "chưa hiệu chỉnh" trên báo cáo) nhưng chỉ lần đầu.
+  if (typeof window.isCalibrationValid === 'function' &&
+      TEST_DISTANCE_GROUPS[testId] &&
+      !window.isCalibrationValid()) {
+    const msg = 'Bài test ' + (testId || '') + ' cần hiệu chuẩn màn hình (thẻ tín dụng) để cho kết quả đo chính xác.\n\n'
+      + 'Vui lòng đặt thẻ tín dụng/CCCD lên màn hình và hiệu chỉnh kích thước. Quá trình chỉ mất ~30 giây.';
+    if (typeof window.showGlobalConfirm === 'function') {
+      window.showGlobalConfirm(msg, {
+        title: 'Bắt buộc hiệu chuẩn trước khi đo',
+        confirmText: '▶ Hiệu chỉnh ngay',
+        cancelText: '⏭ Xem demo (bỏ qua trong phiên này)',
+        type: 'warning',
+        onConfirm: () => {
+          if (window.__ccCal) window.__ccCal.showModal();
+        },
+        onCancel: () => {
+          // Cho xem demo: gắn cờ để báo cáo đánh dấu "chưa hiệu chỉnh"
+          try { sessionStorage.setItem('vision-demo-uncalibrated', '1'); } catch (e) { /* ignore */ }
+          loadTest(testId, steps);
+        }
+      });
+    } else {
+      alert('Bắt buộc hiệu chuẩn màn hình trước khi đo.');
+    }
+    return; // chặn lần đầu, chờ user chọn
+  }
+
   // Cleanup previous module (e.g., OKN render loop)
   const prevMod = getTestModule(state.currentTest);
   if (prevMod && typeof prevMod.cleanup === 'function') {
@@ -1824,6 +1854,58 @@ function setupCalibrator() {
 }
 
 // ================================================================
+//  Calibration State Helpers (dùng chung cho popup chặn đo / báo cáo)
+// ================================================================
+
+/** Lấy fingerprint màn hình hiện tại (dùng phát hiện đổi màn hình/TV). */
+function getCalibrationScreenFingerprint() {
+  const dpr = typeof window !== 'undefined' && window.devicePixelRatio
+    ? Number(window.devicePixelRatio.toFixed(2))
+    : 1;
+  const w = (typeof screen !== 'undefined' && screen.width) ? screen.width : 0;
+  const h = (typeof screen !== 'undefined' && screen.height) ? screen.height : 0;
+  return `${w}x${h}@${dpr}`;
+}
+
+/** Đọc pxPerMm hiệu chuẩn thẻ tín dụng từ SettingsStore/localStorage. */
+function getCalibrationPxPerMm() {
+  try {
+    if (typeof window !== 'undefined' && window.SettingsStore) {
+      const v = window.SettingsStore.get('vision-therapy-cc-pxpermm');
+      if (v != null && v !== '') return parseFloat(v);
+    }
+    const raw = localStorage.getItem('vision-therapy-cc-pxpermm');
+    if (raw) return parseFloat(raw);
+  } catch (e) { /* ignore */ }
+  return 0;
+}
+
+/**
+ * Trạng thái hiệu chuẩn: hợp lệ khi pxPerMm > 0 VÀ màn hình hiện tại trùng
+ * với màn hình lúc hiệu chuẩn (nếu có ghi fingerprint).
+ */
+function isCalibrationValid() {
+  const pxPerMm = getCalibrationPxPerMm();
+  if (!(pxPerMm > 0)) return false;
+
+  // Nếu đã lưu fingerprint lúc hiệu chuẩn → so khớp màn hình hiện tại
+  try {
+    const savedFp = localStorage.getItem('vision-therapy-cc-fingerprint');
+    if (savedFp && savedFp !== '') {
+      return savedFp === getCalibrationScreenFingerprint();
+    }
+  } catch (e) { /* ignore */ }
+  return true;
+}
+
+// Expose global cho mọi script (exam_session_manager, modules, dashboard)
+if (typeof window !== 'undefined') {
+  window.isCalibrationValid = isCalibrationValid;
+  window.getCalibrationScreenFingerprint = getCalibrationScreenFingerprint;
+  window.getCalibrationPxPerMm = getCalibrationPxPerMm;
+}
+
+// ================================================================
 //  Workspace Toggle — Diagnostic / Therapeutic Switching
 // ================================================================
 
@@ -1991,6 +2073,17 @@ function init() {
     }
   });
 
+  // Sau khi hiệu chuẩn thẻ tín dụng thành công → re-render test đang active
+  // (nếu có) để kích thước thị giác cập nhật đúng px/mm mới.
+  document.addEventListener('app:calibration_updated', () => {
+    // Xóa cờ demo (đã hiệu chỉnh đúng rồi)
+    try { sessionStorage.removeItem('vision-demo-uncalibrated'); } catch (e) { /* ignore */ }
+    if (currentWorkspace === 'diagnostic' && state.currentTest) {
+      renderStep();
+      if (typeof window.updateDistanceIndicator === 'function') window.updateDistanceIndicator();
+    }
+  });
+
   // 2. Màu kính Anaglyph (vision_color_calibration) — dự phòng cho __anaglyphColors
   try {
     const savedColors = localStorage.getItem('vision_color_calibration');
@@ -2009,6 +2102,75 @@ function init() {
   if (savedWorkspace === 'therapeutic' && currentWorkspace === 'diagnostic') {
     toggleWorkspace();
   }
+
+  // ================================================================
+  //  Hiệu chuẩn thẻ tín dụng — Popup đầu tiên + tự nhắc khi đổi màn hình
+  // ================================================================
+  try {
+    // Dùng setTimeout để DOM modal render SAU khi toàn bộ init xong
+    setTimeout(() => {
+      const pxPerMm = getCalibrationPxPerMm();
+      const hasFingerprint = (function () {
+        try { return !!localStorage.getItem('vision-therapy-cc-fingerprint'); } catch (e) { return false; }
+      })();
+
+      // Trường hợp có pxPerMm nhưng CHƯA ghi fingerprint (bản cũ) → ghi lại
+      // ngay để lần sau so khớp được; không cần nhắc.
+      const currentFp = getCalibrationScreenFingerprint();
+      if (pxPerMm > 0 && !hasFingerprint) {
+        try { localStorage.setItem('vision-therapy-cc-fingerprint', currentFp); } catch (e) { /* ignore */ }
+      }
+
+      // A. Đã từng hiệu chuẩn nhưng MÀN HÌNH ĐỔI (TV/máy khác) → cảnh báo
+      if (pxPerMm > 0 && hasFingerprint) {
+        const savedFp = (function () {
+          try { return localStorage.getItem('vision-therapy-cc-fingerprint'); } catch (e) { return ''; }
+        })();
+        if (savedFp !== '' && savedFp !== currentFp) {
+          if (typeof window.showGlobalDialog === 'function') {
+            window.showGlobalDialog(
+              `Trang bị đang dùng khác màn hình lúc hiệu chuẩn (${savedFp} → ${currentFp}).\n\n` +
+              'Vui lòng hiệu chỉnh lại thẻ tín dụng để đảm bảo kết quả đo chính xác.',
+              {
+                title: 'Đổi màn hình — Cần hiệu chỉnh lại',
+                type: 'warning',
+                onClose: () => {
+                  if (window.__ccCal) window.__ccCal.showModal();
+                }
+              }
+            );
+          }
+          return;
+        }
+      }
+
+      // B. Lần đầu (chưa từng hiệu chỉnh) → popup giới thiệu + nút hiệu chỉnh ngay
+      if (!(pxPerMm > 0)) {
+        if (typeof window.showGlobalConfirm === 'function') {
+          window.showGlobalConfirm(
+            'Để đo thị lực và luyện tập chính xác, hệ thống cần hiệu chuẩn kích thước màn hình ' +
+            'bằng thẻ tín dụng (85.6 mm) hoặc CCCD.\n\n' +
+            'Quá trình này chỉ mất 30 giây và chỉ cần làm 1 lần cho mỗi màn hình.',
+            {
+              title: 'Chào mừng — Hiệu chuẩn màn hình',
+              confirmText: '▶ Hiệu chỉnh ngay',
+              cancelText: '⏭ Tạm bỏ qua',
+              type: 'info',
+              onConfirm: () => {
+                if (window.__ccCal) window.__ccCal.showModal();
+              },
+              onCancel: () => {
+                // Bỏ qua: chỉ xem/demo — các test đo sẽ bị chặn nhẹ.
+                if (typeof window.showGlobalToast === 'function') {
+                  window.showGlobalToast('Bạn có thể hiệu chỉnh bất cứ lúc nào qua nút 💳 trên thanh menu.', 'info');
+                }
+              }
+            }
+          );
+        }
+      }
+    }, 600);
+  } catch (e) { console.warn('[Calibration] Lỗi khởi động popup hiệu chuẩn:', e); }
 
   // Listen for visionTestCompleted event to resume UniversalInput
   document.addEventListener('visionTestCompleted', (e) => {
