@@ -2150,7 +2150,9 @@ function init() {
           window.showGlobalConfirm(
             'Để đo thị lực và luyện tập chính xác, hệ thống cần hiệu chuẩn kích thước màn hình ' +
             'bằng thẻ tín dụng (85.6 mm) hoặc CCCD.\n\n' +
-            'Quá trình này chỉ mất 30 giây và chỉ cần làm 1 lần cho mỗi màn hình.',
+            'Quá trình này chỉ mất 30 giây và chỉ cần làm 1 lần cho mỗi màn hình.\n\n' +
+            'Nếu người dùng đã có kính xanh - đỏ: cấu hình 1 lần trong "Cấu hình phòng khám" ' +
+            '(Top Menu) để khám và luyện tập thị giác hai mắt.',
             {
               title: 'Chào mừng — Hiệu chuẩn màn hình',
               confirmText: '▶ Hiệu chỉnh ngay',
