@@ -65,7 +65,6 @@
 
     // Manual Entry Modal elements reference
     let manualEntryModal = null;
-    let manualFab = null;
 
     // Clinic Settings Modal element reference
     let clinicSettingsModal = null;
@@ -362,9 +361,6 @@ if (nmEl) nmEl.disabled = false;
 
         // Create Toast Container
         createToastContainer();
-
-        // Create Floating Action Button
-        createManualSaveFab();
 
         // Create Manual Entry Modal
         createManualEntryModal();
@@ -955,18 +951,6 @@ if (nmEl) nmEl.disabled = false;
         document.body.appendChild(toastContainer);
     }
 
-    // Create Floating Action Button (FAB) for manual save
-    function createManualSaveFab() {
-        manualFab = document.createElement('button');
-        manualFab.id = 'manual-save-fab';
-        manualFab.className = 'manual-save-fab';
-        manualFab.setAttribute('title', 'Lưu kết quả thủ công');
-        manualFab.innerHTML = '<span class="fab-icon">💾</span><span class="fab-text">Lưu kết quả</span>';
-        document.body.appendChild(manualFab);
-
-        manualFab.addEventListener('click', handleManualSaveFabClick);
-    }
-
     // Create Manual Entry Modal
     function createManualEntryModal() {
         // Build datalist options from TEST_NAMES_LIST
@@ -1545,6 +1529,8 @@ if (nmEl) nmEl.disabled = false;
         'Auto Distance VA': 'far-vision-auto-distance-va',
         'Auto Near VA': 'near-vision-auto-near-va',
         'Auto BCVA (Crowding Eval)': 'far-vision-auto-bcva-crowding',
+        'Auto Contrast E': 'retina-auto-contrast-e',
+        'Auto Stereo Random Dot': 'binocular-auto-stereo-random-dot',
         'Tumbling E': 'far-vision-tumbling-e',
         'Near LogMAR': 'near-vision-logmar'
     };
@@ -3372,15 +3358,23 @@ document.addEventListener('click', function(e) {
         // Bước 1: Tính trạng thái banner từ dữ liệu local (emr_patient_sessions)
         const localPool = _buildComboPool(patientId, getEmrPatientSessions());
         const localState = _computeComboBannerState([localPool]);
-        renderComboBannerState(localState);
 
-        // [CẢI THIỆN #1] Truy vấn Firebase chỉ khi dữ liệu local KHÔNG cho thấy
-        // MỐC COMBO nào (trạng thái 1) — thường xảy ra khi localStorage bị xóa
-        // (đổi máy / dọn dữ liệu) nhưng Firebase vẫn còn lịch sử. Ngược lại
-        // (local có mốc chốt) → bỏ qua để không tốn lượt query lặp sau mỗi lần lưu.
-        if (window.db && localState.lastTestTime === null && localState.comboTestTypesFound.size < 4) {
-            _syncComboBannerFromFirebase(patientId);
+        // [FIX "TOGGLE LẠI MỜI TEST"] Khi local CHƯA có mốc combo (rỗng hoặc
+        // mới đổi máy), KHÔNG render trạng thái "mời" ngay — vì Firebase có thể
+        // còn lịch sử (F5 đọc được "ngày X/10" trong khi toggle không). Phải
+        // chờ `_syncComboBannerFromFirebase` (async) trả về rồi mới render.
+        if (localState.lastTestTime === null || localState.comboTestTypesFound.size < 4) {
+            // Nếu không có Firebase (offline / lỗi) thì vẫn hiện trạng thái local
+            if (!window.db) {
+                renderComboBannerState(localState);
+                return;
+            }
+            // Có Firebase → để sync (async) render; KHÔNG hiện "mời" tạm thời.
+            _syncComboBannerFromFirebase(patientId, localState);
+            return;
         }
+
+        renderComboBannerState(localState);
     }
 
     // ============================================================
@@ -3504,6 +3498,15 @@ document.addEventListener('click', function(e) {
             return;
         }
 
+        // [FIX BUG "TEST RỒI VẪN ĐỀ NGHỊ"] Nếu bệnh nhân ĐÃ có đủ 4 bài test lẻ
+        // (chạy rời rạc theo phiên khám, không qua nút Combo) → coi như ĐÃ đánh
+        // giá; KHÔNG hiện lời mời lần đầu nữa. Chỉ khi có mốc chốt (lastTestTime)
+        // mới đề nghị làm lại sau 10 ngày luyện tập.
+        if (state.comboTestTypesFound.size >= 4 && state.hasComboBaseline === false && !state.lastTestTime) {
+            banner.style.display = 'none';
+            return;
+        }
+
         banner.style.display = 'block';
         btn.style.display = 'none';
 
@@ -3543,11 +3546,21 @@ document.addEventListener('click', function(e) {
      * - Đếm ngày tập M-game (cộng gộp union ngày với local)
      * Throttle 60s/bệnh nhân để tránh query lặp sau mỗi lần lưu bài tập.
      */
-    async function _syncComboBannerFromFirebase(pid) {
+    async function _syncComboBannerFromFirebase(pid, fallbackLocalState = null) {
         try {
-            if (!pid || !window.db) return;
+            if (!pid || !window.db) {
+                // Không có Firebase → giữ trạng thái local (nếu có fallback)
+                if (fallbackLocalState) renderComboBannerState(fallbackLocalState);
+                return;
+            }
             const now = Date.now();
-            if (_comboFbSyncCache.pid === pid && now - _comboFbSyncCache.ts < 60000) return;
+            if (_comboFbSyncCache.pid === pid && now - _comboFbSyncCache.ts < 60000) {
+                // Trong 60s gần nhất: nếu đã cache và cache đó CÓ kết quả (đã từng
+                // render Firebase) thì không làm gì. Nếu cache chỉ là lần đầu (local
+                // mời) mà chưa từng render từ Firebase → render lại cùng fallback.
+                // Đơn giản: tôn trọng cache — bỏ qua (tránh query lặp).
+                return;
+            }
             _comboFbSyncCache = { pid: pid, ts: now };
 
             const snapshot = await window.db.collection("Patients")
@@ -3578,7 +3591,11 @@ document.addEventListener('click', function(e) {
                 if (mappedType) fbPool.results.push({ test_type: mappedType });
             });
 
-            if (fbPool.records.length === 0 && fbPool.results.length === 0) return;
+            if (fbPool.records.length === 0 && fbPool.results.length === 0) {
+                // Firebase rỗng → render trạng thái local (mời) 
+                if (fallbackLocalState) renderComboBannerState(fallbackLocalState);
+                return;
+            }
 
             // Gộp union với pool local (đọc LẠI tại thời điểm response để không
             // mất bản ghi vừa lưu trong lúc chờ mạng) → trạng thái đầy đủ nhất
@@ -3587,6 +3604,7 @@ document.addEventListener('click', function(e) {
             renderComboBannerState(merged);
         } catch (err) {
             console.warn('[Combo Banner] Không lấy được dữ liệu Firebase (giữ trạng thái local):', err);
+            if (fallbackLocalState) renderComboBannerState(fallbackLocalState);
         }
     }
 

@@ -435,6 +435,17 @@ class TherapeuticMenuController {
                 console.warn('[Therapeutic] Lỗi khi dừng game trên fullscreenchange:', err);
             }
             this._restoreTherapeuticLobby();
+
+            // [FIX MÀN HÌNH SAU THOÁT GAME] Giữ nguyên workspace Huấn luyện:
+            // mở sidebar (top menu + Lobby huấn luyện) để chọn bài tiếp theo.
+            if (typeof window.refreshTherapeuticMenu === 'function') {
+                window.refreshTherapeuticMenu(true);
+            }
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar) sidebar.classList.remove('sidebar-hidden');
+            if (typeof window.updateDistanceIndicator === 'function') {
+                window.updateDistanceIndicator();
+            }
         }
     }
 
@@ -672,10 +683,10 @@ class TherapeuticMenuController {
         const docHref = this._docHrefFor(module.id);
 
         const lobbyHtml = `
-            <div style="position: fixed; inset: 0; z-index: 9998; background: rgba(15, 23, 42, 0.97); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; font-family: sans-serif;">
+            <div style="position: fixed; inset: 0; z-index: 2147483000; background: rgba(15, 23, 42, 0.97); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; font-family: sans-serif;">
 
                 <!-- NÚT TẮT (ĐÓNG) LOBBY: cố định góc màn hình, ngoài Split-Pane -->
-                <button id="btn-close-lobby" title="Nhấn ESC để thoát" style="position: fixed; top: 24px; right: 24px; width: 44px; height: 44px; font-size: 20px; background: rgba(255,255,255,0.1); border: none; color: #cbd5e1; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s; z-index: 9999;">
+                <button id="btn-close-lobby" title="Nhấn ESC để thoát" style="position: fixed; top: 24px; right: 24px; width: 44px; height: 44px; font-size: 20px; background: rgba(255,255,255,0.1); border: none; color: #cbd5e1; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s; z-index: 2147483001;">
                     ✖
                 </button>
 
@@ -852,8 +863,10 @@ class TherapeuticMenuController {
             console.warn("[Therapeutic] Fullscreen request failed:", err);
         });
 
-        // Force CSS for workspace: full viewport, white background, cover all UI
-        this.workspaceContainer.style.cssText = 'width: 100vw; height: 100vh; background: #FFFFFF; position: fixed; inset: 0; z-index: 9999;';
+        // Force CSS for workspace: full viewport, white background, cover all UI.
+        // z-index ngang mức Lobby (2147483000) — phải phủ được mọi lớp app
+        // (exam-modal 9999, toast 10000, OKN warning 20000) khi đang chơi.
+        this.workspaceContainer.style.cssText = 'width: 100vw; height: 100vh; background: #FFFFFF; position: fixed; inset: 0; z-index: 2147483000;';
 
         // Remove Lobby
         this.workspaceContainer.innerHTML = '';
@@ -1039,17 +1052,17 @@ window.renderTherapeuticLobby = function(container) {
  *   2) Khi nhấn nút toggle chuyển Khám → Luyện tập (main.js toggleWorkspace).
  * @returns {HTMLElement|null} Container menu đã render, hoặc null nếu chưa có DOM.
  */
-window.refreshTherapeuticMenu = function() {
+window.refreshTherapeuticMenu = function(fromToggle) {
     const container = document.getElementById('menu-therapeutic');
     if (!container) return null;
 
     const diagnosticMenu = document.getElementById('menu-diagnostic');
     const protocol = localStorage.getItem('currentProtocol') || 'exam';
 
-    // Chế độ "Test thị giác" (mặc định): GIỮ sidebar Khám (menu-diagnostic),
-    // ẩn Lobby phác đồ — người bệnh chỉ cần bảng khám thị giác. Lobby vẫn
-    // render bình thường nếu người dùng chủ động bấm toggle sang Huấn luyện.
-    if (protocol === 'exam') {
+    // "Test thị giác" (mặc định): sidebar giữ menu Khám. Khi người dùng chủ
+    // động bấm Toggle sang Huấn luyện (fromToggle === true) mới render Lobby
+    // (fallback bố cục Phác đồ Nhược thị — mở toàn bộ M1–M13, link Docs không vỡ).
+    if (protocol === 'exam' && !fromToggle) {
         if (diagnosticMenu) diagnosticMenu.style.display = 'grid';
         container.style.display = 'none';
         return container;
@@ -1439,9 +1452,10 @@ window.syncM12ProgressFromFirebase = async function(patientId, moduleKey = 'M12'
 // SPA Event Listener: Xử lý chuyển đổi workspace qua lại
 document.addEventListener('onWorkspaceChanged', (e) => {
     if (e.detail.toWorkspace === 'therapeutic') {
-        // Render lại đúng bố cục Phác đồ + reset style inline có thể gây lệch
+        // Render lại đúng bố cục Phác đồ + reset style inline có thể gây lệch.
+        // fromToggle=true: mở Lobby ngay cả khi protocol = 'exam' (Test thị giác).
         if (typeof window.refreshTherapeuticMenu === 'function') {
-            window.refreshTherapeuticMenu();
+            window.refreshTherapeuticMenu(true);
         } else {
             window.therapeuticMenu.init();
         }
@@ -1499,5 +1513,16 @@ window.closeTherapyModule = function() {
     // 4. BẮT BUỘC vẽ lại danh sách menu game vào vùng hiển thị chính
     if (typeof window.renderTherapeuticLobby === 'function') {
         window.renderTherapeuticLobby(content);
+    }
+
+    // 5. [FIX MÀN HÌNH SAU THOÁT GAME] Giữ workspace Huấn luyện + mở sidebar
+    //    (top menu + Lobby huấn luyện trong sidebar) để chọn bài tiếp theo.
+    if (typeof window.refreshTherapeuticMenu === 'function') {
+        window.refreshTherapeuticMenu(true);
+    }
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.classList.remove('sidebar-hidden');
+    if (typeof window.updateDistanceIndicator === 'function') {
+        window.updateDistanceIndicator();
     }
 };

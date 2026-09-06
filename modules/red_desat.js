@@ -338,6 +338,20 @@ const redDesatModule = {
 
     this._results.push(entry);
 
+    // Đẩy kết quả lâm sàng vào EMR qua sự kiện chuẩn visionTestCompleted
+    const eyeLabel = laterality === 'OD' ? 'OD (Mắt phải)' : laterality === 'OS' ? 'OS (Mắt trái)' : 'Khác';
+    document.dispatchEvent(new CustomEvent('visionTestCompleted', {
+      detail: {
+        test_type: 'Red Desaturation',
+        is_manual_entry: false,
+        eye_tested: laterality,
+        clinical_metrics: {
+          [eyeLabel]: this._saturation + '%'
+        }
+      },
+      bubbles: true
+    }));
+
     const countEl = document.getElementById('red-desat-log-count');
     if (countEl) countEl.textContent = this._results.length;
 

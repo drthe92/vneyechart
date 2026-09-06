@@ -412,7 +412,6 @@ button {
   background: var(--main-bg);
   overflow: hidden;                /* NO SCROLL */
   position: relative;
-  z-index: 1;                      /* stacking context: module overlays stay below #sidebar (z-index 50) */
 }
 
 /* -- Display Board (centered content container) -- */
@@ -425,6 +424,11 @@ button {
   height: 100%;
   padding: var(--gap-lg);
   text-align: center;
+  /* Ngăn overlay của module khám (Heidi/Fixation... absolute z-1000) trèo lên
+     #sidebar (z-index 50; phủ toàn màn hình khi mở): cô lập stacking context
+     ngay tại đây. KHÔNG đặt trên #main-area để không giam cả Lobby huấn luyện
+     (fixed z-9998 trong #workspace-therapeutic) — overlay đó phải phủ sidebar. */
+  isolation: isolate;
 }
 
 /* ---------- Dynamically rendered test content ---------- */

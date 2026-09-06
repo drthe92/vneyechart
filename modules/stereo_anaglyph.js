@@ -366,6 +366,22 @@ class StereoRenderer {
       summary: this._generateSummary()
     };
 
+    // Đẩy kết quả lâm sàng vào EMR qua sự kiện chuẩn visionTestCompleted
+    document.dispatchEvent(new CustomEvent('visionTestCompleted', {
+      detail: {
+        test_type: 'Stereo Anaglyph',
+        is_manual_entry: false,
+        clinical_metrics: {
+          'Stereo (Độ nổi)': results.finalLevel + ' arcsec',
+          'Tổng số câu': results.summary.totalQuestions,
+          'Trả lời đúng': results.summary.correctAnswers,
+          'Trả lời sai': results.summary.incorrectAnswers,
+          'Thời gian (giây)': Math.round(results.durationSeconds)
+        }
+      },
+      bubbles: true
+    }));
+
     this._showResultsScreen(results);
   }
 

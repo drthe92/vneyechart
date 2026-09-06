@@ -1759,7 +1759,7 @@ function toggleWorkspace() {
     if (menuTher) {
       // Render lại đúng bố cục theo Phác đồ hiện tại mỗi lần chuyển sang Luyện tập
       if (typeof window.refreshTherapeuticMenu === 'function') {
-        window.refreshTherapeuticMenu();
+        window.refreshTherapeuticMenu(true);
       } else {
         menuTher.style.display = 'block';
       }
@@ -2410,6 +2410,10 @@ export { state, loadTest, nextStep, prevStep, back, registerTestModule, testModu
 // Expose globally for non-module scripts (exam_session_manager.js)
 if (typeof window !== 'undefined') {
     window.generateTherapyReportHTML = generateTherapyReportHTML;
+    // [FIX THOÁT GAME] Cho phép therapeutic_menu_controller (module) chuyển hẳn
+    // workspace về Phòng khám khi người dùng thoát game/đóng Lobby huấn luyện —
+    // tránh màn hình "chỉ còn sảnh luyện tập, mất top menu, nền sáng".
+    window.ensureDiagnosticWorkspace = ensureDiagnosticWorkspace;
 }
 
 // ================================================================

@@ -896,52 +896,6 @@
     outline-offset: 2px;
 }
 
-/* ===== FLOATING ACTION BUTTON (FAB) ===== */
-.manual-save-fab {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 9998;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 14px 20px;
-    background: rgba(17, 24, 39, 0.75);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 14px;
-    color: #ffffff;
-    font-size: 14px;
-    font-weight: 600;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-    cursor: pointer;
-    opacity: 0.4;
-    transform: scale(1);
-    transition: all var(--transition-base);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
-    letter-spacing: 0.02em;
-}
-
-.manual-save-fab:hover {
-    opacity: 1;
-    transform: scale(1.05);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
-}
-
-.manual-save-fab:active {
-    transform: scale(0.98);
-}
-
-.manual-save-fab .fab-icon {
-    font-size: 18px;
-    line-height: 1;
-}
-
-.manual-save-fab .fab-text {
-    white-space: nowrap;
-}
-
 /* ===== MANUAL ENTRY MODAL EXTRA STYLES ===== */
 .manual-entry-modal-content {
     max-width: 600px;
@@ -1028,24 +982,6 @@
     .manual-entry-form .form-row {
         flex-direction: column;
         gap: 0;
-    }
-
-    .manual-save-fab {
-        bottom: 12px;
-        right: 12px;
-        padding: 12px 16px;
-        font-size: 13px;
-    }
-
-    .manual-save-fab .fab-text {
-        display: none;
-    }
-}
-
-/* Print: hide FAB */
-@media print {
-    .manual-save-fab {
-        display: none !important;
     }
 }
 
@@ -1491,6 +1427,12 @@
    Kích thước nội tại (width/height) do Engine gán theo
    clientWidth/clientHeight thực tế — tỷ lệ 1:1 (Scale Lock).
    ============================================================ */
+#workspace-therapeutic {
+    /* [FIX NỀN SÁNG SAU THOÁT GAME] Lobby huấn luyện nền tối — thay thế
+       nền trắng #ffffff của #main-area khi workspace Huấn luyện hiển thị. */
+    background: #0d1b2a;
+}
+
 #workspace-therapeutic canvas {
     display: block;
     position: absolute;
