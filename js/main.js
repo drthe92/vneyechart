@@ -327,6 +327,136 @@ if (typeof window !== 'undefined') {
 }
 
 /**
+ * Dialog thông báo (thay thế alert()) — modal chuyên nghiệp, dark theme,
+ * nút OK duy nhất. KHÔNG dùng alert()/confirm() trình duyệt thô.
+ * @param {string} message - Nội dung thông báo
+ * @param {Object} [options] - { title, type: 'info'|'success'|'error'|'warning', onClose }
+ * @returns {HTMLElement} overlay vừa tạo
+ */
+function showGlobalDialog(message, options = {}) {
+  if (typeof document === 'undefined' || !document.body) return null;
+  const { title = 'Thông báo', type = 'info', onClose = null } = options;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'global-dialog-overlay';
+  overlay.style.cssText = `
+    position: fixed; inset: 0; z-index: 2147483001;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.55); backdrop-filter: blur(2px);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  `;
+
+  const COLORS = {
+    info:    { accent: '#4da6ff', icon: 'ℹ️' },
+    success: { accent: '#22c55e', icon: '✅' },
+    error:   { accent: '#ef4444', icon: '⚠️' },
+    warning: { accent: '#f59e0b', icon: '⚠️' },
+  };
+  const c = COLORS[type] || COLORS.info;
+
+  const box = document.createElement('div');
+  box.style.cssText = `
+    background: #1e293b; border: 1px solid #334155; border-radius: 14px;
+    padding: 24px 28px; max-width: 420px; width: calc(100vw - 48px);
+    box-shadow: 0 12px 48px rgba(0,0,0,0.45); color: #e2e8f0; text-align: left;
+  `;
+  box.innerHTML = `
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px; font-size:17px; font-weight:700; color:#fff;">
+      <span style="font-size:22px;">${c.icon}</span> ${title}
+    </div>
+    <div style="font-size:14px; line-height:1.65; color:#cbd5e1; white-space:pre-line;">${message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+      <button class="global-dialog-ok" style="padding:9px 22px; border:none; border-radius:8px; font-weight:600; font-size:14px; cursor:pointer; background:${c.accent}; color:#fff;">OK</button>
+    </div>
+  `;
+  overlay.appendChild(box);
+
+  const close = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', escHandler);
+    if (typeof onClose === 'function') onClose();
+  };
+  const escHandler = (e) => { if (e.key === 'Escape') close(); };
+  box.querySelector('.global-dialog-ok').addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', escHandler);
+
+  document.body.appendChild(overlay);
+  const okBtn = box.querySelector('.global-dialog-ok');
+  setTimeout(() => okBtn && okBtn.focus(), 10);
+  return overlay;
+}
+
+/**
+ * Xác nhận (thay thế confirm()) — modal OK/Hủy chuyên nghiệp.
+ * @param {string} message
+ * @param {Object} [options] - { title, onConfirm, onCancel, confirmText, cancelText, type }
+ */
+function showGlobalConfirm(message, options = {}) {
+  if (typeof document === 'undefined' || !document.body) return null;
+  const { title = 'Xác nhận', onConfirm = null, onCancel = null,
+          confirmText = 'OK', cancelText = 'Hủy', type = 'warning' } = options;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'global-dialog-overlay';
+  overlay.style.cssText = `
+    position: fixed; inset: 0; z-index: 2147483001;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.55); backdrop-filter: blur(2px);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  `;
+
+  const COLORS = {
+    info:    { accent: '#4da6ff', icon: 'ℹ️' },
+    success: { accent: '#22c55e', icon: '✅' },
+    error:   { accent: '#ef4444', icon: '⚠️' },
+    warning: { accent: '#f59e0b', icon: '⚠️' },
+  };
+  const c = COLORS[type] || COLORS.warning;
+
+  const box = document.createElement('div');
+  box.style.cssText = `
+    background: #1e293b; border: 1px solid #334155; border-radius: 14px;
+    padding: 24px 28px; max-width: 460px; width: calc(100vw - 48px);
+    box-shadow: 0 12px 48px rgba(0,0,0,0.45); color: #e2e8f0; text-align: left;
+  `;
+  box.innerHTML = `
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px; font-size:17px; font-weight:700; color:#fff;">
+      <span style="font-size:22px;">${c.icon}</span> ${title}
+    </div>
+    <div style="font-size:14px; line-height:1.65; color:#cbd5e1; white-space:pre-line;">${message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+      <button class="global-dialog-cancel" style="padding:9px 20px; border:1px solid #475569; border-radius:8px; font-weight:600; font-size:14px; cursor:pointer; background:transparent; color:#cbd5e1;">${cancelText}</button>
+      <button class="global-dialog-confirm" style="padding:9px 22px; border:none; border-radius:8px; font-weight:600; font-size:14px; cursor:pointer; background:${c.accent}; color:#fff;">${confirmText}</button>
+    </div>
+  `;
+  overlay.appendChild(box);
+
+  const close = (result) => {
+    overlay.remove();
+    document.removeEventListener('keydown', escHandler);
+    if (result && typeof onConfirm === 'function') onConfirm();
+    else if (!result && typeof onCancel === 'function') onCancel();
+  };
+  const escHandler = (e) => { if (e.key === 'Escape') close(false); };
+  box.querySelector('.global-dialog-cancel').addEventListener('click', () => close(false));
+  box.querySelector('.global-dialog-confirm').addEventListener('click', () => close(true));
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(false); });
+  document.addEventListener('keydown', escHandler);
+
+  document.body.appendChild(overlay);
+  const okBtn = box.querySelector('.global-dialog-confirm');
+  setTimeout(() => okBtn && okBtn.focus(), 10);
+  return overlay;
+}
+
+// Expose dialog/confirm cho mọi script
+if (typeof window !== 'undefined') {
+  window.showGlobalDialog = showGlobalDialog;
+  window.showGlobalConfirm = showGlobalConfirm;
+}
+
+/**
  * Bóc tách giá trị số (parseFloat) từ clinical_metrics theo danh sách key.
  */
 function _parseFloatMetric(metrics, keys) {
@@ -1994,11 +2124,19 @@ function init() {
     if (window.examSessionManager && typeof window.examSessionManager.addTherapyRecord === 'function') {
         success = window.examSessionManager.addTherapyRecord(therapyRecord);
         if (!success) {
-            alert('Vui long tao phien kham truoc khi luu ket qua!');
+            if (typeof window.showGlobalDialog === 'function') {
+                window.showGlobalDialog('Vui lòng tạo phiên khám trước khi lưu kết quả!', { title: 'Chưa có phiên khám', type: 'warning' });
+            } else {
+                alert('Vui long tao phien kham truoc khi luu ket qua!');
+            }
         }
     } else {
         console.error('[EMR CORE] Khong tim thay instance cua ExamSessionManager.');
-        alert('Loi he thong: Khong tim thay quan ly phiem kham. Vui long refresh trang.');
+        if (typeof window.showGlobalDialog === 'function') {
+            window.showGlobalDialog('Lỗi hệ thống: Không tìm thấy quản lý phiên khám. Vui lòng refresh trang.', { title: 'Lỗi hệ thống', type: 'error' });
+        } else {
+            alert('Loi he thong: Khong tim thay quan ly phiem kham. Vui long refresh trang.');
+        }
         success = false;
     }
 

@@ -111,7 +111,11 @@ class WebGLOKNRenderer {
     this.gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
     
     if (!this.gl) {
-      alert("Trình duyệt không hỗ trợ WebGL. Tính năng OKN phân giải cao bị vô hiệu hóa.");
+      if (typeof window.showGlobalDialog === 'function') {
+        window.showGlobalDialog("Trình duyệt không hỗ trợ WebGL. Tính năng OKN phân giải cao bị vô hiệu hóa.", { title: 'OKN Test', type: 'error' });
+      } else {
+        alert("Trình duyệt không hỗ trợ WebGL. Tính năng OKN phân giải cao bị vô hiệu hóa.");
+      }
       return;
     }
 

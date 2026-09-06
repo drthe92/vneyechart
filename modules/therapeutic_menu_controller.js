@@ -886,7 +886,20 @@ class TherapeuticMenuController {
             this.currentGame.start(config);
         } catch (error) {
             console.error("[LỖI ENGINE NGHIÊM TRỌNG]:", error);
-            alert((error && error.message) ? error.message : "Không thể khởi động bài tập. Vui lòng xem Console.");
+            const msg = (error && error.message) ? error.message : "Không thể khởi động bài tập. Vui lòng xem Console.";
+            const container = document.getElementById('display-board');
+            if (typeof window.showGlobalDialog === 'function') {
+                window.showGlobalDialog(msg, { title: 'Không thể khởi động bài tập', type: 'error' });
+            } else {
+                alert(msg);
+            }
+            // [FIX MÀN HÌNH KẸT] Khôi phục workspace về trạng thái an toàn khi game lỗi
+            if (typeof window.ensureDiagnosticWorkspace === 'function') {
+                window.ensureDiagnosticWorkspace();
+            }
+            if (container) {
+                container.innerHTML = '';
+            }
         }
     }
 }

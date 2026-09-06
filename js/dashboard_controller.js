@@ -116,7 +116,11 @@ window.addEventListener('DOMContentLoaded', () => {
         
         topBtn.onclick = () => {
             if (!localStorage.getItem("currentPatientId")) {
-                alert("Vui lòng 'Bắt đầu khám' (Đăng nhập) để có thể tải dữ liệu biểu đồ.");
+                if (typeof window.showGlobalDialog === 'function') {
+                    window.showGlobalDialog("Vui lòng 'Bắt đầu khám' (Đăng nhập) để có thể tải dữ liệu biểu đồ.", { title: 'Chưa đăng nhập', type: 'warning' });
+                } else {
+                    alert("Vui lòng 'Bắt đầu khám' (Đăng nhập) để có thể tải dữ liệu biểu đồ.");
+                }
                 return;
             }
             window.openDashboard();

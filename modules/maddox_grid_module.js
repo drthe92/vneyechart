@@ -426,7 +426,11 @@ class MaddoxGridModule {
             const nearDistMeters = parseInt(document.getElementById('sel-near-dist').value) / 100;
             
             if (!ipd_mm || isNaN(hd) || isNaN(hn)) {
-                alert("Vui lòng nhập đủ IPD, H_d và H_n");
+                if (typeof window.showGlobalDialog === 'function') {
+                    window.showGlobalDialog("Vui lòng nhập đủ IPD, H_d và H_n", { title: 'Thiếu thông số', type: 'warning' });
+                } else {
+                    alert("Vui lòng nhập đủ IPD, H_d và H_n");
+                }
                 return;
             }
             
@@ -436,7 +440,11 @@ class MaddoxGridModule {
             const deltaD = dNear - dFar;
             
             if (deltaD === 0) {
-                alert("Khoảng cách xa và gần không được trùng nhau");
+                if (typeof window.showGlobalDialog === 'function') {
+                    window.showGlobalDialog("Khoảng cách xa và gần không được trùng nhau", { title: 'Cảnh báo', type: 'warning' });
+                } else {
+                    alert("Khoảng cách xa và gần không được trùng nhau");
+                }
                 return;
             }
             

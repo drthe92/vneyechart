@@ -139,7 +139,7 @@
 
         // Chốt chặn cuối cùng (JS validation)
         if (!phone || !name || !yob) {
-            alert("Vui lòng nhập đầy đủ Số điện thoại, Họ và Tên, Năm sinh.");
+            showGlobalDialogSafe("Vui lòng nhập đầy đủ Số điện thoại, Họ và Tên, Năm sinh.", { title: 'Thiếu thông tin', type: 'warning' });
             return;
         }
 
@@ -196,62 +196,96 @@ if (nmEl) nmEl.disabled = false;
                 startExam(nameInput, yearInput, patientId);
             } else {
                 const confirmMsg = "Hệ thống không tìm thấy hồ sơ cũ.\n\n- Nếu đây là người bệnh mới, bấm 'OK' để tạo hồ sơ.\n- Nếu gõ sai thông tin, bấm 'Hủy' để sửa lại.";
-                if (confirm(confirmMsg)) {
-                    await patientRef.set({
-                        phone: phoneInput,
-                        fullName: nameInput,
-                        birthYear: yearInput,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        status: "Active",
-                        protocol: protocolInput
+                if (typeof window.showGlobalConfirm === 'function') {
+                    window.showGlobalConfirm(confirmMsg, {
+                        title: 'Tạo hồ sơ mới?',
+                        confirmText: 'Tạo hồ sơ',
+                        onConfirm: () => createNewPatientRecord()
                     });
-                    if (typeof window.SettingsStore !== 'undefined') {
-                        window.SettingsStore.set("currentPatientId", patientId);
-                        window.SettingsStore.set("currentPatientName", nameInput);
-                        window.SettingsStore.set("currentPatientYob", yearInput);
-                        window.SettingsStore.set("currentProtocol", protocolInput);
-                    } else {
-                        localStorage.setItem("currentPatientId", patientId);
-                        localStorage.setItem("currentPatientName", nameInput);
-                        localStorage.setItem("currentPatientYob", yearInput);
-                        localStorage.setItem("currentProtocol", protocolInput);
-                    }
-                    if (typeof window.migrateTherapyLevelsToPatient === 'function') {
-                        // [FIX LEVEL] Chuyển khóa level toàn cục cũ → khóa riêng theo bệnh nhân
-                        window.migrateTherapyLevelsToPatient(patientId);
-                    }
-                    // [CẢI THIỆN SPLASH + HIỆU NĂNG] Đồng bộ level M1..M12 bằng 1 lần chạy
-                    if (typeof window.syncAllTherapyLevels === 'function') {
-                        window.syncAllTherapyLevels(patientId);
-                    } else if (typeof window.syncM12ProgressFromFirebase === 'function') {
-                        window.syncM12ProgressFromFirebase(patientId, 'M12');
-                        window.syncM12ProgressFromFirebase(patientId, 'M1');
-                        window.syncM12ProgressFromFirebase(patientId, 'M2');
-                        window.syncM12ProgressFromFirebase(patientId, 'M5');
-                        window.syncM12ProgressFromFirebase(patientId, 'M7');
-                        window.syncM12ProgressFromFirebase(patientId, 'M8');
-                        window.syncM12ProgressFromFirebase(patientId, 'M9');
-                        window.syncM12ProgressFromFirebase(patientId, 'M10');
-                        window.syncM12ProgressFromFirebase(patientId, 'M11');
-                        window.syncM12ProgressFromFirebase(patientId, 'M4');
-                    }
-                    hideModal(startExamModal);
-                    const formEl = document.getElementById("start-exam-form");
-                    if (formEl) formEl.reset();
-                    const nmEl = document.getElementById("patient-name");
-                    const ybEl = document.getElementById("patient-yob");
-if (nmEl) nmEl.disabled = false;
-                    if (ybEl) ybEl.disabled = false;
-                    startExam(nameInput, yearInput, patientId);
+                } else if (confirm(confirmMsg)) {
+                    await createNewPatientRecord();
                 }
             }
         } catch (error) {
             console.error("Lỗi kết nối Firebase: ", error);
-            alert("Không thể kết nối máy chủ. Vui lòng kiểm tra lại mạng.");
+            showGlobalDialogSafe("Không thể kết nối máy chủ. Vui lòng kiểm tra lại mạng.", { title: 'Lỗi kết nối', type: 'error' });
         }
     }
 
     // Initialize the module
+    /**
+     * Tạo hồ sơ bệnh nhân mới trên Firebase + đồng bộ level + mở phiên khám.
+     * Được gọi từ callback của showGlobalConfirm (thay confirm() trình duyệt).
+     */
+    async function createNewPatientRecord() {
+        const phoneInput = document.getElementById("input_phone") ? document.getElementById("input_phone").value.trim() : "";
+        const nameInput = document.getElementById("patient-name") ? document.getElementById("patient-name").value.trim() : "";
+        const yearInput = document.getElementById("patient-yob") ? document.getElementById("patient-yob").value.trim() : "";
+        const protocolInput = document.getElementById("input_protocol") ? document.getElementById("input_protocol").value : "exam";
+        const patientId = buildPatientId(phoneInput, nameInput, yearInput);
+        const patientRef = db.collection("Patients").doc(patientId);
+        try {
+            await patientRef.set({
+                phone: phoneInput,
+                fullName: nameInput,
+                birthYear: yearInput,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                status: "Active",
+                protocol: protocolInput
+            });
+            if (typeof window.SettingsStore !== 'undefined') {
+                window.SettingsStore.set("currentPatientId", patientId);
+                window.SettingsStore.set("currentPatientName", nameInput);
+                window.SettingsStore.set("currentPatientYob", yearInput);
+                window.SettingsStore.set("currentProtocol", protocolInput);
+            } else {
+                localStorage.setItem("currentPatientId", patientId);
+                localStorage.setItem("currentPatientName", nameInput);
+                localStorage.setItem("currentPatientYob", yearInput);
+                localStorage.setItem("currentProtocol", protocolInput);
+            }
+            if (typeof window.migrateTherapyLevelsToPatient === 'function') {
+                // [FIX LEVEL] Chuyển khóa level toàn cục cũ → khóa riêng theo bệnh nhân
+                window.migrateTherapyLevelsToPatient(patientId);
+            }
+            // [CẢI THIỆN SPLASH + HIỆU NĂNG] Đồng bộ level M1..M12 bằng 1 lần chạy
+            if (typeof window.syncAllTherapyLevels === 'function') {
+                window.syncAllTherapyLevels(patientId);
+            } else if (typeof window.syncM12ProgressFromFirebase === 'function') {
+                window.syncM12ProgressFromFirebase(patientId, 'M12');
+                window.syncM12ProgressFromFirebase(patientId, 'M1');
+                window.syncM12ProgressFromFirebase(patientId, 'M2');
+                window.syncM12ProgressFromFirebase(patientId, 'M5');
+                window.syncM12ProgressFromFirebase(patientId, 'M7');
+                window.syncM12ProgressFromFirebase(patientId, 'M8');
+                window.syncM12ProgressFromFirebase(patientId, 'M9');
+                window.syncM12ProgressFromFirebase(patientId, 'M10');
+                window.syncM12ProgressFromFirebase(patientId, 'M11');
+                window.syncM12ProgressFromFirebase(patientId, 'M4');
+            }
+            hideModal(startExamModal);
+            const formEl = document.getElementById("start-exam-form");
+            if (formEl) formEl.reset();
+            const nmEl = document.getElementById("patient-name");
+            const ybEl = document.getElementById("patient-yob");
+            if (nmEl) nmEl.disabled = false;
+            if (ybEl) ybEl.disabled = false;
+            startExam(nameInput, yearInput, patientId);
+        } catch (error) {
+            console.error("Lỗi kết nối Firebase: ", error);
+            showGlobalDialogSafe("Không thể kết nối máy chủ. Vui lòng kiểm tra lại mạng.", { title: 'Lỗi kết nối', type: 'error' });
+        }
+    }
+
+    // Helper: dùng showGlobalDialog nếu có, fallback alert nếu chưa load xong
+    function showGlobalDialogSafe(message, options) {
+        if (typeof window.showGlobalDialog === 'function') {
+            window.showGlobalDialog(message, options);
+        } else {
+            alert(message);
+        }
+    }
+
     function init() {
         // Tự phục hồi cấu hình nếu localStorage bị trình duyệt xóa (đóng/khởi động lại)
         if (typeof window.SettingsStore !== 'undefined') {
@@ -3141,7 +3175,7 @@ function openClinicSettingsModal() {
             document.documentElement.style.setProperty('--calibrated-cyan', selectedCyan);
             
             modal.style.display = 'none';
-            alert('Đã lưu cấu hình thành công!');
+            showGlobalDialogSafe('Đã lưu cấu hình thành công!', { title: 'Thành công', type: 'success' });
         });
 
         // Bảo vệ phím gõ
