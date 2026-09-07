@@ -41,16 +41,33 @@
 <h2>5. Hướng dẫn Luyện tập trên Phần mềm</h2>
 <ul>
     <li><strong>Yêu cầu bắt buộc:</strong> BẮT BUỘC Đeo kính Đỏ (Mắt phải) - Lục lam (Mắt trái). Khoảng cách ngồi phải chính xác tuyệt đối (VD: 40cm - 50cm) để phần mềm tính toán lăng kính chính xác.</li>
-    <li><strong>Giao diện & Nhiệm vụ:</strong> Màn hình xám trống trải (Không gian tự do). Ở giữa có 2 dải màu sắc (Đỏ và Xanh) hòa quyện vào nhau. Bệnh nhân cần "gồng" cơ mắt (cảm giác giống như đang nhìn xuyên qua màn hình về một điểm ở rất xa phía sau tường) để giữ 2 dải màu chập thành 1 khối hình chữ nhật duy nhất.</li>
-    <li><strong>Thử thách leo dốc:</strong> Cần giữ hợp thị thành công liên tục trong 10 giây. Khi đếm ngược hết 10 giây, mức lăng kính sẽ tăng lên 2&Delta; (2 khối tách nhau ra vắt chéo xa hơn), đòi hỏi mắt phải phân kỳ mạnh hơn.</li>
-    <li><strong>Xử lý khi vỡ hình:</strong> Ngay khi thấy hình chữ nhật chẻ làm đôi (Vỡ hợp thị), bệnh nhân LẬP TỨC bấm Phím SPACE. Hệ thống sẽ tự động lùi mức lăng kính lại, cho mắt nghỉ ngơi 3 giây, rồi bắt đầu leo dốc trở lại. Nếu vỡ hình 3 lần liên tiếp tại cùng 1 mức lăng kính, bài tập sẽ kết thúc.</li>
+    <li><strong>Giao diện & Nhiệm vụ:</strong> Màn hình xám trống trải (Không gian tự do). Ở giữa có 2 dải màu sắc (Đỏ và Xanh) ban đầu chồng khít thành <strong>1 hình hợp nhất</strong>. Bệnh nhân cần "gồng" cơ mắt (cảm giác giống như đang nhìn xuyên qua màn hình về một điểm ở rất xa phía sau tường) để giữ 2 dải màu chập thành 1 khối hình chữ nhật duy nhất.</li>
+    <li><strong>Cấp độ (Level 1–10):</strong> Phần mềm chia thành 10 cấp độ theo mức lăng kính phân kỳ đích — từ 2&Delta; (Level 1) lên 8&Delta; (Level 10). Chỉ được chọn các Level đã mở khóa (các Level khóa sẽ bị vô hiệu hóa trong màn hình chọn cấp độ); qua màn Level hiện tại sẽ tự động mở khóa Level kế tiếp.</li>
+    <li><strong>Quá trình Test (1 lần liên tục):</strong> Từ hình hợp nhất, 2 khối <strong>tách dần đều với vận tốc 0,5 &Delta;/giây</strong> đến mục tiêu điều trị (&Delta; của Level) rồi <strong>giữ nguyên</strong> ở mức đích. <strong>ĐẠT = duy trì hợp thị ở mức đích trong 20 giây</strong> (mốc ĐẠT được báo bằng tiếng "ting" + viền xanh chớp).</li>
+    <li><strong>Xử lý khi vỡ hình:</strong> Ngay khi thấy hình chữ nhật chẻ làm đôi (Vỡ hợp thị), bệnh nhân LẬP TỨC bấm <strong>Phím SPACE</strong> hoặc <strong>chạm vào màn hình cảm ứng</strong>:
+        <ul>
+            <li><em>Tương tác TRƯỚC mốc ĐẠT:</em> phiên nghỉ 5 giây rồi khởi động lại từ đầu (hình hợp nhất, tách dần lại).</li>
+            <li><em>Tương tác SAU mốc ĐẠT:</em> bài test được đánh giá qua Level — <strong>ĐẠT, mở khóa Level kế tiếp</strong>.</li>
+        </ul>
+    </li>
+    <li><strong>Hết 1 phút không tương tác kể từ mốc ĐẠT:</strong> game hiện thông báo hoàn thành bài test với 3 lựa chọn kết quả quan sát:
+        <ul>
+            <li><strong>1. Tôi thấy 1 khối hình suốt quá trình test</strong> → ĐẠT, mở khóa Level kế tiếp.</li>
+            <li><strong>2. Tôi thấy khối hình tách ra</strong> → yêu cầu đọc kỹ hướng dẫn và làm lại test, <strong>chưa mở</strong> Level kế tiếp.</li>
+            <li><strong>3. Tôi bỏ dở test, bỏ qua phiên tập</strong> → <strong>chưa mở</strong> Level kế tiếp.</li>
+        </ul>
+    </li>
+    <li><strong>Cấu hình nâng cao (Bác sĩ chỉ định):</strong> Trong màn hình cài đặt trước khi tập, bác sĩ có thể bật tùy chọn "Cấu hình nâng cao" để chỉ định tay mức lăng kính mục tiêu (vd bảo trì 10–12&Delta;). Quá trình test giống hệt chế độ Level (tách 0,5 &Delta;/giây → giữ đích 20 giây), nhưng không mở khóa Level.</li>
 </ul>
 
 <h2>6. Mục tiêu Luyện tập (Tiêu chuẩn lâm sàng)</h2>
-<p>Bài tập được thiết kế theo các Chu kỳ lặp (Cyclic Repetitions) để rèn luyện sức bền.</p>
+<p>Bài tập là một Test liên tục duy nhất (không chia lượt tập): Tách dần đều đến mục tiêu điều trị rồi duy trì ở mức đích.</p>
 <ul>
-    <li><strong>Pha Hình thành:</strong> Mục tiêu tiêu chuẩn là bệnh nhân cần leo dốc từ 2&Delta; lên 8&Delta; một cách mượt mà, và thực hiện lặp lại thành công 5 Chu kỳ liên tiếp (Khoảng 3 đến 5 phút) mà không cảm thấy nỗ lực hay căng tức hốc mắt.</li>
-    <li><strong>Pha Vượt ngưỡng (Maintenance):</strong> Với các ca cần thiết lập vùng đệm dự trữ vững chắc để chống tái phát, bác sĩ có thể cấu hình mục tiêu lâm sàng lên 10&Delta; hoặc 12&Delta;. Chạm tới mốc này, bệnh nhân đã có một hệ thống vận nhãn cực kỳ linh hoạt và dẻo dai.</li>
+    <li><strong>Thang Level theo Lăng kính Phân kỳ (Base-In):</strong> Level 1: 2&Delta; · L2: 2.7&Delta; · L3: 3.3&Delta; · L4: 4&Delta; · L5: 4.7&Delta; · L6: 5.3&Delta; · L7: 6&Delta; · L8: 6.7&Delta; · L9: 7.3&Delta; · L10: 8&Delta;.</li>
+    <li><strong>Vận tốc Test:</strong> Từ hình hợp nhất, 2 khối tách dần đều <strong>0,5 &Delta;/giây</strong> đến mức đích (vd Level 10: 8&Delta; → 16 giây tách), sau đó giữ nguyên ở mức đích.</li>
+    <li><strong>Tiêu chí ĐẠT:</strong> Duy trì hợp thị ở mức đích trong <strong>20 giây</strong>. Tương tác (SPACE/chạm) sau mốc ĐẠT, hoặc xác nhận lựa chọn "thấy 1 khối suốt test" → <strong>ĐẠT, mở khóa Level kế tiếp</strong>. Chinh phục Level 10 (8&Delta;) = Tốt nghiệp module.</li>
+    <li><strong>Pha Hình thành:</strong> Hoàn thành thang Level 1 → 10 (2&Delta; → 8&Delta;) một cách mượt mà mà không cảm thấy nỗ lực hay căng tức hốc mắt.</li>
+    <li><strong>Pha Vượt ngưỡng (Maintenance):</strong> Với các ca cần thiết lập vùng đệm dự trữ vững chắc để chống tái phát, bác sĩ dùng <strong>Cấu hình nâng cao</strong> để chỉ định mục tiêu lâm sàng lên 10&Delta; hoặc 12&Delta;. Chạm tới mốc này, bệnh nhân đã có một hệ thống vận nhãn cực kỳ linh hoạt và dẻo dai.</li>
 </ul>
 
     <div style="text-align: center; margin: 40px 0 20px 0; padding-top: 20px; border-top: 1px dashed #444;">

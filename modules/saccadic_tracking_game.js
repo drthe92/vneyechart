@@ -146,6 +146,16 @@ class SaccadicTrackingGame extends BinocularGameEngine {
         super.start();
         this.canvas.style.cursor = 'crosshair';
 
+        // Khởi tạo AudioContext sớm (sau cử chỉ click của người dùng) để
+        // âm thanh phản hồi Trúng / Trượt hoạt động ngay từ đầu phiên
+        try {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (AC) {
+                this._audioCtx = new AC();
+                if (this._audioCtx.state === 'suspended') this._audioCtx.resume();
+            }
+        } catch (e) { /* im lặng */ }
+
         // Thêm event listener click trên canvas
         this._boundClickHandler = this._handleClick.bind(this);
         this.canvas.addEventListener('click', this._boundClickHandler);
@@ -167,6 +177,7 @@ class SaccadicTrackingGame extends BinocularGameEngine {
         const expiresAt = this.currentTarget.expiresAt;
         if (Number.isFinite(expiresAt) && performance.now() >= expiresAt) {
             this.misses++;
+            this._playTone(160, 'square', 0.18); // Buzzer (mục tiêu hết giờ = trượt) — pitch thấp
             if (this.hits >= this.maxHits) {
                 this._endGame();
             } else {
@@ -300,6 +311,7 @@ class SaccadicTrackingGame extends BinocularGameEngine {
             const latency = performance.now() - this.spawnTime;
             this.latencies.push(latency);
             this.hits++;
+            this._playTone(880, 'sine', 0.12); // Ting (trúng mục tiêu) — pitch cao
 
             // Kiểm tra đạt maxHits
             if (this.hits >= this.maxHits) {
@@ -307,6 +319,37 @@ class SaccadicTrackingGame extends BinocularGameEngine {
             } else {
                 this._spawnTarget();
             }
+        }
+    }
+
+    /**
+     * Phát âm thanh phản hồi (ting / buzzer) qua WebAudio
+     * @param {number} freq - Tần số (Hz)
+     * @param {string} type - Dạng sóng ('sine' | 'square')
+     * @param {number} duration - Thời lượng (giây)
+     */
+    _playTone(freq, type, duration) {
+        try {
+            if (!this._audioCtx) {
+                const AC = window.AudioContext || window.webkitAudioContext;
+                if (!AC) return;
+                this._audioCtx = new AC();
+            }
+            const ctx = this._audioCtx;
+            if (ctx.state === 'suspended') ctx.resume();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type;
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + duration + 0.02);
+        } catch (e) {
+            // Im lặng nếu trình duyệt chặn audio
         }
     }
 

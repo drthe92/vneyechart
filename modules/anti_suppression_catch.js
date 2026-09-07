@@ -123,6 +123,16 @@ class CatchGame extends BinocularGameEngine {
         super.start();
         // Ẩn con trỏ chuột khi vào fullscreen gameplay
         this.canvas.style.cursor = 'none';
+
+        // Khởi tạo AudioContext sớm (sau cử chỉ click của người dùng) để
+        // đảm bảo âm thanh phản hồi Đúng/Sai hoạt động ngay từ đầu phiên
+        try {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (AC) {
+                this._audioCtx = new AC();
+                if (this._audioCtx.state === 'suspended') this._audioCtx.resume();
+            }
+        } catch (e) { /* im lặng */ }
     }
 
     /**
@@ -178,6 +188,7 @@ class CatchGame extends BinocularGameEngine {
                 // ============================================
                 this.score += 1;           // Cộng 1 điểm
                 this.hits += 1;            // Tăng bộ đếm trúng
+                this._playTone(880, 'sine', 0.12);   // Ting (hứng trúng +1 điểm) — pitch cao
 
                 // TĂNG ĐỘ KHÓ: Giảm tương phản mắt lành
                 // Công thức: healthyAlpha = max(0.1, healthyAlpha - 0.05)
@@ -195,6 +206,7 @@ class CatchGame extends BinocularGameEngine {
             if (d.y > this.canvas.height) {
                 this.score = Math.max(0, this.score - 1);  // Trừ 1 điểm (không âm)
                 this.misses += 1;                            // Tăng bộ đếm trượt
+                this._playTone(160, 'square', 0.18);   // Buzzer (hứng trượt -1 điểm) — pitch thấp
 
                 // GIẢM ĐỘ KHÓ: Tăng tương phản mắt lành
                 // Công thức: healthyAlpha = min(1.0, healthyAlpha + 0.1)
@@ -354,6 +366,37 @@ class CatchGame extends BinocularGameEngine {
         if (e.touches.length === 0) return;
         const rect = this.canvas.getBoundingClientRect();
         this._mouseX = e.touches[0].clientX - rect.left;
+    }
+
+    /**
+     * Phát âm thanh phản hồi (ting / buzzer) qua WebAudio
+     * @param {number} freq - Tần số (Hz)
+     * @param {string} type - Dạng sóng ('sine' | 'square')
+     * @param {number} duration - Thời lượng (giây)
+     */
+    _playTone(freq, type, duration) {
+        try {
+            if (!this._audioCtx) {
+                const AC = window.AudioContext || window.webkitAudioContext;
+                if (!AC) return;
+                this._audioCtx = new AC();
+            }
+            const ctx = this._audioCtx;
+            if (ctx.state === 'suspended') ctx.resume();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type;
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + duration + 0.02);
+        } catch (e) {
+            // Im lặng nếu trình duyệt chặn audio
+        }
     }
 
     /**

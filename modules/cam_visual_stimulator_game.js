@@ -125,6 +125,16 @@ class CamVisualStimulatorGame extends BinocularGameEngine {
         this._lastFrameTime = this._gameStartTime;
         this._nextCueTime = this._gameStartTime + this._cueGap();
 
+        // Khởi tạo AudioContext sớm (sau cử chỉ click của người dùng) để
+        // âm thanh phản hồi Trúng / Sót / Bấm nhầm hoạt động ngay từ đầu phiên
+        try {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (AC) {
+                this._audioCtx = new AC();
+                if (this._audioCtx.state === 'suspended') this._audioCtx.resume();
+            }
+        } catch (e) { /* im lặng */ }
+
         super.start();
 
         window.addEventListener('keydown', this._onKeyDown);
@@ -161,6 +171,7 @@ class CamVisualStimulatorGame extends BinocularGameEngine {
         if (this._cueActive) {
             if (now >= this._cueEndTime) {
                 this.totalMisses++;
+                this._playTone(160, 'square', 0.18); // Buzzer (sót cue đỏ = mất điểm) — pitch thấp
                 this._cueActive = false;
                 this._dotColor = this._restColor;
                 this._nextCueTime = now + this._cueGap();
@@ -217,11 +228,13 @@ class CamVisualStimulatorGame extends BinocularGameEngine {
         if (this._cueActive) {
             this.totalHits++;
             this._reactionTimes.push(now - this._cueStartTime);
+            this._playTone(880, 'sine', 0.12); // Ting (trúng cue đỏ = cộng điểm) — pitch cao
             this._cueActive = false;
             this._dotColor = this._restColor;
             this._nextCueTime = now + this._cueGap();
         } else {
             this.falseAlarms++;
+            this._playTone(160, 'square', 0.18); // Buzzer (bấm nhầm = trừ điểm) — pitch thấp
         }
     }
 
@@ -273,6 +286,37 @@ class CamVisualStimulatorGame extends BinocularGameEngine {
         this.finishSession();
         this.stop();
         this._showResultOverlay(accuracyRate, avgRt, isPassed, unlockedNew, graduated);
+    }
+
+    /**
+     * Phát âm thanh phản hồi (ting / buzzer) qua WebAudio
+     * @param {number} freq - Tần số (Hz)
+     * @param {string} type - Dạng sóng ('sine' | 'square')
+     * @param {number} duration - Thời lượng (giây)
+     */
+    _playTone(freq, type, duration) {
+        try {
+            if (!this._audioCtx) {
+                const AC = window.AudioContext || window.webkitAudioContext;
+                if (!AC) return;
+                this._audioCtx = new AC();
+            }
+            const ctx = this._audioCtx;
+            if (ctx.state === 'suspended') ctx.resume();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type;
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + duration + 0.02);
+        } catch (e) {
+            // Im lặng nếu trình duyệt chặn audio
+        }
     }
 
     /**

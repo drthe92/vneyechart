@@ -59,6 +59,9 @@ html, body {
   background: var(--main-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* [CHỐNG MẤT FULLSCREEN] Chặn double-tap zoom + cử chỉ hệ thống làm
+     nhiễu input (vẫn cho phép pan/pinch cho vùng cuộn như bảng Pelli) */
+  touch-action: manipulation;
 }
 
 a {
@@ -79,6 +82,10 @@ button {
   max-height: 85vh !important;
   overflow-y: auto !important;
   overscroll-behavior: contain;
+  /* Ép full chiều rộng overlay: tránh flex shrink-to-fit làm wrapper
+     phình theo max-content nội dung (lobby game, dashboard) gây tràn */
+  width: 100%;
+  max-width: 100%;
 }
 
 /* ---------- App Container ---------- */
@@ -87,8 +94,6 @@ button {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  /* Maintain 16:9 aspect ratio for TV casting */
-  aspect-ratio: 16 / 9;
 }
 
 /* ============================================================
@@ -465,19 +470,49 @@ button {
 }
 
 /* ============================================================
-   RESPONSIVE  —  keep 16:9 ratio for TV casting
+   RESPONSIVE — màn hình khác tỉ lệ 16:9 (laptop 16:10, 4:3,
+   tablet, điện thoại). #app luôn khớp viewport (100vw × 100vh)
+   thay vì ép tỉ lệ 16:9 làm vùng đo bị cắt bên phải.
    ============================================================ */
-@media (max-aspect-ratio: 16 / 9) {
-  #app {
-    width: auto;
-    height: 100vh;
+
+/* Header: ẩn tiêu đề + cho phép bọc hàng khi không đủ chỗ */
+@media (max-width: 900px) {
+  #sidebar-title {
+    display: none;
+  }
+  #sidebar-header {
+    gap: 10px;
+    padding: 12px 16px;
+    flex-wrap: wrap;
   }
 }
 
-@media (min-aspect-ratio: 16 / 9) {
-  #app {
-    width: 100vw;
-    height: auto;
+/* Điện thoại: thu nhỏ nút header để 9 nút đều hiển thị được */
+@media (max-width: 600px) {
+  #sidebar-header {
+    gap: 6px;
+    padding: 8px 10px;
+  }
+  #settings-btn, #cc-calib-btn, #fullscreen-btn, #workspace-toggle-btn {
+    width: 42px;
+    height: 42px;
+  }
+  #settings-btn svg, #cc-calib-btn svg, #fullscreen-btn svg {
+    width: 22px !important;
+    height: 22px !important;
+  }
+  #workspace-toggle-btn i {
+    font-size: 18px !important;
+  }
+  #history-viewer-btn, #top-dashboard-btn, #docs-btn {
+    width: 34px !important;
+    height: 34px !important;
+    font-size: 15px !important;
+    margin-left: 0 !important;
+  }
+  .start-exam-btn {
+    font-size: 11px;
+    padding: 6px 8px;
   }
 }
 
@@ -985,6 +1020,9 @@ button {
   #menu {
     grid-template-columns: 1fr;
   }
+  #menu-diagnostic, #menu-therapeutic {
+    padding: 16px;
+  }
   .menu-group-labels {
     grid-column: 1;
     flex-direction: row;
@@ -992,7 +1030,7 @@ button {
     gap: 4px;
   }
   .menu-items {
-    grid-column: 1;
+    grid-column: 1 / -1;   /* trải full chiều rộng thay vì kẹt cột 1 (70px) */
     grid-template-columns: 1fr;
   }
   .menu-item {
@@ -1965,6 +2003,8 @@ button {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
   backdrop-filter: blur(4px);
   min-width: 340px;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
   align-items: center;
 }
 
@@ -2087,6 +2127,34 @@ button {
 
 .red-desat-btn-up:hover, .red-desat-btn-down:hover {
   background: #218838;
+}
+
+/* Điện thoại: hàng trượt bão hoà bọc xuống dòng thứ 2 (slider full width) */
+@media (max-width: 480px) {
+  .red-desat-slider-row {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .red-desat-slider-row input[type="range"] {
+    flex: 1 1 140px;
+    min-width: 120px;
+  }
+}
+
+/* Dashboard modal: cho phép select/input co lại trên màn hình hẹp
+   (tránh min-content của option làm tràn modal) */
+#progress-dashboard-modal label {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+#progress-dashboard-modal select,
+#progress-dashboard-modal input[type="date"] {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* Pelli-Robson Test Buttons */

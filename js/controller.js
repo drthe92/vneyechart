@@ -83,6 +83,13 @@ class UniversalInput {
     /** @type {boolean} - Flag to suspend/resume input handling */
     this.isSuspended = false;
 
+    /**
+     * @type {boolean} - Module switching: bật khi menu chính đang mở.
+     * Khi bật, các phím điều hướng (mũi tên, Enter, Space) thuộc về menu,
+     * UniversalInput không phát tín hiệu NEXT/PREV/SHUFFLE nữa.
+     */
+    this.moduleSwitchingEnabled = false;
+
     // --- Bound handlers ---
     this._boundKeydown      = this._onKeydown.bind(this);
     this._boundMouseDown    = this._onMouseDown.bind(this);
@@ -136,6 +143,20 @@ class UniversalInput {
    */
   resume() {
     this.isSuspended = false;
+  }
+
+  /**
+   * Bật module switching: menu chính đang mở, menu sở hữu các phím điều hướng.
+   */
+  enableModuleSwitching() {
+    this.moduleSwitchingEnabled = true;
+  }
+
+  /**
+   * Tắt module switching: menu chính đã đóng, trả phím điều hướng cho test.
+   */
+  disableModuleSwitching() {
+    this.moduleSwitchingEnabled = false;
   }
 
   // ================================================================
@@ -218,6 +239,15 @@ class UniversalInput {
     // 2. Chặn key spam: bỏ qua mọi phím khi người dùng giữ (e.repeat)
     if (e.repeat) return;
 
+    // 2.5 Khi menu chính đang mở (module switching), các phím điều hướng thuộc
+    // về menu (điều hướng mục, kích hoạt mục). Không phát tín hiệu test.
+    // Riêng Escape/Backspace vẫn được phép (BACK) để giữ hành vi cũ.
+    if (this.moduleSwitchingEnabled) {
+      const navKeys = ['ArrowRight', 'ArrowDown', 'PageDown', 'Enter',
+                       'ArrowLeft', 'ArrowUp', 'PageUp', ' '];
+      if (navKeys.includes(e.key)) return;
+    }
+
     // 3. Handle non-standard keys by keyCode (flying mouse OK button)
     // LƯU Ý: ĐÃ LOẠI BỎ keyCode 18 (Alt) — phím Alt không được dùng để mô phỏng
     // OK/Enter nữa, tránh xung đột với tổ hợp hệ thống như Alt + Tab.
@@ -285,7 +315,10 @@ class UniversalInput {
     if (this.isSuspended) return;
 
     // Bỏ qua tương tác trên button, link, input…
-    const tag = e.target?.closest('button, a, input, select, textarea, [role="button"]');
+    const tgt = e.target;
+    const tag = (tgt && typeof tgt.closest === 'function')
+      ? tgt.closest('button, a, input, select, textarea, [role="button"]')
+      : null;
     if (tag) return;
 
     if (e.button === 0) {

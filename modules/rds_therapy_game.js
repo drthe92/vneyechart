@@ -469,7 +469,8 @@ class RDSTherapyGame extends BinocularGameEngine {
         // Giảm độ khó để tái lập dung hợp
         this.currentArcsec = Math.min(this.maxArcsec, this.currentArcsec * 1.5);
 
-        // Phát hiệu ứng visual (flash đỏ)
+        // Phát hiệu ứng âm thanh (buzzer) + visual (flash đỏ)
+        this._playMissBuzzer();
         this._playMissEffect();
     }
 
@@ -686,6 +687,32 @@ class RDSTherapyGame extends BinocularGameEngine {
             
             oscillator.start();
             oscillator.stop(audioCtx.currentTime + 0.1);
+        } catch (e) {
+            console.warn("[Biofeedback] Trình duyệt không hỗ trợ AudioContext");
+        }
+    }
+
+    /**
+     * Phát tiếng buzzer trầm (160Hz, 180ms) khi TRƯỢT bằng Web Audio API
+     * Không cần file âm thanh ngoài — tạo oscillator thuần túy
+     */
+    _playMissBuzzer() {
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.type = 'square';
+            oscillator.frequency.setValueAtTime(160, audioCtx.currentTime); // Tần số 160Hz
+
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // Âm lượng nhỏ
+            gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.18);
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.18);
         } catch (e) {
             console.warn("[Biofeedback] Trình duyệt không hỗ trợ AudioContext");
         }

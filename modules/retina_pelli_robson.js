@@ -207,6 +207,7 @@ const pelliRobson = {
     parts.push('<div class="pelli-title">Pelli‑Robson Contrast Sensitivity Chart</div>');
     parts.push(`<div class="pelli-subtitle">Slide ${index + 1} / 4 — Cố định Tần số không gian (0.5 - 1 cpd) — Khoảng cách 0.9m</div>`);
 
+    parts.push('<div class="pelli-table-wrapper">');
     parts.push('<table class="pelli-table" style="margin: 0 auto; margin-top: 2vh; border-collapse: separate; border-spacing: 10px 15px;">');
     
     let startTripletIdx = index * TRIPLETS_PER_SLIDE;
@@ -232,6 +233,7 @@ const pelliRobson = {
       parts.push('</tr>');
     }
     parts.push('</table>');
+    parts.push('</div>');
 
     parts.push('<div class="pelli-nav" style="text-align: center; margin-top: 20px;">');
     parts.push(`  <button class="ishihara-nav-btn" id="pelliPrev" ${index === 0 ? 'disabled' : ''}>❮ Trước</button>`);

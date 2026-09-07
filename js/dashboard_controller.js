@@ -610,11 +610,18 @@ async function fetchFirebaseData() {
     }
 
     try {
-        const snapshot = await window.db.collection("Patients")
-                                        .doc(patientId)
-                                        .collection("Sessions")
-                                        .orderBy("timestamp", "asc")
-                                        .get();
+        // [TẢI 1 LẦN] Dùng cache truy vấn Sessions dùng chung (60s) thay vì
+        // đọc lại TOÀN BỘ collection mỗi lần mở dashboard. Không cần orderBy:
+        // _aggregateByDay() tự sắp xếp theo timestamp. Sau mỗi lần app lưu
+        // Session, cache bị hủy (invalidatePatientSessionsCache) nên dashboard
+        // vẫn thấy dữ liệu mới nhất ngay lập tức.
+        const snapshot = (typeof window.getPatientSessionsCached === 'function')
+            ? await window.getPatientSessionsCached(patientId)
+            : await window.db.collection("Patients")
+                .doc(patientId)
+                .collection("Sessions")
+                .orderBy("timestamp", "asc")
+                .get();
 
         snapshot.forEach(doc => {
             const data = doc.data();

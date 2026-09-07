@@ -177,11 +177,21 @@ class TherapeuticMenuController {
                 medicalPurpose: 'Tăng biên độ phân kỳ (Base In).',
                 indication: 'Lác trong ẩn.',
                 contraindication: 'Đang bị liệt cơ vận nhãn.',
-                gameplay: 'Tập trung giữ 2 khối màu chập 1 khi chúng tách xa nhau.',
-                goal: 'Chịu đựng được mức phân kỳ 8 Đi-ốp (Δ) trong 5 chu kỳ.',
+                gameplay: '2 khối màu bắt đầu hợp nhất thành 1 hình, tách dần đều (0,5 Δ/giây) đến mức lăng kính của Level rồi giữ nguyên. Khi thấy hình tách đôi, bấm SPACE hoặc chạm màn hình.',
+                goal: 'Giữ hợp thị ở mức đích (Δ của Level) đủ 20 giây để ĐẠT và mở khóa Level kế tiếp (Level 10: 8 Δ). Tương tác sau mốc ĐẠT, hoặc xác nhận "thấy 1 khối suốt test" → qua màn.',
                 settings: [
                     {
-                        id: 'divergence-start', key: 'startDiopter', label: 'Mức lăng kính xuất phát (Δ)', numeric: true,
+                        id: 'divergence-level', key: 'level', label: 'Cấp độ', type: 'levels',
+                        min: 1, max: 10,
+                        storageKey: 'vision-therapy-m6-max-level',
+                        help: 'Level càng cao: mức lăng kính đích càng lớn (2 → 8 Δ). Quá trình: 2 khối hợp nhất → tách dần 0,5 Δ/giây → đạt mức đích → giữ 20 giây = ĐẠT. SPACE/chạm trước mốc ĐẠT: nghỉ 5s làm lại từ đầu; sau mốc ĐẠT: qua màn; hết 1 phút: xác nhận kết quả quan sát.'
+                    },
+                    {
+                        id: 'divergence-advanced', key: 'advanced', label: '⚙️ Cấu hình nâng cao (bác sĩ tự nhập Δ)', type: 'toggle',
+                        help: 'Bỏ qua Level: bác sĩ chỉ định tay mức xuất phát và mục tiêu (vd bảo trì 10–12 Δ).'
+                    },
+                    {
+                        id: 'divergence-start', key: 'startDiopter', label: 'Mức lăng kính xuất phát (Δ)', numeric: true, advanced: true,
                         options: [
                             { value: '2', label: '2 Δ', selected: true },
                             { value: '4', label: '4 Δ', selected: false },
@@ -190,7 +200,7 @@ class TherapeuticMenuController {
                         ]
                     },
                     {
-                        id: 'divergence-target', key: 'targetDiopter', label: 'Mức lăng kính mục tiêu (Δ)', numeric: true,
+                        id: 'divergence-target', key: 'targetDiopter', label: 'Mức lăng kính mục tiêu (Δ)', numeric: true, advanced: true,
                         options: [
                             { value: '8', label: '8 Δ', selected: true },
                             { value: '10', label: '10 Δ', selected: false },
@@ -199,7 +209,8 @@ class TherapeuticMenuController {
                         ]
                     }
                 ],
-                mandatoryWarning: '⚠️ CẢNH BÁO: Đeo kính Đỏ-Lục Lam (Mắt phải ĐỎ / Mắt trái XANH) trước khi chơi.'
+                mandatoryWarning: '⚠️ CẢNH BÁO: Đeo kính Đỏ-Lục Lam (Mắt phải ĐỎ / Mắt trái XANH) trước khi chơi.',
+                recommendationNote: '👓 KHUYẾN CÁO: Đeo kính +2.00D (cho khoảng cách khám 50 cm) hoặc +2.50D (cho khoảng cách khám 40 cm) — cộng thêm vào số kính cũ — để loại bỏ hiện tượng điều tiết khi thực hiện test M6.'
             },
             {
                 id: 'convergence',
@@ -211,11 +222,21 @@ class TherapeuticMenuController {
                 medicalPurpose: 'Đo lường và tăng cường dự trữ hợp thị Hội tụ (PFV - Positive Fusional Vergence).',
                 indication: 'Suy giảm dự trữ hội tụ, mỏi mắt khi học bài, nhìn gần.',
                 contraindication: 'Đang bị liệt cơ vận nhãn.',
-                gameplay: 'Tập trung giữ 2 khối màu chập 1 khi chúng tách xa nhau.',
-                goal: 'Đạt mức dự trữ hợp thị Hội tụ 15 Δ.',
+                gameplay: '2 khối màu bắt đầu hợp nhất thành 1 hình, tách dần đều (0,5 Δ/giây) đến mức lăng kính của Level rồi giữ nguyên. Khi thấy hình tách đôi, bấm SPACE hoặc chạm màn hình.',
+                goal: 'Giữ hợp thị ở mức đích (Δ của Level) đủ 20 giây để ĐẠT và mở khóa Level kế tiếp (Level 10: 15 Δ). Tương tác sau mốc ĐẠT, hoặc xác nhận "thấy 1 khối suốt test" → qua màn.',
                 settings: [
                     {
-                        id: 'convergence-start', key: 'startDiopter', label: 'Mức lăng kính xuất phát (Δ)', numeric: true,
+                        id: 'convergence-level', key: 'level', label: 'Cấp độ', type: 'levels',
+                        min: 1, max: 10,
+                        storageKey: 'vision-therapy-m13-max-level',
+                        help: 'Level càng cao: mức lăng kính đích càng lớn (3 → 15 Δ). Quá trình: 2 khối hợp nhất → tách dần 0,5 Δ/giây → đạt mức đích → giữ 20 giây = ĐẠT. SPACE/chạm trước mốc ĐẠT: nghỉ 5s làm lại từ đầu; sau mốc ĐẠT: qua màn; hết 1 phút: xác nhận kết quả quan sát.'
+                    },
+                    {
+                        id: 'convergence-advanced', key: 'advanced', label: '⚙️ Cấu hình nâng cao (bác sĩ tự nhập Δ)', type: 'toggle',
+                        help: 'Bỏ qua Level: bác sĩ chỉ định tay mức xuất phát và mục tiêu (vd bảo trì 18–24 Δ).'
+                    },
+                    {
+                        id: 'convergence-start', key: 'startDiopter', label: 'Mức lăng kính xuất phát (Δ)', numeric: true, advanced: true,
                         options: [
                             { value: '3', label: '3 Δ', selected: true },
                             { value: '6', label: '6 Δ', selected: false },
@@ -230,7 +251,7 @@ class TherapeuticMenuController {
                         ]
                     },
                     {
-                        id: 'convergence-target', key: 'targetDiopter', label: 'Mức lăng kính mục tiêu (Δ)', numeric: true,
+                        id: 'convergence-target', key: 'targetDiopter', label: 'Mức lăng kính mục tiêu (Δ)', numeric: true, advanced: true,
                         options: [
                             { value: '3', label: '3 Δ', selected: false },
                             { value: '6', label: '6 Δ', selected: false },
@@ -511,6 +532,11 @@ class TherapeuticMenuController {
     }
 
     stopCurrentGame() {
+        // [CHỐNG MẤT FULLSCREEN / INPUT] Game kết thúc → trả phím điều hướng
+        // về UniversalInput (đã bị suspend khi game khởi động).
+        if (window.universalInput && typeof window.universalInput.resume === 'function') {
+            window.universalInput.resume();
+        }
         if (this.currentGame) {
             try {
                 this.currentGame.stop();
@@ -559,7 +585,33 @@ class TherapeuticMenuController {
         }
 
         let html = '';
+        let advOpen = false; // Cờ nhóm "Cấu hình nâng cao" đang mở (M6/M13)
         for (const setting of module.settings) {
+            // === TOGGLE CẤU HÌNH NÂNG CAO (hiện/ẩn nhóm bác sĩ tự nhập Δ) ===
+            if (setting.type === 'toggle') {
+                if (advOpen) {
+                    html += '</div>';
+                    advOpen = false;
+                }
+                html += `
+                    <div style="margin-bottom:12px;">
+                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#cbd5e1;cursor:pointer;">
+                            <input type="checkbox" id="${setting.id}" style="width:16px;height:16px;cursor:pointer;"> ${setting.label}
+                        </label>
+                        <p style="font-size:12px;color:#64748b;margin:4px 0 0 0;">${setting.help || ''}</p>
+                    </div>
+                `;
+                continue;
+            }
+
+            // === NHÓM CẤU HÌNH NÂNG CAO: ẩn mặc định, hiện khi bật toggle ===
+            if (setting.advanced) {
+                if (!advOpen) {
+                    html += `<div id="${module.id}-advanced-wrap" style="display:none; margin-top:12px; padding:12px; border:1px dashed #475569; border-radius:8px;">`;
+                    advOpen = true;
+                }
+            }
+
             // === BỘ CHỌN CẤP ĐỘ (Level Picker) — thay thế dropdown rời rạc ===
             if (setting.type === 'levels') {
                 const min = setting.min || 1;
@@ -593,7 +645,7 @@ class TherapeuticMenuController {
                 html += `
                     <div style="margin-bottom:12px;">
                         <label style="display:block;font-size:13px;color:#cbd5e1;margin-bottom:6px;" for="${setting.id}">${setting.label} (1 = Dễ nhất, ${max} = Khó nhất):</label>
-                        <div id="${setting.id}-wrap" style="display:flex;gap:6px;align-items:stretch;">
+                        <div id="${setting.id}-wrap" style="display:flex;gap:6px;align-items:stretch;flex-wrap:wrap;">
                             ${levelBtns}
                         </div>
                         <input type="hidden" id="${setting.id}" value="${current}">
@@ -616,6 +668,9 @@ class TherapeuticMenuController {
                     </select>
                 </div>
             `;
+        }
+        if (advOpen) {
+            html += '</div>';
         }
         return html;
     }
@@ -661,7 +716,8 @@ class TherapeuticMenuController {
             contraindication: module.contraindication || '',
             gameplay: module.gameplay || '',
             goal: module.goal || '',
-            mandatory_warning_html: module.mandatoryWarning || '⚠️ CẢNH BÁO: Tuân thủ quy định an toàn trước khi chơi.'
+            mandatory_warning_html: module.mandatoryWarning || '⚠️ CẢNH BÁO: Tuân thủ quy định an toàn trước khi chơi.',
+            recommendation_note_html: module.recommendationNote || ''
         };
 
         // [SỬA LỖI CỰ LY] Mọi phác đồ huấn luyện (M1-M13) diễn ra ở CỰ LY GẦN:
@@ -699,7 +755,7 @@ class TherapeuticMenuController {
                 <div style="position: relative; display: flex; gap: 24px; width: 90%; max-width: 1200px; min-height: 70vh; background: #0f172a; padding: 32px; border-radius: 12px; border: 1px solid #1e293b; color: #cbd5e1; text-align: left;">
 
                     <!-- CỘT TRÁI (60%): THÔNG TIN LÂM SÀNG (SCROLLABLE) -->
-                    <div style="flex: 6; overflow-y: auto; padding-right: 15px; border-right: 1px solid #1e293b;">
+                    <div style="flex: 6; min-width: 0; overflow-y: auto; padding-right: 15px; border-right: 1px solid #1e293b;">
                         <h2 style="color: #38bdf8; margin-top: 0; font-size: 22px; border-bottom: 1px solid #1e293b; padding-bottom: 10px;">${game.title}<a href="${docHref}" target="_blank" title="Xem tài liệu y khoa (mở trang mới)" style="text-decoration:none; margin-left:10px;">ℹ️</a></h2>
 
                         <p style="font-size: 12px; color: #a78bfa; margin: 0 0 16px 0; font-weight: bold;">${game.stage}</p>
@@ -736,7 +792,7 @@ class TherapeuticMenuController {
                     </div>
 
                     <!-- CỘT PHẢI (40%): ĐIỀU KHIỂN & HÀNH ĐỘNG (STICKY) -->
-                    <div style="flex: 4; display: flex; flex-direction: column; gap: 16px; padding-left: 10px;">
+                    <div style="flex: 4; min-width: 0; display: flex; flex-direction: column; gap: 16px; padding-left: 10px;">
 
                         <!-- FORM CÀI ĐẶT ĐỘNG (theo từng game) — Ẩn với M3 (không cần cấu hình) -->
                         ${module.id !== 'vergence' ? `
@@ -752,6 +808,15 @@ class TherapeuticMenuController {
                                 ${game.mandatory_warning_html}
                             </span>
                         </div>
+
+                        <!-- KHUYẾN CÁO Y KHOA (chỉ hiển thị khi module có recommendationNote) -->
+                        ${game.recommendation_note_html ? `
+                        <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid #0ea5e9; padding: 12px; border-radius: 6px; text-align: center;">
+                            <span style="color: #38bdf8; font-weight: bold; font-size: 13px;">
+                                ${game.recommendation_note_html}
+                            </span>
+                        </div>
+                        ` : ''}
 
                         <!-- ACTION BUTTONS -->
                         <button id="btn-start-fullscreen" style="width: 100%; background: #3b82f6; color: white; padding: 14px; border: none; border-radius: 6px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s;">
@@ -792,6 +857,15 @@ class TherapeuticMenuController {
             });
         });
 
+        // Bật/tắt nhóm "Cấu hình nâng cao" (M6/M13): hiện/ẩn các select bác sĩ tự nhập Δ
+        const advToggle = document.getElementById(`${module.id}-advanced`);
+        const advWrap = document.getElementById(`${module.id}-advanced-wrap`);
+        if (advToggle && advWrap) {
+            advToggle.addEventListener('change', () => {
+                advWrap.style.display = advToggle.checked ? 'block' : 'none';
+            });
+        }
+
         // Attach close button handler
         const closeBtn = document.getElementById('btn-close-lobby');
         if (closeBtn) {
@@ -807,7 +881,14 @@ class TherapeuticMenuController {
                 if (module.settings) {
                     for (const setting of module.settings) {
                         const el = document.getElementById(setting.id);
-                        if (el) {
+                        if (!el) continue;
+                        // [FIX CHECKBOX] Với <input type="checkbox">, thuộc tính .value
+                        // LUÔN trả về "on" (giá trị mặc định) bất kể được tick hay không
+                        // — trạng thái thực nằm ở .checked. Đọc sai ở đây làm M6/M13
+                        // luôn bị đẩy vào "Cấu hình nâng cao" dù toggle không được bật.
+                        if (el.type === 'checkbox') {
+                            config[setting.key] = el.checked ? 'on' : '';
+                        } else {
                             config[setting.key] = setting.numeric ? Number(el.value) : el.value;
                         }
                     }
@@ -876,6 +957,12 @@ class TherapeuticMenuController {
         // (custom launcher M6/M13, deep-link, v.v.) chứ không chỉ startTherapyModule.
         if (window.__calibrator) {
             window.__calibrator.distanceM = window.__calibrator.distanceNearM || 0.4;
+        }
+
+        // Game tự xử lý input riêng (customControls) → khóa UniversalInput để
+        // phím mũi tên/ESC/Space không tác động kép lên test chẩn đoán bên dưới.
+        if (window.universalInput && typeof window.universalInput.suspend === 'function') {
+            window.universalInput.suspend();
         }
 
         // Initialize and start game
@@ -1050,6 +1137,11 @@ window.renderTherapeuticLobby = function(container) {
     html += `</div></div>`;
     container.innerHTML = html;
 
+    // [FIX "LOAD 2 LẦN"] Đánh dấu Lobby đã mount — autoMountTherapeutic bỏ qua
+    // init/render lại nếu menu đã có nội dung (tránh render lần 2/3 khi boot
+    // với workspace Luyện tập được khôi phục từ localStorage).
+    window.__therapeuticLobbyMounted = true;
+
     // Combo Banner: chèn lại vào đầu menu Luyện tập sau khi lobby render (innerHTML bị xóa)
     if (typeof window.updateComboBanner === 'function') {
         window.updateComboBanner();
@@ -1128,6 +1220,13 @@ window.refreshTherapeuticMenu = function(fromToggle) {
 
         // Kiểm tra DOM tồn tại VÀ đã hiển thị thật (offsetParent !== null)
         if (menuEl && workspaceEl && menuEl.offsetParent !== null && workspaceEl.offsetParent !== null) {
+            // [FIX "LOAD 2 LẦN"] Lobby đã được render (toggleWorkspace →
+            // refreshTherapeuticMenu → renderTherapeuticLobby) thì KHÔNG
+            // init/render lại — trước đây poll này render thêm lần thứ 3.
+            if (window.__therapeuticLobbyMounted) {
+                clearInterval(mountCheck);
+                return;
+            }
             window.therapeuticMenu.init();
             clearInterval(mountCheck);
             return;
@@ -1154,6 +1253,8 @@ const M5_LEVEL_KEY = 'vision-therapy-m5-max-level';
 const M7_LEVEL_KEY = 'vision-therapy-m7-max-level';
 const M8_LEVEL_KEY = 'vision-therapy-m8-max-level';
 const M11_LEVEL_KEY = 'vision-therapy-m11-max-level';
+const M6_LEVEL_KEY = 'vision-therapy-m6-max-level';
+const M13_LEVEL_KEY = 'vision-therapy-m13-max-level';
 
 // ============================================================
 // [FIX MẤT LEVEL] KHÓA LEVEL THEO TỪNG BỆNH NHÂN
@@ -1251,7 +1352,7 @@ window.migrateTherapyLevelsToPatient = function(patientId) {
     try {
         if (!patientId) return;
 
-        const hasAnyLegacy = ['M1', 'M2', 'M4', 'M5', 'M7', 'M8', 'M9', 'M10', 'M11', 'M12']
+        const hasAnyLegacy = ['M1', 'M2', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10', 'M11', 'M12', 'M13']
             .some(m => localStorage.getItem(_legacyTherapyLevelKey(m)) !== null);
         if (!hasAnyLegacy) return;
 
@@ -1262,7 +1363,7 @@ window.migrateTherapyLevelsToPatient = function(patientId) {
             return;
         }
 
-        const mods = ['M1', 'M2', 'M4', 'M5', 'M7', 'M8', 'M9', 'M10', 'M11', 'M12'];
+        const mods = ['M1', 'M2', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10', 'M11', 'M12', 'M13'];
         for (const m of mods) {
             const legacyKey = _legacyTherapyLevelKey(m);
             const legacy = parseInt(localStorage.getItem(legacyKey) || '', 10);
@@ -1312,14 +1413,31 @@ async function _getPatientSessionsCached(pid) {
     return _fbSessionsInflight;
 }
 
+// [TẢI 1 LẦN] Cache truy vấn Sessions dùng CHUNG cho mọi module
+// (level sync, combo banner, dashboard) → 1 bệnh nhân chỉ đọc Firebase
+// tối đa 1 lần / 60 giây, bất kể bao nhiêu nơi cần dữ liệu.
+window.getPatientSessionsCached = _getPatientSessionsCached;
+
+// Hủy cache khi app vừa GHI thêm Session → lần đọc kế tiếp lấy dữ liệu mới
+// (dashboard refresh, level sync) thay vì snapshot cũ trong 60s.
+window.invalidatePatientSessionsCache = function(pid) {
+    if (!pid || _fbSessionsCache.pid === pid) {
+        _fbSessionsCache = { pid: null, ts: 0, snapshot: null };
+    }
+    if (_fbSessionsInflight) {
+        _fbSessionsInflight.catch(() => {});
+        _fbSessionsInflight = null;
+    }
+};
+
 // Ánh xạ module → id của level-wrap trong Lobby (dùng cho cập nhật UI)
 const THERAPY_LEVEL_WRAP_MAP = {
     'M1': 'catch-level-wrap', 'M2': 'align-level-wrap', 'M4': 'saccadic-level-wrap',
-    'M5': 'rds-level-wrap', 'M7': 'cam-level-wrap', 'M8': 'anti-crowding-level-wrap',
-    'M9': 'redcone-level-wrap', 'M10': 'okn-level-wrap', 'M11': 'gabor-level-wrap',
-    'M12': 'pursuit-level-wrap'
+    'M5': 'rds-level-wrap', 'M6': 'divergence-level-wrap', 'M7': 'cam-level-wrap',
+    'M8': 'anti-crowding-level-wrap', 'M9': 'redcone-level-wrap', 'M10': 'okn-level-wrap',
+    'M11': 'gabor-level-wrap', 'M12': 'pursuit-level-wrap', 'M13': 'convergence-level-wrap'
 };
-const THERAPY_LEVEL_MODULES = ['M12', 'M1', 'M2', 'M4', 'M5', 'M7', 'M8', 'M9', 'M10', 'M11'];
+const THERAPY_LEVEL_MODULES = ['M12', 'M1', 'M2', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10', 'M11', 'M13'];
 
 /**
  * Cập nhật trạng thái khóa/mở khóa của level-wrap nếu Lobby module đang mở.
@@ -1411,9 +1529,9 @@ window.syncAllTherapyLevels = function(patientId) {
 window.syncM12ProgressFromFirebase = async function(patientId, moduleKey = 'M12') {
     const LEVEL_KEY_MAP = {
         'M1': M1_LEVEL_KEY, 'M2': M2_LEVEL_KEY, 'M4': M4_LEVEL_KEY,
-        'M5': M5_LEVEL_KEY, 'M7': M7_LEVEL_KEY, 'M8': M8_LEVEL_KEY,
-        'M9': M9_LEVEL_KEY, 'M10': M10_LEVEL_KEY, 'M11': M11_LEVEL_KEY,
-        'M12': M12_LEVEL_KEY
+        'M5': M5_LEVEL_KEY, 'M6': M6_LEVEL_KEY, 'M7': M7_LEVEL_KEY,
+        'M8': M8_LEVEL_KEY, 'M9': M9_LEVEL_KEY, 'M10': M10_LEVEL_KEY,
+        'M11': M11_LEVEL_KEY, 'M12': M12_LEVEL_KEY, 'M13': M13_LEVEL_KEY
     };
     const LEGACY_LEVEL_KEY = LEVEL_KEY_MAP[moduleKey] || M12_LEVEL_KEY;
     try {

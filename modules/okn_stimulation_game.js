@@ -14,7 +14,7 @@
  *   ngẫu nhiên 1.5–2s (Nâng cao: trôi chậm ngược chiều sọc).
  *
  * Tương tác: Click/Chạm đốm sáng. Trúng -> "Ting" (Web Audio) + biến mất.
- * Trượt (hết giờ) -> Mất, KHÔNG có âm thanh. Hitbox bù trừ 15px cho trẻ em.
+ * Trượt (hết giờ) -> Mất + tiếng "Buzzer". Hitbox bù trừ 15px cho trẻ em.
  *
  * Dữ liệu đầu ra: customData = { stripeSpeed, direction, targetsSpawned,
  * targetsHit, accuracy, avgReactionTimeMs }.
@@ -219,8 +219,9 @@ class OKNStimulationGame extends BinocularGameEngine {
                 this._target.vx = -Math.abs(this._target.vx);
             }
 
-            // Hết giờ -> TRƯỢT (mất, không âm thanh)
+            // Hết giờ -> TRƯỢT (mất, phát âm thanh báo sai)
             if (now >= this._target.expiresAt) {
+                this._playTone(160, 'square', 0.18); // Buzzer (sót đốm đỏ) — pitch thấp
                 this._clearTarget();
                 this._nextSpawnAt = now + this.SPAWN_GAP_MS;
             }

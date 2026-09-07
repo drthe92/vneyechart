@@ -1749,6 +1749,7 @@ let universalInput = null;
 
 function setupInput() {
   universalInput = new UniversalInput({ logToConsole: true });
+  window.universalInput = universalInput;  // Expose cho therapeutic controller (suspend/resume khi game)
 
   document.addEventListener('app:next', () => nextStep());
   document.addEventListener('app:prev', () => prevStep());
@@ -1969,12 +1970,11 @@ function toggleWorkspace() {
     // Switch sidebar menu
     if (menuDiag) menuDiag.style.display = 'none';
     if (menuTher) {
-      // Render lại đúng bố cục theo Phác đồ hiện tại mỗi lần chuyển sang Luyện tập
-      if (typeof window.refreshTherapeuticMenu === 'function') {
-        window.refreshTherapeuticMenu(true);
-      } else {
-        menuTher.style.display = 'block';
-      }
+      // [FIX "LOAD 2 LẦN"] Lobby ĐÃ được render bởi event onWorkspaceChanged
+      // (therapeutic_menu_controller.js:1489) phát ở trên → KHÔNG gọi
+      // refreshTherapeuticMenu trực tiếp nữa, chỉ đảm bảo menu hiển thị.
+      // Trước đây gọi 2 đường cùng 1 hàm → menu render 2 lần ngay khi boot.
+      menuTher.style.display = 'block';
     }
 
     // Update toggle button icon → clinic-medical (return to diagnostic)
@@ -2484,8 +2484,9 @@ function formatTherapyClinicalResult(input) {
     // LƯU Ý: Phải đặt TRƯỚC khối M3 vì chuỗi 'M13' chứa 'M3'
     if (gameName && gameName.includes('M13')) {
         const diopter = metrics?.customData?.finalConvergenceDiopter ?? metrics?.finalConvergenceDiopter ?? metrics?.score;
+        const lv = metrics?.customData?.level;
         if (diopter !== undefined && diopter !== null) {
-            return `Dự trữ Hợp thị Hội tụ (PFV): <strong style="color: #00e676;">${diopter} &Delta;</strong>`;
+            return `Dự trữ Hợp thị Hội tụ (PFV): <strong style="color: #00e676;">${diopter} &Delta;</strong>${lv ? ` | Level ${ lv }` : ''}`;
         }
     }
 
@@ -2493,8 +2494,9 @@ function formatTherapyClinicalResult(input) {
     const gameId = input?.gameId || metrics?.gameId || '';
     if (gameId === 'M6' || (gameName && gameName.includes('M6'))) {
         const diopter = metrics?.customData?.finalDivergenceDiopter ?? metrics?.finalDivergenceDiopter ?? metrics?.score;
+        const lv = metrics?.customData?.level;
         if (diopter !== undefined && diopter !== null) {
-            return `Dự trữ Hợp thị Phân kỳ (NFV): <strong style="color: #00e676;">${diopter} &Delta;</strong>`;
+            return `Dự trữ Hợp thị Phân kỳ (NFV): <strong style="color: #00e676;">${diopter} &Delta;</strong>${lv ? ` | Level ${ lv }` : ''}`;
         }
     }
 
@@ -2644,9 +2646,15 @@ function generateTherapyReportHTML(patientId, recordsOverride = null) {
             isPassed = (cd.passed ?? false) === true
                 || ((cd.passed === undefined) && (cd.finalArcsec ?? 0) > 0 && (cd.finalArcsec ?? 0) <= 40);
         } else if (record.gameName.includes('M13')) {
-            isPassed = (cd.maxDiopter ?? 0) >= (cd.targetDiopter ?? 15);
+            // M13: QUA MÀN khi ĐẠT Level (giữ hợp thị ở mức đích 20 giây) — `passed` có sẵn;
+            // fallback bản ghi cũ (chưa có passed): đạt mục tiêu Δ do bác sĩ chỉ định
+            isPassed = (cd.passed ?? false) === true
+                || ((cd.passed === undefined) && (cd.maxDiopter ?? 0) >= (cd.targetDiopter ?? 15));
         } else if (record.gameName.includes('M6')) {
-            isPassed = (cd.maxDiopter ?? 0) >= (cd.targetDiopter ?? 8);
+            // M6: QUA MÀN khi ĐẠT Level (giữ hợp thị ở mức đích 20 giây) — `passed` có sẵn;
+            // fallback bản ghi cũ (chưa có passed): đạt mục tiêu Δ do bác sĩ chỉ định
+            isPassed = (cd.passed ?? false) === true
+                || ((cd.passed === undefined) && (cd.maxDiopter ?? 0) >= (cd.targetDiopter ?? 8));
         } else if (record.gameName.includes('M7')) {
             // M7: QUA MÀN khi đạt tiêu chí Level (≥ 85% chính xác + phản xạ theo Level)
             // (fallback bản ghi cũ: ≥ 80% chính xác + phản xạ ≤ 800ms)
@@ -2724,6 +2732,12 @@ if (typeof window !== 'undefined') {
 (function initPWA() {
     if (!('serviceWorker' in navigator)) return;
 
+    // [FIX "LOAD 2 LẦN"] Cờ "người dùng đã cấp phép cập nhật" — page CHỈ reload
+    // khi có worker mới activate sau khi bác sĩ bấm "Bấm để tải lại". Trước đây
+    // reload VÔ ĐIỀU KIỆN trên controllerchange → lần mở app đầu tiên (SW vừa
+    // cài + clients.claim()) khiến TOÀN BỘ app boot 2 lần liên tiếp.
+    let __pwaUpdateApproved = false;
+
     // --- Toast helper: delegate về showGlobalToast DUY NHẤT ---
     function showPwaToast(message, options = {}) {
         const { duration = 3000, actionText = null, onAction = null } = options;
@@ -2770,6 +2784,7 @@ if (typeof window !== 'undefined') {
                                 duration: 0,
                                 actionText: 'Bấm để tải lại',
                                 onAction: () => {
+                                    __pwaUpdateApproved = true;
                                     const worker = reg.waiting || newWorker;
                                     if (worker) worker.postMessage({ type: 'SKIP_WAITING' });
                                 }
@@ -2781,8 +2796,74 @@ if (typeof window !== 'undefined') {
             .catch((err) => console.error('Service Worker registration failed:', err));
     });
 
-    // Khi worker mới đã activate (sau khi người dùng cấp phép) → tải lại đúng lúc
+    // Khi worker mới đã activate (sau khi người dùng cấp phép) → tải lại đúng lúc.
+    // Chỉ reload khi có cờ cấp phép — controllerchange do clients.claim() ở lần
+    // cài SW đầu tiên KHÔNG được phép làm boot lại toàn bộ app.
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-        window.location.reload();
+        if (__pwaUpdateApproved) window.location.reload();
     });
+})();
+
+// ================================================================
+//  [CHỐNG THOÁT APP VÔ TÌNH] Khóa Back/Forward của trình duyệt
+//  -----------------------------------------------------------------
+//  Alt+← / Alt+→, nút Back/Forward trên remote/chuột, vuốt mép màn
+//  hình cảm ứng... nếu làm trình duyệt điều hướng lịch sử thì trang
+//  rời đi → mất fullscreen + mất phiên. Chốt 1 entry lịch sử và tự
+//  đẩy lại ngay khi popstate.
+// ================================================================
+(function historyLock() {
+  try {
+    if (window.history && history.pushState) {
+      history.pushState({ __vtLocked: true }, '');
+      window.addEventListener('popstate', () => {
+        history.pushState({ __vtLocked: true }, '');
+      });
+    }
+  } catch (e) { /* noop */ }
+})();
+
+// ================================================================
+//  [CHỐNG THOÁT APP VÔ TÌNH] Chặn nút chuột Back/Forward (4/5)
+//  -----------------------------------------------------------------
+//  Chrome điều hướng lịch sử trên nút 4/5 — chặn ở cả mousedown
+//  (trước khi điều hướng kịp kích hoạt) + auxclick (phòng hờ).
+//  Giữ nguyên handler mouseup hiện có (bấm nút 4/5 = mở menu).
+// ================================================================
+document.addEventListener('mousedown', (e) => {
+  if (e.button === 3 || e.button === 4) e.preventDefault();
+}, { passive: false });
+document.addEventListener('auxclick', (e) => {
+  if (e.button === 3 || e.button === 4) e.preventDefault();
+}, { passive: false });
+
+// ================================================================
+//  [CHỐNG THOÁT APP VÔ TÌNH] Chặn vuốt mép màn hình cảm ứng
+//  -----------------------------------------------------------------
+//  Back-gesture của Android/iOS khởi phát từ mép trái/phải màn hình.
+//  Vuốt ngang bắt đầu ≤24px từ mép → preventDefault để trình duyệt
+//  không điều hướng Back/Forward. Chạy ĐỘC LẬP với universalInput
+//  (vẫn hiệu lực khi game đang chạy / universalInput bị suspend).
+// ================================================================
+(function edgeSwipeGuard() {
+  let edgeTouch = null;
+  document.addEventListener('touchstart', (e) => {
+    const t = e.changedTouches[0];
+    if (!t) return;
+    edgeTouch = {
+      x: t.clientX,
+      y: t.clientY,
+      edge: t.clientX < 24 || t.clientX > window.innerWidth - 24,
+    };
+  }, { passive: true });
+  document.addEventListener('touchmove', (e) => {
+    if (!edgeTouch || !edgeTouch.edge) return;
+    const t = e.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - edgeTouch.x;
+    const dy = t.clientY - edgeTouch.y;
+    if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy)) {
+      e.preventDefault(); // vuốt mép ngang = back gesture → chặn
+    }
+  }, { passive: false });
 })();

@@ -4,7 +4,7 @@
  * chỉ chịu trách nhiệm phần tải UI (App Shell + tài nguyên tĩnh).
  */
 
-const CACHE_NAME = 'vision-emr-cache-v3';
+const CACHE_NAME = 'vision-emr-cache-v6';
 
 /* App Shell + tài nguyên tĩnh thiết yếu (đường dẫn tương đối với gốc trang) */
 const urlsToCache = [

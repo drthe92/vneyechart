@@ -224,15 +224,19 @@ if (nmEl) nmEl.disabled = false;
         const protocolInput = document.getElementById("input_protocol") ? document.getElementById("input_protocol").value : "exam";
         const patientId = buildPatientId(phoneInput, nameInput, yearInput);
         const patientRef = db.collection("Patients").doc(patientId);
+        const dataToSave = {
+            phone: phoneInput,
+            patientName: nameInput,
+            yob: yearInput,
+            examTimestamp: Date.now(),
+            status: "Active",
+            protocol: protocolInput
+        };
         try {
-            await patientRef.set({
-                phone: phoneInput,
-                fullName: nameInput,
-                birthYear: yearInput,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                status: "Active",
-                protocol: protocolInput
-            });
+            // [DEBUG PAYLOAD] Soi dữ liệu + ID bệnh nhân ngay trước khi ghi Firestore
+            console.log("Patient ID:", patientId);
+            console.log("Payload:", dataToSave);
+            await patientRef.set(dataToSave);
             if (typeof window.SettingsStore !== 'undefined') {
                 window.SettingsStore.set("currentPatientId", patientId);
                 window.SettingsStore.set("currentPatientName", nameInput);
@@ -3626,10 +3630,15 @@ document.addEventListener('click', function(e) {
             }
             _comboFbSyncCache = { pid: pid, ts: now };
 
-            const snapshot = await window.db.collection("Patients")
-                .doc(pid)
-                .collection("Sessions")
-                .get();
+            // [TẢI 1 LẦN] Dùng cache truy vấn Sessions dùng chung (60s) —
+            // không query riêng nữa → level sync + banner + dashboard chỉ tốn
+            // ĐÚNG 1 lượt đọc Firebase / 60s / bệnh nhân.
+            const snapshot = (typeof window.getPatientSessionsCached === 'function')
+                ? await window.getPatientSessionsCached(pid)
+                : await window.db.collection("Patients")
+                    .doc(pid)
+                    .collection("Sessions")
+                    .get();
 
             const fbPool = { records: [], results: [] };
             snapshot.forEach(doc => {
@@ -3867,6 +3876,13 @@ document.addEventListener('click', function(e) {
 
                          sessionsRef.add(payload)
                              .catch(err => console.error("[Firebase Sync] Lỗi ghi dữ liệu:", err));
+
+                         // [TẢI 1 LẦN] Vừa ghi Session mới → hủy cache chung để
+                         // lần đọc kế tiếp (dashboard refresh, level sync, banner)
+                         // lấy đúng dữ liệu MỚI, không phải snapshot cũ trong 60s.
+                         if (typeof window.invalidatePatientSessionsCache === 'function') {
+                             window.invalidatePatientSessionsCache(currentPatientId);
+                         }
                              
                      } catch (error) {
                          console.error("[Firebase Sync] Lỗi khởi tạo đồng bộ:", error);
@@ -3970,10 +3986,40 @@ document.addEventListener('click', function(e) {
 
         if (gId === 'M6' || (detail.gameName && detail.gameName.includes('M6'))) {
             const diopter = detail.metrics && detail.metrics.finalDivergenceDiopter !== undefined ? detail.metrics.finalDivergenceDiopter : detail.score;
-            clinicalText = `Dự trữ Hợp thị Phân kỳ (NFV): <strong style="color: #00e676; font-size: 18px;">${diopter} &Delta;</strong>`;
+            const level = detail.metrics?.level ?? detail.metrics?.customData?.level ?? null;
+            const passed = detail.metrics?.passed ?? detail.metrics?.customData?.passed ?? false;
+            const unlocked = detail.metrics?.nextLevelUnlocked ?? detail.metrics?.customData?.nextLevelUnlocked ?? false;
+            const graduated = detail.metrics?.graduated ?? detail.metrics?.customData?.graduated ?? false;
+            const mode = detail.metrics?.mode ?? detail.metrics?.customData?.mode ?? 'level';
+            let evalPass = passed
+                ? '<span style="color: #00e676; font-weight: bold;">ĐẠT</span>'
+                : '<span style="color: #f87171; font-weight: bold;">CHƯA ĐẠT (cần giữ hợp thị ở mức đích 20 giây)</span>';
+            if (passed && graduated) evalPass += ' — <span style="color: #fbbf24; font-weight: bold;">🏆 TỐT NGHIỆP 10 Level!</span>';
+            else if (passed && unlocked) evalPass += ` — <span style="color: #fbbf24; font-weight: bold;">Đã mở khóa Level ${(parseInt(level, 10) || 1) + 1}!</span>`;
+            clinicalText = `
+                <div style="font-size: 15px; line-height: 1.8; text-align: left; padding: 0 10px;">
+                    Dự trữ Hợp thị Phân kỳ (NFV): <strong style="color: #fff;">${diopter} &Delta;</strong> (${evalPass})<br>
+                    ${mode === 'level' ? 'Level đã chinh phục: <strong style="color: #22d3ee;">Level ' + level + '</strong>' : 'Cấu hình nâng cao (bác sĩ chỉ định Δ)'}
+                </div>
+            `;
         } else if (gId === 'M13' || (detail.gameName && detail.gameName.includes('M13'))) {
             const diopter = detail.metrics && detail.metrics.finalConvergenceDiopter !== undefined ? detail.metrics.finalConvergenceDiopter : detail.score;
-            clinicalText = `Dự trữ Hợp thị Hội tụ (PFV): <strong style="color: #00e676; font-size: 18px;">${diopter} &Delta;</strong>`;
+            const level = detail.metrics?.level ?? detail.metrics?.customData?.level ?? null;
+            const passed = detail.metrics?.passed ?? detail.metrics?.customData?.passed ?? false;
+            const unlocked = detail.metrics?.nextLevelUnlocked ?? detail.metrics?.customData?.nextLevelUnlocked ?? false;
+            const graduated = detail.metrics?.graduated ?? detail.metrics?.customData?.graduated ?? false;
+            const mode = detail.metrics?.mode ?? detail.metrics?.customData?.mode ?? 'level';
+            let evalPass = passed
+                ? '<span style="color: #00e676; font-weight: bold;">ĐẠT</span>'
+                : '<span style="color: #f87171; font-weight: bold;">CHƯA ĐẠT (cần giữ hợp thị ở mức đích 20 giây)</span>';
+            if (passed && graduated) evalPass += ' — <span style="color: #fbbf24; font-weight: bold;">🏆 TỐT NGHIỆP 10 Level!</span>';
+            else if (passed && unlocked) evalPass += ` — <span style="color: #fbbf24; font-weight: bold;">Đã mở khóa Level ${(parseInt(level, 10) || 1) + 1}!</span>`;
+            clinicalText = `
+                <div style="font-size: 15px; line-height: 1.8; text-align: left; padding: 0 10px;">
+                    Dự trữ Hợp thị Hội tụ (PFV): <strong style="color: #fff;">${diopter} &Delta;</strong> (${evalPass})<br>
+                    ${mode === 'level' ? 'Level đã chinh phục: <strong style="color: #22d3ee;">Level ' + level + '</strong>' : 'Cấu hình nâng cao (bác sĩ chỉ định Δ)'}
+                </div>
+            `;
         } else if (gId === 'M3' || (detail.gameName && detail.gameName.includes('M3'))) {
             // Rút xuất 2 chỉ số từ payload của M3
             // LƯU Ý: main.js dispatch đã unwrap customData sẵn, nên detail.metrics là chính customData

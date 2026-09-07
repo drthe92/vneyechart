@@ -1,3 +1,10 @@
+// Phòng hờ double-execute (SW cache race / load lại trang): nếu script chạy
+// 2 lần trong cùng global scope, `const provider` sẽ ném SyntaxError.
+if (window.__firebaseConfigLoaded) {
+  window.db = window.db || firebase.firestore();
+} else {
+window.__firebaseConfigLoaded = true;
+
 const firebaseConfig = {
     apiKey: "AIzaSyCIMRsiTlvJdxwwcxeT-D9oMKcmeF1Xcac",
     authDomain: "matcauvong-app.firebaseapp.com",
@@ -11,6 +18,19 @@ const firebaseConfig = {
 if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
 }
+
+// Đăng nhập ẩn danh ngầm: ứng dụng tự xin định danh ẩn danh từ máy chủ
+// Firebase để mọi phiên đọc/ghi Firestore (EMR, level luyện tập...) hoạt
+// động với quyền mặc định an toàn, không cần bệnh nhân thao tác trước.
+firebase.auth().signInAnonymously().catch((error) => {
+    console.error("Lỗi đăng nhập ẩn danh:", error);
+});
+
+// Khởi tạo App Check ngay sau khi initializeApp(firebaseConfig)
+// Compat SDK: Provider phải được khai báo qua namespace firebase.appCheck.
+self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+const provider = new firebase.appCheck.ReCaptchaEnterpriseProvider('6Leih60tAAAAAA-DwVEce4I1cB6nDsxT2CRpJjyv');
+firebase.appCheck().activate(provider, true); // true = tự động làm mới token ngầm
 window.db = firebase.firestore();
 
 /**
@@ -21,7 +41,9 @@ window.db = firebase.firestore();
  * Phải gọi TRƯỚC mọi thao tác đọc/ghi Firestore khác.
  */
 try {
-    window.db.enableIndexedDbPersistence()
+    // [FIX Compat SDK] Firebase v9 Compat dùng tên mới enablePersistence()
+    // (không còn enableIndexedDbPersistence như v8) — tránh TypeError.
+    window.db.enablePersistence()
         .then(() => {
             console.info('[Firebase] IndexedDB Persistence đã bật — Offline queue sẵn sàng.');
         })
@@ -39,3 +61,4 @@ try {
 } catch (e) {
     console.warn('[Firebase] Lỗi khởi tạo Persistence:', e);
 }
+} // end if (!window.__firebaseConfigLoaded)

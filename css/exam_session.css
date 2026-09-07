@@ -253,6 +253,13 @@
     }
 }
 
+/* [FIX Z-INDEX] Cửa sổ Đăng nhập ("Bắt đầu khám") phải nổi TRÊN Lobby
+   huấn luyện (z-index 2147483000) — khi bấm "BẮT ĐẦU TẬP" mà chưa đăng nhập
+   ở module luyện tập, modal bị Lobby che khuất nếu giữ mức 9999 mặc định. */
+#start-exam-modal {
+    z-index: 2147483001;
+}
+
 .exam-modal-content {
     background: linear-gradient(180deg, #ffffff 0%, var(--gray-50) 100%);
     border-radius: var(--radius-xl);
