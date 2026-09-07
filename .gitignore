@@ -1,71 +1,50 @@
-# Backup archives & context (không nên đưa lên repo — nặng + có thể chứa dữ liệu nhạy cảm)
+# ============================================================
+# .gitignore — Vision Therapy WebApp (vneyechart)
+# ============================================================
+
+# --- Bản sao lưu & ngữ cảnh (nặng + có thể chứa dữ liệu nhạy cảm) ---
 backup-*.tar.gz
 gemini_context.txt
 
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
-# C extensions
-*.so
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# SSH keys (security - never commit)
+# --- SSH keys & bí mật (Tuyệt đối không commit) ---
 thebom
 thebom.pub
 *.pem
 *.key
+*.p12
 id_rsa
 id_rsa.pub
 id_ed25519
 id_ed25519.pub
 
-# PyInstaller
-#  - https://github.com/pyinstaller/pyinstaller/discussions/1113
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#  - https://github.com/pyinstaller/pyinstaller/issues/2183
-#
+# --- Biến môi trường & khóa dịch vụ ---
+.env
+.env.*
+!.env.example
+firebase-service-account*.json
+serviceAccount*.json
+
+# --- Python (Optotype Generator, neuro_ophthalmology) ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# --- Node (nếu có) ---
+node_modules/
+
+# --- Hệ điều hành / Editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# --- Nhật ký & tạm ---
+*.log
+logs/
+tmp/
