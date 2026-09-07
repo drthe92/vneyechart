@@ -26,11 +26,11 @@ firebase.auth().signInAnonymously().catch((error) => {
     console.error("Lỗi đăng nhập ẩn danh:", error);
 });
 
-// Khởi tạo App Check ngay sau khi initializeApp(firebaseConfig)
-// Compat SDK: Provider phải được khai báo qua namespace firebase.appCheck.
-self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-const provider = new firebase.appCheck.ReCaptchaEnterpriseProvider('6Leih60tAAAAAA-DwVEce4I1cB6nDsxT2CRpJjyv');
-firebase.appCheck().activate(provider, true); // true = tự động làm mới token ngầm
+// [ĐÃ TẠM KHÓA APP CHECK ĐỂ THÔNG LUỒNG SẢN XUẤT]
+// const provider = new firebase.appCheck.ReCaptchaEnterpriseProvider('6Leih60tAAAAAA-DwVEce4I1cB6nDsxT2CRpJjyv');
+// const appCheck = firebase.appCheck();
+// appCheck.activate(provider, true);
+
 window.db = firebase.firestore();
 
 /**
