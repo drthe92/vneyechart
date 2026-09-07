@@ -267,9 +267,10 @@ class DichopticPursuitGame extends BinocularGameEngine {
             this.inBoundsFrames++;
         } else {
             this.outOfBoundsHits++;
-            // Kích hoạt nháy viền đỏ + tiếng báo lỗi (giới hạn 300ms/lần)
+            // Kích hoạt nháy viền đỏ + tiếng báo lỗi (giãn 1s/lần, âm lượng thấp
+            // để không gây khó chịu khi trẻ chệch hướng liên tục)
             this._flashUntil = now + 200;
-            if (now - this._lastErrorSound > 300) {
+            if (now - this._lastErrorSound > 1000) {
                 this._playErrorSound();
                 this._lastErrorSound = now;
             }
@@ -295,7 +296,7 @@ class DichopticPursuitGame extends BinocularGameEngine {
             osc.type = 'square';
             osc.frequency.setValueAtTime(200, t);
             osc.frequency.exponentialRampToValueAtTime(120, t + 0.15);
-            gain.gain.setValueAtTime(0.18, t);
+            gain.gain.setValueAtTime(0.08, t);
             gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
             osc.connect(gain);
             gain.connect(ctx.destination);

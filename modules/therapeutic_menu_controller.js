@@ -101,26 +101,6 @@ class TherapeuticMenuController {
                 contraindication: 'Đang bị liệt cơ vận nhãn.',
                 gameplay: 'Nhìn tập trung để 2 khối màu chập thành 1. Khi 2 khối bị tách làm đôi (vỡ hình), bấm ngay phím SPACE.',
                 goal: 'Đạt mức dự trữ Hội tụ (Base-Out) ≥ 15 Δ và Phân kỳ (Base-In) ≥ 8 Δ.',
-                settings: [
-                    {
-                        id: 'vergence-start', key: 'startDiopter', label: 'Mức lăng kính xuất phát (Δ)', numeric: true,
-                        options: [
-                            { value: '2', label: '2 Δ', selected: true },
-                            { value: '4', label: '4 Δ', selected: false },
-                            { value: '6', label: '6 Δ', selected: false },
-                            { value: '8', label: '8 Δ', selected: false }
-                        ]
-                    },
-                    {
-                        id: 'vergence-target', key: 'targetDiopter', label: 'Mức lăng kính mục tiêu (Δ)', numeric: true,
-                        options: [
-                            { value: '8', label: '8 Δ', selected: true },
-                            { value: '10', label: '10 Δ', selected: false },
-                            { value: '12', label: '12 Δ', selected: false },
-                            { value: '15', label: '15 Δ', selected: false }
-                        ]
-                    }
-                ],
                 mandatoryWarning: '⚠️ CẢNH BÁO: Đeo kính Đỏ-Lục Lam (Mắt phải ĐỎ / Mắt trái XANH) trước khi chơi.'
             },
             {

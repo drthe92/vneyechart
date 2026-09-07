@@ -554,30 +554,30 @@ class GaborPerceptualLearningGame extends BinocularGameEngine {
 
         const overlay = document.createElement('div');
         overlay.style.cssText = `
-            position: fixed; inset: 0; z-index: 10000;
+            position: fixed; inset: 0; z-index: 2147483001;
             background: rgba(15, 23, 42, 0.95);
             color: white;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            text-align: center; padding: 30px;
+            display: flex; flex-direction: column; align-items: center; justify-content: safe center;
+            text-align: center; padding: 30px; overflow-y: auto;
             font-family: 'Segoe UI', Arial, sans-serif;
         `;
 
         overlay.innerHTML = `
-            <h1 style="font-size: 32px; color: ${evalColor}; margin-bottom: 20px;">
+            <h1 style="font-size: 26px; color: ${evalColor}; margin: 0 0 20px 0;">
                 ✅ ${isPassed ? 'BÁO CÁO LÂM SÀNG: ĐẠT MỤC TIÊU' : 'BÁO CÁO LÂM SÀNG: HOÀN THÀNH PHIÊN TẬP'}
             </h1>
 
-            <div style="max-width: 600px; background: rgba(255,255,255,0.05); border-radius: 12px; padding: 25px; margin-bottom: 25px;">
-                <p style="font-size: 20px; margin: 8px 0;"><strong>⭐ Cấp độ đã chinh phục:</strong> <span style="color: #fbbf24;">Level ${this.level}</span></p>
-                <p style="font-size: 20px; margin: 8px 0;"><strong>🔬 Ngưỡng tương phản hội tụ:</strong> <span style="color: #60a5fa;">${this.currentLogCS.toFixed(2)} LogCS (${contrastPct.toFixed(1)}%)</span></p>
-                <p style="font-size: 20px; margin: 8px 0;"><strong>🔄 Số đảo chiều:</strong> <span style="color: #22d3ee;">${this.reversals} / ${this._targetReversals}</span></p>
-                <p style="font-size: 20px; margin: 8px 0;"><strong>📊 Chính xác:</strong> <span style="color: #10b981;">${this.totalTrials > 0 ? (this.correctAnswers / this.totalTrials * 100).toFixed(1) : 0}%</span> (${this.correctAnswers}/${this.totalTrials})</p>
+            <div style="width: 92%; max-width: 620px; background: #1e293b; border-radius: 12px; padding: 14px 22px; margin: 0 auto 20px auto; box-sizing: border-box; text-align: left;">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px dashed rgba(148, 163, 184, 0.25);"><span style="font-size: 15px; color: #94a3b8;">⭐ Cấp độ đã chinh phục</span><span style="font-size: 17px; font-weight: bold; color: #fbbf24; white-space: nowrap;">Level ${this.level}</span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px dashed rgba(148, 163, 184, 0.25);"><span style="font-size: 15px; color: #94a3b8;">🔬 Ngưỡng tương phản hội tụ</span><span style="font-size: 17px; font-weight: bold; color: #60a5fa; white-space: nowrap;">${this.currentLogCS.toFixed(2)} LogCS (${contrastPct.toFixed(1)}%)</span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px dashed rgba(148, 163, 184, 0.25);"><span style="font-size: 15px; color: #94a3b8;">🔄 Số đảo chiều</span><span style="font-size: 17px; font-weight: bold; color: #22d3ee; white-space: nowrap;">${this.reversals} / ${this._targetReversals}</span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px dashed rgba(148, 163, 184, 0.25);"><span style="font-size: 15px; color: #94a3b8;">📊 Chính xác</span><span style="font-size: 17px; font-weight: bold; color: #10b981; white-space: nowrap;">${this.totalTrials > 0 ? (this.correctAnswers / this.totalTrials * 100).toFixed(1) : 0}% (${this.correctAnswers}/${this.totalTrials})</span></div>
             </div>
 
-            <p style="font-size: 18px; color: ${evalColor}; margin: 0 0 20px 0; font-weight: bold;">${evalText}</p>
+            <p style="font-size: 17px; color: ${evalColor}; margin: 0 0 20px 0; font-weight: bold;">${evalText}</p>
 
             <button id="btn-next-module" style="
-                padding: 15px 40px; font-size: 18px; cursor: pointer;
+                padding: 14px 44px; font-size: 17px; cursor: pointer;
                 background: #3b82f6; color: white; border: none; border-radius: 8px;
                 font-weight: bold; transition: background 0.3s;
             ">Trở về Lobby</button>

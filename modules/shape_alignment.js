@@ -63,6 +63,7 @@ class ShapeAlignmentGame extends BinocularGameEngine {
         this.state = 'PLAYING';   // 'PLAYING' | 'ENDED'
         this.alignState = 'SEEKING'; // 'SEEKING' (chưa vào khung) | 'HOLDING' (đang đếm giữ)
         this.holdStart = 0;       // timestamp bắt đầu hold
+        this._boardStart = performance.now(); // timestamp bắt đầu bàn hiện tại (giới hạn 1 phút/bàn)
 
         // --- Vị trí ---
         this.targetPos = { x: this.canvas.width / 2, y: this.canvas.height / 2 };
@@ -135,6 +136,7 @@ class ShapeAlignmentGame extends BinocularGameEngine {
         // Reset trạng thái khớp của bàn mới
         this.alignState = 'SEEKING';
         this.holdStart = 0;
+        this._boardStart = performance.now(); // Reset đồng hồ 1 phút/bàn
     }
 
     /**
@@ -155,6 +157,15 @@ class ShapeAlignmentGame extends BinocularGameEngine {
      */
     update() {
         if (this.state !== 'PLAYING') return;
+
+        // Giới hạn thời gian tối đa 1 phút mỗi bàn: quá hạn = TRƯỢT (gãy chuỗi),
+        // sang bàn mới — tránh trẻ kẹt vô hạn ở 1 bàn khó.
+        if (performance.now() - this._boardStart > 60000) {
+            this.streak = 0;
+            this._playTone(160, 'square', 0.18); // Buzzer (hết giờ bàn)
+            this._randomizeTargetPosition();
+            return;
+        }
 
         const dist = this._euclideanDistance();
         // Dung hợp (Fusion Lock): Sai số tâm tối đa 5 pixel
@@ -405,19 +416,28 @@ class ShapeAlignmentGame extends BinocularGameEngine {
 
         const overlay = document.createElement('div');
         overlay.id = overlayId;
-        overlay.style.cssText = 'position:fixed; inset:0; z-index:99999; background:rgba(15,23,42,0.95); display:flex; align-items:center; justify-content:center; flex-direction:column; color:white; text-align:center; padding:40px;';
+        overlay.style.cssText = 'position:fixed; inset:0; z-index:2147483001; background:rgba(15,23,42,0.95); display:flex; align-items:center; justify-content:safe center; flex-direction:column; color:white; text-align:center; padding:40px; overflow-y:auto;';
 
         overlay.innerHTML = `
-            <h1 style="font-size:32px; color:${evalColor}; margin-bottom:20px;">${passed ? 'BÁO CÁO LÂM SÀNG: QUA MÀN' : 'BÁO CÁO LÂM SÀNG: HOÀN THÀNH PHIÊN TẬP'}</h1>
-            <div style="max-width:600px; padding:20px; border:2px solid ${evalColor}; border-radius:12px; background:rgba(52,211,153,0.08); margin-bottom:20px;">
-                <p style="font-size:18px; margin:8px 0;"><strong>Level:</strong> <span style="color:#fbbf24;">${this.level}/10</span>
-                <strong style="margin-left:20px;">Chuỗi khớp:</strong> <span style="color:#22d3ee;">${this.streak}/${M2_PASS_STREAK} lần liên tiếp</span>
-                <strong style="margin-left:20px;">Tổng lần khớp:</strong> <span>${this.attempts}/${M2_MAX_ATTEMPTS}</span></p>
-                <p style="font-size:16px; margin:8px 0;"><strong>Cấu hình:</strong> Khung ${this.sizePx}px | Giữ yên ${(this.holdTimeMs / 1000).toFixed(1)}s | Nền: ${M2_NOISE_LABELS[this.noise] || 'Trơn'}</p>
-                <p style="font-size:16px; margin:8px 0; color:#94a3b8;"><strong>Góc thị giác Foveal:</strong> <span style="color:#fbbf24; font-size:20px;">${visualAngleDeg.toFixed(2)}°</span></p>
+            <h1 style="font-size: 26px; color: ${evalColor}; margin: 0 0 20px 0;">
+                ${passed ? 'BÁO CÁO LÂM SÀNG: QUA MÀN' : 'BÁO CÁO LÂM SÀNG: HOÀN THÀNH PHIÊN TẬP'}
+            </h1>
+
+            <div style="width: 92%; max-width: 620px; background: #1e293b; border-radius: 12px; padding: 14px 22px; margin: 0 auto 20px auto; box-sizing: border-box; text-align: left;">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px dashed rgba(148, 163, 184, 0.25);"><span style="font-size: 15px; color: #94a3b8;">⭐ Cấp độ đã chinh phục</span><span style="font-size: 17px; font-weight: bold; color: #fbbf24; white-space: nowrap;">Level ${this.level}/10</span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px dashed rgba(148, 163, 184, 0.25);"><span style="font-size: 15px; color: #94a3b8;">🔗 Chuỗi khớp</span><span style="font-size: 17px; font-weight: bold; color: #22d3ee; white-space: nowrap;">${this.streak}/${M2_PASS_STREAK} lần liên tiếp</span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px dashed rgba(148, 163, 184, 0.25);"><span style="font-size: 15px; color: #94a3b8;">🎯 Tổng lần khớp</span><span style="font-size: 17px; font-weight: bold; color: #e2e8f0; white-space: nowrap;">${this.attempts}/${M2_MAX_ATTEMPTS}</span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px dashed rgba(148, 163, 184, 0.25);"><span style="font-size: 15px; color: #94a3b8;">⚙️ Cấu hình</span><span style="font-size: 17px; font-weight: bold; color: #94a3b8; white-space: nowrap;">Khung ${this.sizePx}px · Giữ ${(this.holdTimeMs / 1000).toFixed(1)}s · Nền: ${M2_NOISE_LABELS[this.noise] || 'Trơn'}</span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px dashed rgba(148, 163, 184, 0.25);"><span style="font-size: 15px; color: #94a3b8;">📐 Góc thị giác Foveal</span><span style="font-size: 17px; font-weight: bold; color: #fbbf24; white-space: nowrap;">${visualAngleDeg.toFixed(2)}°</span></div>
             </div>
-            <p style="font-size:18px; color:${evalColor}; margin:0 0 20px 0; font-weight:bold;">${evalText}</p>
-            <button id="btn-go-module3" style="padding:15px 40px; font-size:20px; background:#3b82f6; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">Trở về Lobby</button>
+
+            <p style="font-size: 17px; color: ${evalColor}; margin: 0 0 20px 0; font-weight: bold;">${evalText}</p>
+
+            <button id="btn-go-module3" style="
+                padding: 14px 44px; font-size: 17px; cursor: pointer;
+                background: #3b82f6; color: white; border: none; border-radius: 8px;
+                font-weight: bold; transition: background 0.3s;
+            ">Trở về Lobby</button>
         `;
 
         document.body.appendChild(overlay);

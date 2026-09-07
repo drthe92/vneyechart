@@ -52,6 +52,7 @@ class DivergenceTherapyGame extends BinocularGameEngine {
         this.stateStartTime = 0;
         this.totalPlayTime = 0;
         this.gameStartTime = 0;
+        this._lastActivityAt = Date.now(); // Mốc hoạt động cuối (dừng rAF khi nghỉ 65s)
 
         // [A4] Kích thước vật lý thanh hợp thị (px thực tế theo hiệu chuẩn)
         this._updateBarPhysicalSize();
@@ -175,11 +176,13 @@ class DivergenceTherapyGame extends BinocularGameEngine {
     _setState(newState) {
         this.state = newState;
         this.stateStartTime = Date.now();
+        this._lastActivityAt = Date.now();
     }
 
     // --- 2. LOGIC TƯƠNG TÁC (SPACE / CHẠM MÀN HÌNH) ---
     _handleBreak() {
         if (this.state === 'ENDED' || this.state === 'RESTING') return;
+        this._lastActivityAt = Date.now();
 
         if (this.state === 'PASSED_WAIT') {
             // Tương tác SAU mốc ĐẠT → QUA MÀN, mở khóa Level kế tiếp
@@ -196,6 +199,15 @@ class DivergenceTherapyGame extends BinocularGameEngine {
     }
 
     update(dt = 0) {
+        if (!this._running) return; // vòng lặp đã dừng (idle)
+
+        // [IDLE STOP] Không có hoạt động 65 giây → dừng vòng lặp render
+        // (giữ nguyên instance để hộp thoại 3 lựa chọn / _endGame vẫn hoạt động)
+        if (Date.now() - this._lastActivityAt > 65000) {
+            this._haltIdleLoop();
+            return;
+        }
+
         if (this.state === 'ENDED') return;
 
         const now = Date.now();
@@ -363,11 +375,12 @@ class DivergenceTherapyGame extends BinocularGameEngine {
     _showResultPrompt() {
         if (this._resultPromptShown || this.state !== 'PASSED_WAIT') return;
         this._resultPromptShown = true;
+        this._lastActivityAt = Date.now();
 
         const overlay = document.createElement('div');
         overlay.id = 'm6-result-prompt';
         overlay.style.cssText = `
-            position: fixed; inset: 0; z-index: 10000;
+            position: fixed; inset: 0; z-index: 2147483001;
             background: rgba(15, 23, 42, 0.95);
             color: white;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -412,9 +425,28 @@ class DivergenceTherapyGame extends BinocularGameEngine {
         };
     }
 
+    /**
+     * [IDLE STOP] Dừng vòng lặp render khi không hoạt động 65 giây.
+     * Chỉ cancel rAF + gỡ listener — KHÔNG dọn instance (sessionMetrics,
+     * canvas vẫn còn) để hộp thoại 3 lựa chọn / _endGame vẫn hoạt động.
+     * @private
+     */
+    _haltIdleLoop() {
+        if (this._animationFrameId) cancelAnimationFrame(this._animationFrameId);
+        this._animationFrameId = null;
+        this._running = false;
+        window.removeEventListener('keydown', this._spaceHandler);
+        window.removeEventListener('keydown', this._escHandler);
+        if (this.canvas) {
+            this.canvas.removeEventListener('pointerdown', this._pointerHandler);
+        }
+        console.info('Idle 65 giây — dừng vòng lặp render.');
+    }
+
     // --- 4. KẾT THÚC VÀ LƯU BỆNH ÁN ---
     _endGame(reason, passed = false) {
         this.state = 'ENDED';
+        this._lastActivityAt = Date.now();
         this.totalPlayTime = Math.round((Date.now() - this.gameStartTime) / 1000);
         if (this.canvas) this.canvas.style.cursor = 'default';
 
