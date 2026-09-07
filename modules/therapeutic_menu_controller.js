@@ -736,7 +736,7 @@ class TherapeuticMenuController {
 
                     <!-- CỘT TRÁI (60%): THÔNG TIN LÂM SÀNG (SCROLLABLE) -->
                     <div style="flex: 6; min-width: 0; overflow-y: auto; padding-right: 15px; border-right: 1px solid #1e293b;">
-                        <h2 style="color: #38bdf8; margin-top: 0; font-size: 22px; border-bottom: 1px solid #1e293b; padding-bottom: 10px;">${game.title}<a href="${docHref}" target="_blank" title="Xem tài liệu y khoa (mở trang mới)" style="text-decoration:none; margin-left:10px;">ℹ️</a></h2>
+                        <h2 style="color: #38bdf8; margin-top: 0; font-size: 22px; border-bottom: 1px solid #1e293b; padding-bottom: 10px;">${game.title}<a href="${docHref}" target="_blank" rel="noopener" title="Xem tài liệu y khoa của module này (mở tab mới)" style="display:inline-flex; align-items:center; gap:6px; margin-left:12px; padding:4px 14px; border-radius:20px; background:rgba(56,189,248,0.15); border:1px solid #38bdf8; color:#7dd3fc; font-size:13px; font-weight:bold; text-decoration:none; vertical-align:middle; transition: background 0.2s, color 0.2s;" onmouseover="this.style.background='rgba(56,189,248,0.35)'; this.style.color='#e0f2fe';" onmouseout="this.style.background='rgba(56,189,248,0.15)'; this.style.color='#7dd3fc';">📖 Tài liệu y khoa</a></h2>
 
                         <p style="font-size: 12px; color: #a78bfa; margin: 0 0 16px 0; font-weight: bold;">${game.stage}</p>
 
@@ -1030,6 +1030,7 @@ window.renderTherapeuticLobby = function(container) {
     const config = {
         'amblyopia': {
             title: "Phác đồ Điều trị Nhược thị",
+            docHref: '/docs/amblyopia_protocol.html',
             rows: [
                 { title: "Giai đoạn 1: Đánh thức Hoàng điểm (Đơn thị)", modules: [
                     { id: 'M7', name: 'Kích thích Lưới CAM', icon: '🌀' },
@@ -1056,6 +1057,7 @@ window.renderTherapeuticLobby = function(container) {
         },
         'strabismus_postop': {
             title: "Phác đồ Hậu phẫu Lác (Post-op Vision Therapy)",
+            docHref: '/docs/post_op_strabismus_protocol.html',
             rows: [
                 { title: "Bước 1: Phá vỡ ức chế + Hợp thị cảm giác", modules: [
                     { id: 'M1', name: 'Hứng hạt', icon: '🧺' },
@@ -1080,7 +1082,18 @@ window.renderTherapeuticLobby = function(container) {
 
     // Khởi tạo HTML với CSS Grid nội tuyến
     let html = `<div style="padding: 20px; color: #fff;">
-        <h2 style="color: #00e676; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px;">${currentSetup.title}</h2>
+        <h2 style="color: #00e676; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px;">${currentSetup.title}
+            <a href="${currentSetup.docHref}" target="_blank" rel="noopener"
+               title="Mở tài liệu Protocol điều trị tương ứng (tab mới)"
+               style="display:inline-flex; align-items:center; gap:6px; margin-left:14px; padding:5px 16px; border-radius:20px;
+                      background:rgba(56,189,248,0.15); border:1px solid #38bdf8; color:#7dd3fc;
+                      font-size:13px; font-weight:bold; text-decoration:none; vertical-align:middle;
+                      transition: background 0.2s, color 0.2s;"
+               onmouseover="this.style.background='rgba(56,189,248,0.35)'; this.style.color='#e0f2fe';"
+               onmouseout="this.style.background='rgba(56,189,248,0.15)'; this.style.color='#7dd3fc';">
+                📖 Tài liệu Protocol
+            </a>
+        </h2>
         <style>
             .grid-row { display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 25px; align-items: stretch; }
             @media (min-width: 1024px) {
