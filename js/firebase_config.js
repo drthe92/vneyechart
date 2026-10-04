@@ -26,8 +26,13 @@ firebase.auth().signInAnonymously().catch((error) => {
     console.error("Lỗi đăng nhập ẩn danh:", error);
 });
 
-// [ĐÃ TẠM KHÓA APP CHECK ĐỂ THÔNG LUỒNG SẢN XUẤT]
-// const provider = new firebase.appCheck.ReCaptchaEnterpriseProvider('6Leih60tAAAAAA-DwVEce4I1cB6nDsxT2CRpJjyv');
+// [APP CHECK — TẠM KHÓA LẠI 2026-10-04] Lần mở trước (key đúng console
+// '...411c...') vẫn bị Google trả 400 Bad Request trên /recaptcha/enterprise/clr
+// (nghi key giới hạn domain, không cover IP:port/dev subdomain) → spam lỗi đỏ
+// mỗi lần gọi Firestore. Enforcement đang TẮT nên khóa lại không ảnh hưởng gì.
+// Muốn mở lại: vào GCP reCAPTCHA Enterprise → cho key cover hết domain dùng
+// thật (app/dev/localhost...) hoặc dùng debug token, rồi mới uncomment.
+// const provider = new firebase.appCheck.ReCaptchaEnterpriseProvider('6Leih60tAAAAAA-DwVEce411cB6nDsxT2CRpJjyv');
 // const appCheck = firebase.appCheck();
 // appCheck.activate(provider, true);
 

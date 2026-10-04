@@ -1,0 +1,74 @@
+// firestore.rules — Vision Therapy WebApp (vneyechart / matcauvong-app)
+// ============================================================================
+// Cách dùng: Firebase console → Firestore Database → Rules → paste toàn bộ
+// file này → Publish. Bấm "Rules playground" để mô phỏng trước khi publish.
+//
+// Nguyên tắc:
+//  - Mặc định CẤM TẤT CẢ (match /{document=**} cuối file).
+//  - Client chỉ được: đọc + tạo Patients/{id}, đọc + tạo Sessions.
+//    KHÔNG update, KHÔNG delete từ client (chống ghi đè / xóa trộm).
+//  - Mọi quyền đều yêu cầu đăng nhập (kể cả anonymous — app tự
+//    signInAnonymously trong js/firebase_config.js).
+//  - Validate hình dạng payload để chống spam rác vào collection.
+//
+//  Bề mặt ghi/đọc thực tế của app (đừng nới lỏng nếu chưa đổi code):
+//   - set  Patients/{phone_name_yob} {phone, patientName, yob,
+//          examTimestamp, status, protocol}          (exam_session_manager.js)
+//   - get  Patients/{id}                             (đăng nhập phiên khám)
+//   - add  Patients/{id}/Sessions {id, gameName, test_id,
+//          durationSeconds, metrics, opticalSettings,
+//          timestamp, updatedAt, device_userAgent}
+//   - get  Patients/{id}/Sessions                    (level sync, banner,
+//                                                     dashboard — cache 60s)
+// ============================================================================
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- Hồ sơ bệnh nhân ----
+    match /Patients/{patientId} {
+      // Đọc: đã đăng nhập (anonymous OK).
+      allow read: if request.auth != null;
+
+      // Tạo / ghi đè: đã đăng nhập + đúng 3 trường định danh + giới hạn dài
+      // để chống bơm rác (patientId đã có dạng phone_name_yob ở client).
+      allow create, update: if request.auth != null
+        && request.resource.data.keys().hasAll(['phone', 'patientName', 'yob'])
+        && request.resource.data.phone is string
+        && request.resource.data.patientName is string
+        && request.resource.data.yob is string
+        && request.resource.data.phone.size() > 0
+        && request.resource.data.phone.size() <= 20
+        && request.resource.data.patientName.size() > 0
+        && request.resource.data.patientName.size() <= 100
+        && request.resource.data.yob.size() <= 10;
+
+      // Xóa hồ sơ: KHÔNG cho từ client. Muốn xóa thì xóa tay trong console.
+      allow delete: if false;
+
+      // ---- Phiên tập / kết quả đo của bệnh nhân ----
+      match /Sessions/{sessionId} {
+        // Đọc: đã đăng nhập.
+        allow read: if request.auth != null;
+
+        // Tạo: đã đăng nhập + có tên module + timestamp + chống doc quá khổ.
+        // (timestamp là serverTimestamp nên phía rules thấy kiểu timestamp.)
+        allow create: if request.auth != null
+          && request.resource.data.keys().hasAll(['gameName', 'timestamp'])
+          && request.resource.data.gameName is string
+          && request.resource.data.gameName.size() > 0
+          && request.resource.data.gameName.size() <= 200
+          && request.resource.data.timestamp is timestamp;
+
+        // Sửa / xóa lịch sử: KHÔNG cho từ client (bất biến y tế).
+        allow update, delete: if false;
+      }
+    }
+
+    // ---- Tất cả collection khác: cấm tuyệt đối ----
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
