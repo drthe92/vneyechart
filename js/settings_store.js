@@ -74,15 +74,23 @@
 
   const SettingsStore = {
 
-    /** Ghi cấu hình: localStorage + cookie dự phòng (nếu thuộc CONFIG_KEYS). */
+    /**
+     * Ghi cấu hình: localStorage + cookie dự phòng (nếu thuộc CONFIG_KEYS).
+     * [BƯỚC 4] Trả về true/false để caller EMR phát hiện hết quota
+     * (trước đây nuốt lỗi im lặng → mất dữ liệu không ai biết).
+     */
     set(key, value) {
+      let ok = true;
       const ls = getLocalStorage();
       if (ls) {
-        try { ls.setItem(key, value); } catch (e) { /* quota — bỏ qua */ }
+        try { ls.setItem(key, value); } catch (e) { ok = false; }
+      } else {
+        ok = false;
       }
       if (CONFIG_KEYS.indexOf(key) !== -1) {
         setCookie(key, value);
       }
+      return ok;
     },
 
     /** Đọc: localStorage trước, fallback cookie dự phòng (chỉ khóa cấu hình). */

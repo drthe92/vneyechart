@@ -208,7 +208,56 @@ if (nmEl) nmEl.disabled = false;
             }
         } catch (error) {
             console.error("Lỗi kết nối Firebase: ", error);
-            showGlobalDialogSafe("Không thể kết nối máy chủ. Vui lòng kiểm tra lại mạng.", { title: 'Lỗi kết nối', type: 'error' });
+            // [BƯỚC 4+] Mất mạng khi mở phiên: cho KHÁM OFFLINE thay vì chặn cứng.
+            // Hồ sơ xếp hàng chờ, tự đẩy lên khi có mạng (giống offline-queue).
+            if (phone && name && yob) {
+                const offlinePatientId = buildPatientId(phone, name, yob);
+                const doOfflineStart = () => {
+                    queuePendingPatientSync(offlinePatientId, {
+                        phone: phone,
+                        patientName: name,
+                        yob: yob,
+                        examTimestamp: Date.now(),
+                        status: "Active",
+                        protocol: protocolInput
+                    });
+                    try {
+                        if (typeof window.SettingsStore !== 'undefined') {
+                            window.SettingsStore.set("currentPatientId", offlinePatientId);
+                            window.SettingsStore.set("currentPatientName", name);
+                            window.SettingsStore.set("currentPatientYob", yob);
+                            window.SettingsStore.set("currentProtocol", protocolInput);
+                        } else {
+                            localStorage.setItem("currentPatientId", offlinePatientId);
+                            localStorage.setItem("currentPatientName", name);
+                            localStorage.setItem("currentPatientYob", yob);
+                            localStorage.setItem("currentProtocol", protocolInput);
+                        }
+                    } catch (x) { /* best-effort */ }
+                    hideModal(startExamModal);
+                    const formEl = document.getElementById("start-exam-form");
+                    if (formEl) formEl.reset();
+                    const nmEl = document.getElementById("patient-name");
+                    const ybEl = document.getElementById("patient-yob");
+                    if (nmEl) nmEl.disabled = false;
+                    if (ybEl) ybEl.disabled = false;
+                    startExam(name, yob, offlinePatientId);
+                    try { showToast('📴 Đang offline — phiên khám lưu trên máy, hồ sơ sẽ tự đồng bộ khi có mạng.'); } catch (x) { /* ignore */ }
+                };
+                if (typeof window.showGlobalConfirm === 'function') {
+                    window.showGlobalConfirm('Không tới được máy chủ (mất mạng?). Bắt đầu phiên khám OFFLINE? Dữ liệu lưu trên máy và hồ sơ tự đồng bộ khi có mạng.', {
+                        title: 'Khám offline?',
+                        confirmText: 'Khám offline',
+                        cancelText: 'Để sau',
+                        type: 'warning',
+                        onConfirm: doOfflineStart
+                    });
+                } else {
+                    doOfflineStart();
+                }
+                return;
+            }
+            showGlobalDialogSafe(firebaseErrorMessage(error), { title: 'Lỗi kết nối', type: 'error' });
         }
     }
 
@@ -218,10 +267,26 @@ if (nmEl) nmEl.disabled = false;
      * Được gọi từ callback của showGlobalConfirm (thay confirm() trình duyệt).
      */
     async function createNewPatientRecord() {
-        const phoneInput = document.getElementById("input_phone") ? document.getElementById("input_phone").value.trim() : "";
-        const nameInput = document.getElementById("patient-name") ? document.getElementById("patient-name").value.trim() : "";
-        const yearInput = document.getElementById("patient-yob") ? document.getElementById("patient-yob").value.trim() : "";
+        let phoneInput = document.getElementById("input_phone") ? document.getElementById("input_phone").value.trim() : "";
+        let nameInput = document.getElementById("patient-name") ? document.getElementById("patient-name").value.trim() : "";
+        let yearInput = document.getElementById("patient-yob") ? document.getElementById("patient-yob").value.trim() : "";
         const protocolInput = document.getElementById("input_protocol") ? document.getElementById("input_protocol").value : "exam";
+        // [FIX ẨN DANH] handleSessionStart đặt giá trị mặc định vào biến cục bộ
+        // nhưng hàm này đọc lại DOM (ô phone/yob trống, name="Ẩn danh") nên từng
+        // sinh ID rác UNKNOWN_andanh_NOYOB + payload phone rỗng → rules từ chối.
+        // Áp lại đúng logic mặc định ẩn danh tại đây + chặn cứng nếu vẫn thiếu.
+        const isAnonRetry = document.getElementById("anonymous-check") ? document.getElementById("anonymous-check").checked : false;
+        if (isAnonRetry) {
+            if (!nameInput) nameInput = "Ẩn danh";
+            if (!yearInput) yearInput = "1900";
+            if (!phoneInput) {
+                phoneInput = "ANON_" + Math.floor(100000 + Math.random() * 900000).toString();
+            }
+        }
+        if (!phoneInput || !nameInput || !yearInput) {
+            showGlobalDialogSafe("Vui lòng nhập đầy đủ Số điện thoại, Họ và Tên, Năm sinh.", { title: 'Thiếu thông tin', type: 'warning' });
+            return;
+        }
         const patientId = buildPatientId(phoneInput, nameInput, yearInput);
         const patientRef = db.collection("Patients").doc(patientId);
         const dataToSave = {
@@ -277,7 +342,7 @@ if (nmEl) nmEl.disabled = false;
             startExam(nameInput, yearInput, patientId);
         } catch (error) {
             console.error("Lỗi kết nối Firebase: ", error);
-            showGlobalDialogSafe("Không thể kết nối máy chủ. Vui lòng kiểm tra lại mạng.", { title: 'Lỗi kết nối', type: 'error' });
+            showGlobalDialogSafe(firebaseErrorMessage(error), { title: 'Lỗi kết nối', type: 'error' });
         }
     }
 
@@ -289,6 +354,129 @@ if (nmEl) nmEl.disabled = false;
             alert(message);
         }
     }
+
+    // ================================================================
+    //  [BƯỚC 4] Chống mất dữ liệu EMR (quota + đồng bộ Firebase)
+    // ================================================================
+
+    /** Đếm số lần ghi Firebase đang bay dở (sessionsRef.add chưa settle). */
+    window.__pendingFirestoreWrites = window.__pendingFirestoreWrites || 0;
+
+    /** true khi còn bản ghi chưa đồng bộ xong lên Firebase. */
+    window.hasPendingFirestoreWrites = function() {
+        return (window.__pendingFirestoreWrites || 0) > 0;
+    };
+
+    /** Nhận diện lỗi hết quota localStorage trên mọi trình duyệt. */
+    function isQuotaError(e) {
+        if (!e) return false;
+        if (e.code === 22 || e.code === 1014) return true;
+        if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') return true;
+        if (typeof e.message === 'string' && /quota|storage.*full|exceed.*storage/i.test(e.message)) return true;
+        return false;
+    }
+
+    /** Dịch mã lỗi Firebase thành tiếng Việt đúng bản chất (hết tin giả "mất mạng"). */
+    function firebaseErrorMessage(err) {
+        const code = (err && err.code) || '';
+        if (code === 'permission-denied') return 'Máy chủ từ chối ghi (kiểm tra Rules). Dữ liệu vẫn còn nguyên trên máy này — báo quản trị trước khi làm tiếp.';
+        if (code === 'unauthenticated' || code.indexOf('auth/') === 0) return 'Chưa đăng nhập được vào máy chủ (Anonymous auth / domain). Dữ liệu vẫn còn trên máy này.';
+        if (code === 'unavailable' || code === 'deadline-exceeded' || code === 'cancelled') return 'Mất kết nối máy chủ. Dữ liệu đã lưu tạm trên máy và sẽ thử đồng bộ lại khi có mạng.';
+        return 'Không gửi được dữ liệu lên máy chủ (' + (code || 'lỗi không rõ') + '). Dữ liệu vẫn còn trên máy này.';
+    }
+
+    /**
+     * Ghi EMR có chống mất dữ liệu: hết quota → tự dọn (compact + vacuum)
+     * rồi thử lại 1 lần; vẫn rớt thì BÁO TO cho KTV thay vì mất im lặng.
+     * @param {string} key - localStorage key
+     * @param {string} payload - JSON string
+     * @param {boolean} loud - true: thêm dialog (dùng cho chốt phiên khám)
+     * @returns {boolean} true = đã ghi chắc
+     */
+    function persistEmrPayload(key, payload, loud) {
+        const attemptWrite = () => {
+            try {
+                let ok;
+                if (typeof window.SettingsStore !== 'undefined') {
+                    ok = window.SettingsStore.set(key, payload);
+                } else {
+                    localStorage.setItem(key, payload);
+                    ok = true;
+                }
+                return ok !== false;
+            } catch (e) {
+                return isQuotaError(e) ? 'quota' : false;
+            }
+        };
+        let r = attemptWrite();
+        if (r === 'quota' && !window.__emrPruning) {
+            window.__emrPruning = true;
+            try { if (typeof _compactEmrHistory === 'function') _compactEmrHistory(); } catch (x) { /* ignore */ }
+            try { if (typeof _vacuumEmrSessions === 'function') _vacuumEmrSessions(); } catch (x) { /* ignore */ }
+            window.__emrPruning = false;
+            r = attemptWrite();
+        }
+        if (r !== true) {
+            const msg = r === 'quota'
+                ? '⚠️ Bộ nhớ máy ĐẦY — không lưu được dữ liệu khám. Hãy xuất PDF/CSV ngay, rồi xóa bớt lịch sử cũ.'
+                : '⚠️ Không ghi được dữ liệu xuống máy (' + key + '). Hãy xuất PDF/CSV ngay để giữ kết quả.';
+            try { showToast(msg); } catch (x) { /* ignore */ }
+            if (loud) {
+                try { showGlobalDialogSafe(msg, { title: 'Nguy cơ mất dữ liệu', type: 'error' }); } catch (x) { /* ignore */ }
+            }
+            return false;
+        }
+        return true;
+    }
+
+    /** Khóa hàng đợi hồ sơ tạo khi offline, chờ có mạng đẩy lên Firestore. */
+    const PENDING_PATIENT_SYNC_KEY = 'vision_pending_patient_sync';
+
+    /** Xếp hồ sơ vào hàng chờ (dedupe theo patientId, best-effort). */
+    function queuePendingPatientSync(patientId, profile) {
+        try {
+            const raw = localStorage.getItem(PENDING_PATIENT_SYNC_KEY);
+            const list = raw ? JSON.parse(raw) : [];
+            const arr = Array.isArray(list) ? list : [];
+            if (!arr.some(e => e && e.patientId === patientId)) {
+                arr.push({ patientId, profile, queuedAt: Date.now() });
+                localStorage.setItem(PENDING_PATIENT_SYNC_KEY, JSON.stringify(arr));
+            }
+        } catch (e) { /* best-effort — không chặn khám */ }
+    }
+
+    /**
+     * Đẩy hàng chờ lên Firestore: doc chưa có → set (đúng validate Rules:
+     * phone/patientName/yob string); đã có → thôi. Rớt mạng/quyền → giữ lại.
+     */
+    async function flushPendingPatientSync() {
+        let list;
+        try {
+            list = JSON.parse(localStorage.getItem(PENDING_PATIENT_SYNC_KEY) || '[]');
+            if (!Array.isArray(list) || list.length === 0) return;
+        } catch (e) { return; }
+        if (!window.db) return;
+        const rest = [];
+        for (const item of list) {
+            if (!item || !item.patientId) continue;
+            try {
+                const ref = window.db.collection('Patients').doc(item.patientId);
+                const snap = await ref.get();
+                if (!snap.exists && item.profile) {
+                    await ref.set(item.profile);
+                }
+            } catch (e) {
+                rest.push(item);
+            }
+        }
+        try { localStorage.setItem(PENDING_PATIENT_SYNC_KEY, JSON.stringify(rest)); } catch (e) { /* ignore */ }
+        if (rest.length < list.length) {
+            try { showToast('🔄 Đã đồng bộ hồ sơ chờ lên máy chủ.'); } catch (x) { /* ignore */ }
+        }
+    }
+
+    // Expose để KTV/bác sĩ gọi tay từ Console khi cần (F12 → flushPendingPatientSync()).
+    window.flushPendingPatientSync = flushPendingPatientSync;
 
     function init() {
         // Tự phục hồi cấu hình nếu localStorage bị trình duyệt xóa (đóng/khởi động lại)
@@ -305,6 +493,16 @@ if (nmEl) nmEl.disabled = false;
         _compactEmrHistory();
         _vacuumEmrSessions();
         restoreSession();
+
+        // [BƯỚC 4+] Đẩy hồ sơ tạo khi offline + tự thử lại mỗi khi có mạng.
+        try { flushPendingPatientSync(); } catch (e) { /* ignore */ }
+        try {
+            window.addEventListener('online', () => { flushPendingPatientSync(); });
+            // DevTools gạt Offline đôi khi không nổ event 'online' → xả thêm khi tab hiện lại.
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) flushPendingPatientSync();
+            });
+        } catch (e) { /* ignore */ }
 
         // Combo Test Banner: render ngay khi khởi động (nếu đã có bệnh nhân)
         if (document.getElementById('amblyopia-combo-banner')) {
@@ -950,11 +1148,7 @@ if (nmEl) nmEl.disabled = false;
         if (window.__currentExam) {
             try {
                 const payload = JSON.stringify(window.__currentExam);
-                if (typeof window.SettingsStore !== 'undefined') {
-                    window.SettingsStore.set(SESSION_STORAGE_KEY, payload);
-                } else {
-                    localStorage.setItem(SESSION_STORAGE_KEY, payload);
-                }
+                persistEmrPayload(SESSION_STORAGE_KEY, payload, false);
             } catch (e) {
                 console.warn('Failed to save session to localStorage:', e);
             }
@@ -1642,7 +1836,7 @@ if (nmEl) nmEl.disabled = false;
 
         if (!hasTests && !hasTherapy) {
             console.warn('[ExamSessionManager] Chon luu vao lich su: Phiem khom trong (khong co lam sang hoac thuan luyen).');
-            return;
+            return true;
         }
 
         try {
@@ -1674,11 +1868,8 @@ if (nmEl) nmEl.disabled = false;
             }
 
             const payload = JSON.stringify(history);
-            if (typeof window.SettingsStore !== 'undefined') {
-                window.SettingsStore.set(EMR_HISTORY_KEY, payload);
-            } else {
-                localStorage.setItem(EMR_HISTORY_KEY, payload);
-            }
+            // [BƯỚC 4] Ghi qua helper chống mất dữ liệu (hết quota → báo to).
+            if (!persistEmrPayload(EMR_HISTORY_KEY, payload, true)) return false;
 
             // [P#2] Đồng bộ kết quả thị lực lẻ (ngoài Combo) vào store EMR + Firebase
             // để vẽ biểu đồ — định tuyến qua addTherapyRecord (ghi CẢ local
@@ -1707,8 +1898,10 @@ if (nmEl) nmEl.disabled = false;
                     }
                 });
             }
+            return true;
         } catch (e) {
             console.error('[ExamSessionManager] Failed to save to history:', e);
+            return false;
         }
     }
 
@@ -1924,9 +2117,15 @@ if (nmEl) nmEl.disabled = false;
         if (!hasTests && !hasTherapy) {
             console.warn('[ExamSessionManager] Chon reset: Phiem kham trong (khong co lam sang hoac thuan luyen).');
         } else {
-            saveToHistory(window.__currentExam);
+            // [BƯỚC 4] Lưu rớt (hết quota...) → GIỮ PHIÊN để KTV xuất tay,
+            // tuyệt đối không xóa dữ liệu chưa được lưu.
+            if (saveToHistory(window.__currentExam) === false) {
+                showGlobalDialogSafe('KHÔNG lưu được lịch sử xuống máy (nghi hết bộ nhớ). Phiên khám được GIỮ LẠI — hãy xuất PDF/CSV ngay rồi mới đóng.', { title: 'Nguy cơ mất dữ liệu', type: 'error' });
+                return;
+            }
         }
 
+        const doClearSession = () => {
         // Exit fullscreen
         if (document.fullscreenElement) {
             document.exitFullscreen().catch(err => {
@@ -1964,6 +2163,23 @@ if (nmEl) nmEl.disabled = false;
 
         // Combo Banner: làm mới ngay (ẩn banner khi không còn phiên khám)
         updateComboBanner();
+        }; // end doClearSession
+
+        // [BƯỚC 4] Còn bản ghi đang bay lên Firebase → hỏi KTV trước khi đóng,
+        // tránh tắt trình duyệt ngay làm rớt đồng bộ.
+        if (typeof window.hasPendingFirestoreWrites === 'function' && window.hasPendingFirestoreWrites()) {
+            if (typeof window.showGlobalConfirm === 'function') {
+                window.showGlobalConfirm('Còn bản ghi đang đồng bộ lên Firebase chưa xong. Đóng ngay có thể làm rớt đồng bộ (dữ liệu local vẫn còn).', {
+                    title: 'Đồng bộ chưa xong',
+                    confirmText: 'Vẫn đóng phiên',
+                    cancelText: 'Chờ đồng bộ',
+                    type: 'warning',
+                    onConfirm: () => doClearSession()
+                });
+                return;
+            }
+        }
+        doClearSession();
     }
 
     // Enter fullscreen
@@ -3845,12 +4061,9 @@ document.addEventListener('click', function(e) {
                 }
                 
                  // Đóng gói và lưu lại
+                 // [BƯỚC 4] Ghi qua helper chống mất dữ liệu (hết quota → báo to).
                  const sessionsPayload = JSON.stringify(sessions);
-                 if (typeof window.SettingsStore !== 'undefined') {
-                     window.SettingsStore.set('emr_patient_sessions', sessionsPayload);
-                 } else {
-                     localStorage.setItem('emr_patient_sessions', sessionsPayload);
-                 }
+                 persistEmrPayload('emr_patient_sessions', sessionsPayload, false);
                  
                  // BẮT ĐẦU: ĐỒNG BỘ LÊN FIREBASE
                  const currentPatientId = localStorage.getItem("currentPatientId");
@@ -3874,8 +4087,17 @@ document.addEventListener('click', function(e) {
                                device_userAgent: navigator.userAgent
                            };
 
+                         // [BƯỚC 4] Theo dõi ghi dở + báo cho KTV khi rớt
+                         // (trước đây chỉ console.error → mất im lặng).
+                         window.__pendingFirestoreWrites = (window.__pendingFirestoreWrites || 0) + 1;
+                         const __decPendingSync = () => { window.__pendingFirestoreWrites = Math.max(0, (window.__pendingFirestoreWrites || 1) - 1); };
                          sessionsRef.add(payload)
-                             .catch(err => console.error("[Firebase Sync] Lỗi ghi dữ liệu:", err));
+                             .then(__decPendingSync)
+                             .catch(err => {
+                                 __decPendingSync();
+                                 console.error("[Firebase Sync] Lỗi ghi dữ liệu:", err);
+                                 try { showToast('⚠️ ' + firebaseErrorMessage(err)); } catch (x) { /* ignore */ }
+                             });
 
                          // [TẢI 1 LẦN] Vừa ghi Session mới → hủy cache chung để
                          // lần đọc kế tiếp (dashboard refresh, level sync, banner)
