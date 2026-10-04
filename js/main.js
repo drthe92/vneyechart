@@ -79,7 +79,10 @@ function loadTest(testId, steps) {
   // chỉnh thẻ tín dụng hợp lệ (pxPerMm > 0, đúng màn hình). Bấm "Hiệu chỉnh
   // ngay" → mở modal hiệu chuẩn; bấm "Xem demo" → vẫn mở test (kết quả sẽ được
   // đánh dấu "chưa hiệu chỉnh" trên báo cáo) nhưng chỉ lần đầu.
-  if (typeof window.isCalibrationValid === 'function' &&
+  let isDemoUncalibrated = false;
+  try { isDemoUncalibrated = sessionStorage.getItem('vision-demo-uncalibrated') === '1'; } catch (e) { /* ignore */ }
+  if (!isDemoUncalibrated &&
+      typeof window.isCalibrationValid === 'function' &&
       TEST_DISTANCE_GROUPS[testId] &&
       !window.isCalibrationValid()) {
     const msg = 'Bài test ' + (testId || '') + ' cần hiệu chuẩn màn hình (thẻ tín dụng) để cho kết quả đo chính xác.\n\n'
