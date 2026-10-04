@@ -166,13 +166,13 @@ class VergenceTrackerGame extends BinocularGameEngine {
         let rightBarX = cx;
 
         if (this.mode === 'Base-Out') {
-            // Base-Out (Hội tụ): Lăng kính gốc hướng ra ngoài → Bệnh nhân phải CROSS để dung hợp
-            // Mắt trái - Cyan - dịch TRÁI | Mắt phải - Đỏ - dịch PHẢI → Tách ra xa
+            // Base-Out (Hội tụ): Bệnh nhân phải CROSS để dung hợp.
+            // Vật lý: Đỏ (mắt PHẢI) dịch TRÁI + Cyan (mắt TRÁI) dịch PHẢI → cùng hướng vào trong.
             leftBarX = cx - this.splitDistance;
             rightBarX = cx + this.splitDistance;
         } else {
-            // Base-In (Phân kỳ): Lăng kính đỉnh hướng ra ngoài → Bệnh nhân phải DIVERGE để dung hợp
-            // Mắt trái - Cyan - dịch PHẢI | Mắt phải - Đỏ - dịch TRÁI → Tiến lại gần
+            // Base-In (Phân kỳ): Bệnh nhân phải DIVERGE để dung hợp.
+            // Vật lý: Đỏ (mắt PHẢI) dịch PHẢI + Cyan (mắt TRÁI) dịch TRÁI → cùng hướng ra ngoài.
             leftBarX = cx + this.splitDistance;
             rightBarX = cx - this.splitDistance;
         }
@@ -180,11 +180,11 @@ class VergenceTrackerGame extends BinocularGameEngine {
         // D. Vẽ 2 thanh với blend mode 'multiply'
         ctx.globalCompositeOperation = 'multiply';
 
-        // Vẽ thanh mắt Nhược thị (Left Eye - Cyan)
+        // Thanh kênh left (Đỏ → mắt PHẢI qua kính)
         ctx.fillStyle = this.colors.left;
         ctx.fillRect(leftBarX - this.barWidth / 2, cy - this.barHeight / 2, this.barWidth, this.barHeight);
 
-        // Vẽ thanh mắt Lành (Right Eye - Red)
+        // Thanh kênh right (Cyan → mắt TRÁI qua kính)
         ctx.fillStyle = this.colors.right;
         ctx.fillRect(rightBarX - this.barWidth / 2, cy - this.barHeight / 2, this.barWidth, this.barHeight);
 

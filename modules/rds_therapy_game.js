@@ -58,8 +58,9 @@ class RDSTherapyGame extends BinocularGameEngine {
         this.targetRect = { x: 0, y: 0, size: 120 };
 
         // --- Cache Noise ngẫu nhiên — 2 layer trong suốt (Cyan/Red) cho phân thị hai mắt ---
-        this.noiseCanvasRight = null;    // Cyan (Mắt phải nhìn)
-        this.noiseCanvasLeft = null;     // Red (Mắt trái nhìn)
+        // Vật lý kính (phải ĐỎ/trái XANH): Cyan → mắt TRÁI, Đỏ → mắt PHẢI.
+        this.noiseCanvasRight = null;    // Cyan (mắt TRÁI nhìn)
+        this.noiseCanvasLeft = null;     // Red (mắt PHẢI nhìn)
         this.NOISE_RESOLUTION = 4;       // 1 pixel noise mỗi 4px canvas (tối ưu hiệu năng)
 
         // --- Trạng thái trò chơi ---
@@ -201,13 +202,23 @@ class RDSTherapyGame extends BinocularGameEngine {
         const imgR = ctxR.createImageData(w, h);
         const imgL = ctxL.createImageData(w, h);
         
+        // [V1.1] Điểm nhiễu lấy màu hiệu chuẩn (không còn hardcode thuần).
+        const cal = (typeof window !== 'undefined' && window.__anaglyphColors) || {};
+        const toRgb = (hex, fb) => {
+            const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+            if (!m) return fb;
+            const v = parseInt(m[1], 16);
+            return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+        };
+        const [cr, cg, cb] = toRgb(cal.cyan, [77, 255, 255]);
+        const [rr, rg, rb] = toRgb(cal.red, [255, 77, 77]);
         for (let i = 0; i < imgR.data.length; i += 4) {
             const isDot = Math.random() > 0.5;
             if (isDot) {
-                // Cyan (Mắt phải nhìn) - Bọc trên nền trong suốt
-                imgR.data[i] = 0; imgR.data[i+1] = 255; imgR.data[i+2] = 255; imgR.data[i+3] = 255;
-                // Đỏ (Mắt trái nhìn) - Bọc trên nền trong suốt
-                imgL.data[i] = 255; imgL.data[i+1] = 0; imgL.data[i+2] = 0; imgL.data[i+3] = 255;
+                // Cyan (mắt TRÁI nhìn) - Bọc trên nền trong suốt
+                imgR.data[i] = cr; imgR.data[i+1] = cg; imgR.data[i+2] = cb; imgR.data[i+3] = 255;
+                // Đỏ (mắt PHẢI nhìn) - Bọc trên nền trong suốt
+                imgL.data[i] = rr; imgL.data[i+1] = rg; imgL.data[i+2] = rb; imgL.data[i+3] = 255;
             } else {
                 imgR.data[i+3] = 0; // Transparent
                 imgL.data[i+3] = 0; // Transparent
@@ -274,7 +285,7 @@ class RDSTherapyGame extends BinocularGameEngine {
         const targetScreenY = this.targetRect.y * scaleY;
         const targetScreenSize = this.targetRect.size * scaleX;
 
-        // B. Vẽ Nền Noise màu Cyan (Mắt phải nhìn - Cố định)
+        // B. Vẽ Nền Noise màu Cyan (mắt TRÁI nhìn - Cố định)
         ctx.globalCompositeOperation = 'multiply';
         ctx.drawImage(
             this.noiseCanvasRight,

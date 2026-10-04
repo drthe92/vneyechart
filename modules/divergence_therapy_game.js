@@ -294,7 +294,7 @@ class DivergenceTherapyGame extends BinocularGameEngine {
         const cy = this.canvas.height / 2;
 
         // 1. Tính toán vị trí Lăng kính Phân kỳ (Base-In)
-        // Mắt Trái (Cyan) dịch phải, Mắt Phải (Đỏ) dịch trái
+        // Vật lý: Đỏ (mắt PHẢI) dịch phải + Cyan (mắt TRÁI) dịch trái → cùng ra ngoài (Phân kỳ)
         // currentDiopter = 0 → 2 khối chồng khít = 1 hình hợp nhất
         const splitPx = this.diopterToPixels(this.currentDiopter) / 2;
         const leftBarX = cx + splitPx;  // Trái tiến sang Phải
@@ -302,10 +302,10 @@ class DivergenceTherapyGame extends BinocularGameEngine {
 
         // 2. Vẽ hai khối màu (Blend Mode)
         ctx.globalCompositeOperation = 'multiply';
-        ctx.fillStyle = this.colors.left || '#00FFFF'; // Cyan
+        ctx.fillStyle = this.colors.left || '#4DFFFF'; // Kênh left (đỏ → mắt PHẢI)
         ctx.fillRect(leftBarX - this.barWidth/2, cy - this.barHeight/2, this.barWidth, this.barHeight);
 
-        ctx.fillStyle = this.colors.right || '#FF0000'; // Red
+        ctx.fillStyle = this.colors.right || '#FF4D4D'; // Kênh right (cyan → mắt TRÁI)
         ctx.fillRect(rightBarX - this.barWidth/2, cy - this.barHeight/2, this.barWidth, this.barHeight);
         ctx.globalCompositeOperation = 'source-over';
 

@@ -63,6 +63,14 @@ class TherapeuticMenuController {
                         min: 1, max: 10,
                         storageKey: 'vision-therapy-m1-max-level',
                         help: 'Level càng cao: hạt rơi nhanh hơn, thanh hứng hẹp hơn, hạt nhỏ hơn. Mỗi phiên kết thúc khi đủ 30 điểm.'
+                    },
+                    {
+                        id: 'catch-weak-eye', key: 'weakEye', label: 'Mắt nhược thị', numeric: false,
+                        options: [
+                            { value: 'R', label: 'Mắt phải (mặc định)', selected: true },
+                            { value: 'L', label: 'Mắt trái', selected: false }
+                        ],
+                        help: 'Mắt nhược thị nhận tín hiệu đầy đủ (hạt rơi); mắt lành bị giảm tín hiệu (thanh hứng mờ dần). Mặc định R = hành vi hiện tại.'
                     }
                 ],
                 mandatoryWarning: '⚠️ CẢNH BÁO: Đeo kính Đỏ-Lục Lam (Mắt phải ĐỎ / Mắt trái XANH) trước khi chơi.'
@@ -85,6 +93,14 @@ class TherapeuticMenuController {
                         min: 1, max: 10,
                         storageKey: 'vision-therapy-m2-max-level',
                         help: 'Level càng cao: khung & khối nhỏ hơn, thời gian giữ yên lâu hơn, nền nhiễu động nhiều hơn.'
+                    },
+                    {
+                        id: 'align-weak-eye', key: 'weakEye', label: 'Mắt nhược thị', numeric: false,
+                        options: [
+                            { value: 'R', label: 'Mắt phải (mặc định)', selected: true },
+                            { value: 'L', label: 'Mắt trái', selected: false }
+                        ],
+                        help: 'Mắt nhược thị nhận khung đích đầy đủ; mắt lành điều khiển khối kéo. Mặc định R = hành vi hiện tại.'
                     }
                 ],
                 mandatoryWarning: '⚠️ CẢNH BÁO: Đeo kính Đỏ-Lục Lam (Mắt phải ĐỎ / Mắt trái XANH) trước khi chơi.'
@@ -636,7 +652,13 @@ class TherapeuticMenuController {
                 continue;
             }
 
-            const optionsHtml = setting.options.map(o =>
+            // [MẮT NHƯỢC THỊ] Preselect theo bệnh nhân đang đăng nhập.
+            let opts = setting.options;
+            if (setting.key === 'weakEye' && typeof window.getWeakEye === 'function') {
+                const stored = window.getWeakEye();
+                opts = setting.options.map(o => ({ value: o.value, label: o.label, selected: String(o.value) === stored }));
+            }
+            const optionsHtml = opts.map(o =>
                 `<option value="${o.value}"${o.selected ? ' selected' : ''}>${o.label}</option>`
             ).join('');
 
@@ -872,6 +894,10 @@ class TherapeuticMenuController {
                             config[setting.key] = setting.numeric ? Number(el.value) : el.value;
                         }
                     }
+                }
+                // [MẮT NHƯỢC THỊ] Lưu lựa chọn theo bệnh nhân để lần sau khỏi chọn lại.
+                if ((config.weakEye === 'L' || config.weakEye === 'R') && typeof window.setWeakEye === 'function') {
+                    window.setWeakEye(config.weakEye);
                 }
                 this._startFullscreenGame(module, config);
             };
@@ -1227,7 +1253,10 @@ window.refreshTherapeuticMenu = function(fromToggle) {
 
         // Giới hạn 25 chu kỳ (5 giây) — chống rò rỉ bộ nhớ
         if (cycles >= maxCycles) {
-            console.warn('[Therapeutic] Không tìm thấy DOM sau 5 giây. Hủy auto-mount.');
+            // [BƯỚC 5] Đây là trạng thái BÌNH THƯỜNG khi chỉ dùng Phòng khám:
+            // workspace Huấn luyện đang ẩn (display:none) nên auto-mount không chạy.
+            // Nó sẽ mount khi bấm nút chuyển workspace (toggleWorkspace).
+            console.info('[Therapeutic] Workspace Huấn luyện đang ẩn — bỏ qua auto-mount (sẽ mount khi chuyển workspace).');
             clearInterval(mountCheck);
         }
     }, pollInterval);
@@ -1301,6 +1330,37 @@ function _canUseLegacyLevel() {
  *        đồng bộ Firebase để tránh ghi level không thuộc bệnh nhân vào khóa riêng).
  * @returns {number} Level hợp lệ (clamp 1..10)
  */
+/**
+ * Mắt nhược thị của BỆNH NHÂN HIỆN TẠI ('R' | 'L', mặc định 'R' = hành vi cũ).
+ * Lưu riêng theo bệnh nhân; chưa đăng nhập → khóa chung.
+ */
+function _weakEyeStorageKey() {
+    try {
+        const pid = localStorage.getItem('currentPatientId');
+        if (pid) return 'vision-therapy-' + pid + '-weak-eye';
+    } catch (e) { /* ignore */ }
+    return 'vision-therapy-weak-eye';
+}
+window.getWeakEye = function() {
+    const keys = [];
+    try {
+        const pid = localStorage.getItem('currentPatientId');
+        if (pid) keys.push('vision-therapy-' + pid + '-weak-eye');
+    } catch (e) { /* ignore */ }
+    keys.push('vision-therapy-weak-eye');
+    for (const k of keys) {
+        try {
+            const v = localStorage.getItem(k);
+            if (v === 'L' || v === 'R') return v;
+        } catch (e) { /* ignore */ }
+    }
+    return 'R';
+};
+window.setWeakEye = function(v) {
+    v = (v === 'L') ? 'L' : 'R';
+    try { localStorage.setItem(_weakEyeStorageKey(), v); } catch (e) { /* ignore */ }
+    return v;
+};
 window.getTherapyMaxLevel = function(moduleKey, fallback = 1, excludeLegacy = false) {
     const pKey = _patientTherapyLevelKey(moduleKey);
     let v = NaN;

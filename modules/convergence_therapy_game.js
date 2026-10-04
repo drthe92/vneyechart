@@ -295,7 +295,7 @@ class ConvergenceTherapyGame extends BinocularGameEngine {
         const cy = this.canvas.height / 2;
 
         // 1. Tính toán vị trí Lăng kính Hội tụ (Base-Out)
-        // ĐẢO MÀU PHÂN THỊ: Mắt Trái (Đỏ) dịch phải, Mắt Phải (Cyan) dịch trái
+        // Vật lý: Cyan (mắt TRÁI) dịch phải + Đỏ (mắt PHẢI) dịch trái → cùng vào trong (Hội tụ)
         // → Hiệu ứng Base-Out (Hội tụ) ngược với M6 Phân kỳ
         // currentDiopter = 0 → 2 khối chồng khít = 1 hình hợp nhất
         const splitPx = this.diopterToPixels(this.currentDiopter) / 2;
@@ -304,10 +304,10 @@ class ConvergenceTherapyGame extends BinocularGameEngine {
 
         // 2. Vẽ hai khối màu (Blend Mode) — HOÁN ĐỔI MÀU giữa 2 mắt
         ctx.globalCompositeOperation = 'multiply';
-        ctx.fillStyle = this.colors.right || '#FF0000'; // Mắt Trái dùng ĐỎ (Base-Out)
+        ctx.fillStyle = this.colors.right || '#FF4D4D'; // Kênh right (cyan → mắt TRÁI)
         ctx.fillRect(leftBarX - this.barWidth/2, cy - this.barHeight/2, this.barWidth, this.barHeight);
 
-        ctx.fillStyle = this.colors.left || '#00FFFF'; // Mắt Phải dùng CYAN (Base-Out)
+        ctx.fillStyle = this.colors.left || '#4DFFFF'; // Kênh left (đỏ → mắt PHẢI)
         ctx.fillRect(rightBarX - this.barWidth/2, cy - this.barHeight/2, this.barWidth, this.barHeight);
         ctx.globalCompositeOperation = 'source-over';
 

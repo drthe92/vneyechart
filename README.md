@@ -29,10 +29,22 @@ A comprehensive web-based vision therapy application with various optotype tests
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/vision-therapy-webapp.git
+git clone https://github.com/drthe92/vneyechart.git
+cd vneyechart
 ```
 
-2. Open `index.html` in a web browser
+2. Serve tĩnh từ thư mục gốc rồi mở bằng trình duyệt (BẮT BUỘC qua
+http/https — KHÔNG mở `index.html` trực tiếp bằng `file://` vì ES modules
+và Service Worker bị trình duyệt chặn):
+```bash
+python3 -m http.server 8080
+# mở http://localhost:8080/
+```
+
+3. Yêu cầu deploy: host ở **domain root** (vd `app.matcauvong.com`),
+không host dưới sub-path (Service Worker + manifest đang dùng đường dẫn
+tuyệt đối `/sw.js`, `/manifest.json`). Mỗi đợt release có đổi file tĩnh
+thì tăng `CACHE_NAME` trong `sw.js` để client tự cập nhật.
 
 ## Usage
 

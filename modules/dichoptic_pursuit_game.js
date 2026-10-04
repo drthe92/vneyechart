@@ -51,9 +51,11 @@ class DichopticPursuitGame extends BinocularGameEngine {
 
         // --- Màu sắc phân thị (Anaglyph) ---
         // Nền đen tuyệt đối, Đường ray Đỏ, Mục tiêu Lục Lam.
+        // [V1.1] Lấy từ engine (có hiệu chuẩn) thay vì hardcode; GIỮ NGUYÊN
+        // mapping mắt (Đường ray=Mắt phải, Tàu=Mắt trái) chờ audit lâm sàng.
         this.bgColor = '#000000';
-        this.pathColor = '#FF0000';   // Đường ray (Mắt phải)
-        this.shipColor = '#00FFFF';   // Mục tiêu / Tàu (Mắt trái)
+        this.pathColor = (this.colors && this.colors.left) || '#FF0000';   // Đường ray (Mắt phải)
+        this.shipColor = (this.colors && this.colors.right) || '#00FFFF';   // Mục tiêu / Tàu (Mắt trái)
         this.glowColor = '#FFFFFF';   // Màu giao điểm (khi dùng 'lighter')
 
         // --- Mảng tọa độ X của đường ray dọc theo trục Y ---

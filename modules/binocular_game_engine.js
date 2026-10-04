@@ -58,17 +58,21 @@ class BinocularGameEngine {
         this.vergenceDemand = { delta: 0, direction: 'BO', pixelOffset: 0 };
 
         // --- Rào cản y khoa: Bắt buộc hiệu chuẩn Anaglyph colors ---
+        // [V1.1] Fallback dùng màu đã hiệu chuẩn mềm (#FF4D4D/#4DFFFF, khớp
+        // exam_session_manager) thay vì màu thuần — đỡ chói khi chưa hiệu chuẩn.
+        // LƯU Ý AUDIT: ánh xạ kênh left/right sang mắt phải được giữ nguyên tuyệt
+        // đối ở đây; mọi nghi ngờ đảo mắt xem báo cáo audit, không tự đổi mapping.
         if (typeof window !== 'undefined' && window.__anaglyphColors) {
             this.colors = {
-                left: window.__anaglyphColors.red || '#FF0000',
-                right: window.__anaglyphColors.cyan || '#00FFFF',
+                left: window.__anaglyphColors.red || '#FF4D4D',
+                right: window.__anaglyphColors.cyan || '#4DFFFF',
                 lock: '#000000'
             };
         } else {
             // Fallback màu mặc định nếu chưa hiệu chuẩn
             this.colors = {
-                left: '#FF0000',
-                right: '#00FFFF',
+                left: '#FF4D4D',
+                right: '#4DFFFF',
                 lock: '#000000'
             };
         }

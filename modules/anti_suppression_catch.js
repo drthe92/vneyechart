@@ -120,6 +120,12 @@ class CatchGame extends BinocularGameEngine {
      */
     start(config = {}) {
         this.level = this._applyLevel(config && config.level);
+        // [MẮT NHƯỢC THỊ] R (mặc định) = hành vi cũ: nhược thị nhận kênh đỏ
+        // (mắt phải qua kính). L = đảo: nhược thị nhận kênh cyan (mắt trái).
+        // Nguyên tắc: mắt LÀNH luôn là bên bị giảm tín hiệu (healthyAlpha).
+        this.weakEye = (config && config.weakEye === 'L') ? 'L' : 'R';
+        this.weakColor = this.weakEye === 'L' ? this.colors.right : this.colors.left;
+        this.healthyColor = this.weakEye === 'L' ? this.colors.left : this.colors.right;
         super.start();
         // Ẩn con trỏ chuột khi vào fullscreen gameplay
         this.canvas.style.cursor = 'none';
@@ -251,6 +257,7 @@ class CatchGame extends BinocularGameEngine {
         this.sessionMetrics.hits = this.hits;
         this.sessionMetrics.misses = this.misses;
         this.sessionMetrics.customData = {
+            weakEye: this.weakEye || 'R',
             level: this.level,
             completionRate: completionRate,
             finalAlpha: this.healthyAlpha,
@@ -442,7 +449,8 @@ class CatchGame extends BinocularGameEngine {
         // Alpha luôn cố định ở 1.0 (không thay đổi theo staircase)
         // ============================================
         ctx.globalAlpha = 1.0;
-        ctx.fillStyle = this.colors.left; // Màu mắt trái (đỏ trong anaglyph)
+        // Hạt rơi = mắt NHƯỢC THỊ (kênh theo lựa chọn lobby).
+        ctx.fillStyle = this.weakColor || this.colors.left;
 
         for (const d of this.drops) {
             ctx.fillRect(d.x, d.y, d.width, d.height);
@@ -454,7 +462,8 @@ class CatchGame extends BinocularGameEngine {
         // healthyAlpha: 1.0 (đầy đủ) → giảm dần khi người chơi thành công
         // ============================================
         ctx.globalAlpha = this.healthyAlpha;
-        ctx.fillStyle = this.colors.right; // Màu mắt phải (cyan trong anaglyph)
+        // Thanh hứng = mắt LÀNH (kênh còn lại, chịu healthyAlpha).
+        ctx.fillStyle = this.healthyColor || this.colors.right;
         ctx.fillRect(this.paddle.x, this.paddle.y, this.paddle.width, this.paddle.height);
     }
 

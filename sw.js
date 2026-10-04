@@ -4,7 +4,9 @@
  * chỉ chịu trách nhiệm phần tải UI (App Shell + tài nguyên tĩnh).
  */
 
-const CACHE_NAME = 'vision-emr-cache-v6';
+// [BƯỚC 5] Tăng version mỗi đợt release có đổi file tĩnh — client cũ tự tải
+// lại file mới ở lần online kế tiếp (qua Update Toast), cache cũ tự dọn ở activate.
+const CACHE_NAME = 'vision-emr-cache-v7';
 
 /* App Shell + tài nguyên tĩnh thiết yếu (đường dẫn tương đối với gốc trang) */
 const urlsToCache = [

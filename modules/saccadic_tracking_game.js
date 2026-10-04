@@ -272,6 +272,8 @@ class SaccadicTrackingGame extends BinocularGameEngine {
         this.currentTarget = {
             x: x,
             y: y,
+            // [XÁC NHẬN BÁC SĨ] Mỗi mục tiêu chỉ 1 mắt thấy (ngẫu nhiên đỏ/cyan).
+            // Nếu ý đồ là saccadic 2 mắt cùng thấy thì phải đổi sang màu trung tính.
             color: Math.random() < 0.5 ? this.colors.left : this.colors.right,
             expiresAt: Number.isFinite(this.targetLifetimeMs)
                 ? performance.now() + this.targetLifetimeMs  // Hết giờ = trượt

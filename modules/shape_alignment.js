@@ -83,6 +83,11 @@ class ShapeAlignmentGame extends BinocularGameEngine {
      */
     start(config = {}) {
         this.level = this._applyLevel(config && config.level);
+        // [MẮT NHƯỢC THỊ] R (mặc định) = hành vi cũ: khung đích kênh đỏ
+        // (mắt phải). L = đảo: khung đích kênh cyan (mắt trái), khối kéo đổi bên.
+        this.weakEye = (config && config.weakEye === 'L') ? 'L' : 'R';
+        this.weakColor = this.weakEye === 'L' ? this.colors.right : this.colors.left;
+        this.healthyColor = this.weakEye === 'L' ? this.colors.left : this.colors.right;
         this._randomizeTargetPosition();
         super.start();
         this.canvas.style.cursor = 'none';
@@ -332,8 +337,9 @@ class ShapeAlignmentGame extends BinocularGameEngine {
         ctx.textBaseline = 'alphabetic';
 
         // --- C. Vẽ Mắt Nhược thị (Target & Flanking Bars) ---
-        ctx.strokeStyle = this.colors.left; // Cyan cho mắt nhược thị
-        ctx.fillStyle = this.colors.left;
+        // Target + thanh nhiễu = mắt NHƯỢC THỊ (kênh theo lựa chọn lobby).
+        ctx.strokeStyle = this.weakColor || this.colors.left;
+        ctx.fillStyle = this.weakColor || this.colors.left;
         ctx.lineWidth = Math.max(3, targetSize * 0.05);
 
         // Tọa độ tâm Target
@@ -350,7 +356,8 @@ class ShapeAlignmentGame extends BinocularGameEngine {
         ctx.fillRect(tx + targetSize / 2 + gap, ty - targetSize / 2, barThickness, targetSize);
 
         // --- D. Vẽ Mắt Lành (Player) ---
-        ctx.fillStyle = this.colors.right; // Đỏ cho mắt lành
+        // Player (khối kéo) = mắt LÀNH (kênh còn lại).
+        ctx.fillStyle = this.healthyColor || this.colors.right;
         const px = this.playerPos.x - playerSize / 2;
         const py = this.playerPos.y - playerSize / 2;
         ctx.fillRect(px, py, playerSize, playerSize);
@@ -387,6 +394,7 @@ class ShapeAlignmentGame extends BinocularGameEngine {
         // Đóng gói sessionMetrics trước khi stop
         this.sessionMetrics.level = this.level;
         this.sessionMetrics.customData = {
+            weakEye: this.weakEye || 'R',
             level: this.level,
             passed: passed,
             streak: this.streak,
